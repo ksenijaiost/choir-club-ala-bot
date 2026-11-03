@@ -18,7 +18,8 @@ dist/
 build/
 *.tsbuildinfo
 
-# Databases (local SQLite)
+/storage/*
+!storage/.gitkeep
 *.sqlite
 *.sqlite3
 *.db

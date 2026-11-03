@@ -1,6 +1,6 @@
 # Схема базы данных
 
-Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql).
+Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (ранner — `public/admin/migrate.php`).
 
 ## Соглашения
 

@@ -198,10 +198,11 @@ About в BotFather: «Расписание репетиций, отметки, �
 
 ---
 
-## 13. Вне scope на данном этапе
+## 13. Реализация
 
-- Исходный код бота (стек TBD).
-- Миграции ORM — только `docs/schema.sql` как эталон.
+- **Стек:** PHP 8.2+, Nutgram 4.x, Composer, PDO (MySQL на [alabot.liveband.kz](https://alabot.liveband.kz), SQLite локально).
+- **Деплой:** shared hosting без SSH — загрузка файлов (FTP/Git), `vendor/` собирается локально; cron через HTTP `public/cron.php`.
+- **Код:** скелет в репозитории (`src/`, `public/`, `run.php`); полная бизнес-логика — по мере разработки по этому ТЗ и [scenarios.md](scenarios.md).
 
 ---
 
