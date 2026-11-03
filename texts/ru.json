@@ -1,0 +1,140 @@
+{
+  "meta": {
+    "locale": "ru",
+    "timezone": "Asia/Almaty",
+    "placeholders": "Используйте {name}, {date}, {time}, {address}, {part}, {title}, {month}, {year}, {rehearsal_date}, {song}, {type}, {uploader}, {uploaded_at}"
+  },
+  "parts": {
+    "soprano_1": "сопрано 1",
+    "soprano_2": "сопрано 2",
+    "alto_1": "альт 1",
+    "alto_2": "альт 2",
+    "tenor": "тенор",
+    "baritone": "баритон",
+    "bass": "бас"
+  },
+  "menu": {
+    "schedule": "Расписание",
+    "wont_come": "Не приду",
+    "find_song": "Найти песню",
+    "my_recordings": "Мои записи",
+    "admin_schedule": "Админ: расписание",
+    "admin_attendance": "Админ: посещаемость",
+    "admin_payment": "Админ: оплата",
+    "admin_history": "Админ: история",
+    "admin_helpers": "Админ: помощники",
+    "admin_members": "Админ: участники",
+    "admin_materials": "Админ: материалы"
+  },
+  "buttons": {
+    "yes": "Да",
+    "no": "Нет",
+    "accept": "Принять",
+    "reject": "Отклонить",
+    "schedule": "Расписание",
+    "i_paid": "Я оплатил(а)",
+    "confirm_payment": "Подтвердить",
+    "notes": "Ноты",
+    "translit": "Транслит",
+    "party_recordings": "Записи партий",
+    "skip_reason": "Пропустить",
+    "replace_yes": "Да, заменить",
+    "replace_no": "Нет, отмена",
+    "new_song": "Новая песня",
+    "block": "Заблокировать",
+    "unblock": "Разблокировать",
+    "appoint_helper": "Назначить помощником",
+    "remove_helper": "Снять с помощников"
+  },
+  "material_types": {
+    "notes": "ноты",
+    "translit": "транслит",
+    "recording": "запись"
+  },
+  "registration": {
+    "welcome": "Привет! Это бот хора Club Ala 🎶\n\nКак тебя представлять в списках? Напиши имя и фамилию (или так, как привыкли в хоре).",
+    "ask_part": "Выбери свою партию:",
+    "pending_user": "Заявка на рассмотрении. Когда дирижёр или помощник её примет — откроется меню бота.",
+    "admin_new_request": "Новая заявка в хор:\n{name}\nПартия: {part}\n\nПринять или отклонить?",
+    "accepted": "Добро пожаловать в хор, {name}! Меню ниже — расписание, материалы и отметки.",
+    "rejected": "Заявка отклонена. Если это ошибка — напиши дирижёру в личку.",
+    "already_registered": "Ты уже в системе, {name}.",
+    "blocked": "Доступ к боту ограничен. По вопросам — дирижёр в личку."
+  },
+  "schedule": {
+    "list_header": "Ближайшие репетиции:",
+    "item": "• {date}, {time}\n  {address}",
+    "empty": "Пока нет запланированных репетиций.",
+    "changed": "Есть изменения в расписании, загляни"
+  },
+  "reminder": {
+    "day_before": "Завтра репетиция 🎵\n{date}, {time}\n{address}\n\nБудешь?",
+    "will_attend": "Отлично, ждём тебя!",
+    "will_not_attend": "Понял, отметил что тебя не будет. Если хочешь — напиши коротко причину одним сообщением."
+  },
+  "checkin": {
+    "question": "Ты на репетиции?",
+    "thanks_yes": "Отметил, спасибо!",
+    "thanks_no": "Жаль, что не смог(ла). Отметил пропуск."
+  },
+  "absence": {
+    "choose_rehearsal": "На какую репетицию не придёшь?",
+    "ask_reason_optional": "Можешь написать причину одним сообщением или нажми «Пропустить».",
+    "confirmed": "Предупредил дирижёра. До встречи!",
+    "notify_conductor": "Предупреждение об отсутствии:\n{name}, {part}\nРепетиция: {rehearsal_date}\nПричина: {reason}",
+    "forward_reason": "Причина отсутствия от {name} (репетиция {rehearsal_date}):\n\n{reason}"
+  },
+  "discipline": {
+    "third_strike": "У тебя 3 пропуска! До изгнания из хора у тебя осталась одна попытка!",
+    "expelled": "Вас изгнали! За прощением в личку дирижеру.",
+    "expelled_notify_conductor": "У участника {name} ({part}) четвёртый неуважительный пропуск подряд. Рекомендуется связаться лично."
+  },
+  "payment": {
+    "reminder_first": "Не забудь оплатить хор за {month} {year}.",
+    "member_marked": "Записал, что ты оплатил(а). Дирижёр подтвердит.",
+    "conductor_confirm_prompt": "{name} отметил(а) оплату за {month} {year}. Подтвердить?",
+    "conductor_confirmed_member": "Дирижёр подтвердил оплату за {month} {year}. Спасибо!",
+    "mismatch": "Твои показания об оплате не сходятся с показаниями дирижера — кто-то мне нагло врёт, но вы разберитесь сами, я всего лишь бот...",
+    "reminder_second": "Давай денег, давай денег!",
+    "admin_list_header": "Оплата за {month} {year}:",
+    "status_confirmed": "✅ подтверждено",
+    "status_awaiting": "⏳ ждёт подтверждения",
+    "status_unpaid": "❌ не оплачено"
+  },
+  "songs": {
+    "ask_title": "Напиши часть названия песни — найду без учёта регистра.",
+    "not_found": "Ничего не нашёл. Попробуй другое написание.",
+    "pick_from_list": "Нашёл несколько — выбери:",
+    "card_header": "🎵 {title}",
+    "no_material": "Для этой песни материал пока не загружен.",
+    "my_recordings_header": "Записи для твоей партии ({part}):",
+    "my_recordings_empty": "Пока нет записей для партии {part}."
+  },
+  "materials": {
+    "duplicate_card": "Этот файл уже загружен:\nПесня: {song}\nТип: {type}\nПартия: {part}\nКто: {uploader}\nКогда: {uploaded_at}",
+    "replace_confirm_notes": "Заменить старые ноты для «{title}»?",
+    "replace_confirm_translit": "Заменить старый транслит для «{title}»?",
+    "upload_success": "Материал сохранён: {song}, {type}{part_suffix}.",
+    "ask_song": "Выбери песню или создай новую:",
+    "ask_type": "Тип материала:",
+    "ask_part": "Для какой партии запись?",
+    "archived_notice": "Предыдущая версия отправлена в архив.",
+    "restored": "Версия восстановлена из архива."
+  },
+  "attendance": {
+    "history_header": "Посещаемость: {name}",
+    "mark_attended": "был",
+    "mark_warned": "предупредил",
+    "mark_unexcused": "пропуск",
+    "monthly_summary_header": "Сводка за {month} {year}:"
+  },
+  "admin": {
+    "helpers_list": "Помощники:",
+    "members_list": "Участники:",
+    "only_conductor": "Это действие доступно только дирижёру."
+  },
+  "errors": {
+    "generic": "Что-то пошло не так. Попробуй позже или напиши дирижёру.",
+    "unknown_command": "Не понял команду. Используй кнопки меню."
+  }
+}
