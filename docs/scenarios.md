@@ -170,7 +170,7 @@ Cron на shared hosting вызывает один HTTP endpoint (наприме
 
 ### 7.3. `schedule_generate`
 
-- Поддерживать горизонт `schedule_generation_weeks` от текущей даты.
+- Поддерживать горизонт `schedule_generation_weeks` от текущей даты (по умолчанию **4** недели, см. `bot_settings` / [schema.sql](schema.sql)).
 - Создавать только отсутствующие экземпляры по активным `schedule_templates`.
 - Не перезаписывать вручную изменённые поля (флаг `template_id` + правила merge — открытый вопрос: не трогать экземпляры с `updated_at > generated`).
 

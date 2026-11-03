@@ -142,8 +142,18 @@
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
-| `key` | PK VARCHAR(64) | |
-| `value` | TEXT | JSON или строка |
+| `setting_key` | PK VARCHAR(64) | |
+| `setting_value` | TEXT | JSON или строка |
+
+Значения по умолчанию (seed в [schema.sql](schema.sql)):
+
+| `setting_key` | Значение | Смысл |
+|---------------|----------|--------|
+| `schedule_generation_weeks` | `4` | Горизонт автогенерации репетиций (недель) |
+| `payment_reminder_day_1` | `23` | День первого напоминания об оплате |
+| `payment_reminder_day_2` | `1` | День второго напоминания |
+| `payment_reminder_hour` | `12` | Час напоминаний (Asia/Almaty) |
+| `rehearsal_default_duration_minutes` | `120` | Длительность репетиции по умолчанию |
 
 ### `job_deliveries`
 

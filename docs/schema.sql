@@ -158,7 +158,7 @@ INSERT INTO bot_settings (setting_key, setting_value) VALUES
     ('payment_reminder_day_1', '23'),
     ('payment_reminder_day_2', '1'),
     ('payment_reminder_hour', '12'),
-    ('schedule_generation_weeks', '8'),
+    ('schedule_generation_weeks', '4'),
     ('rehearsal_default_duration_minutes', '120')
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
 -- sqlite: use INSERT OR IGNORE
