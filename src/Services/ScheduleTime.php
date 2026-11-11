@@ -58,14 +58,34 @@ final class ScheduleTime
         return self::formatLocalTimeRange($start, $end, $tz);
     }
 
-    public static function minutesBetweenHm(string $startHm, string $endHm): ?int
+    /**
+     * Возвращает «HH:MM» или null, если строка не похожа на время.
+     */
+    public static function parseHmInput(string $text): ?string
     {
-        if (!preg_match('/^\d{1,2}:\d{2}$/', $startHm) || !preg_match('/^\d{1,2}:\d{2}$/', $endHm)) {
+        $text = trim($text);
+        if (!preg_match('/^\d{1,2}:\d{2}$/', $text)) {
             return null;
         }
 
-        [$sh, $sm] = array_map('intval', explode(':', $startHm));
-        [$eh, $em] = array_map('intval', explode(':', $endHm));
+        [$h, $m] = explode(':', $text);
+
+        return sprintf('%02d:%02d', (int) $h, (int) $m);
+    }
+
+    /**
+     * Минуты между двумя моментами в один календарный день; null, если конец не позже начала.
+     */
+    public static function minutesBetweenHm(string $startHm, string $endHm): ?int
+    {
+        $startParsed = self::parseHmInput($startHm);
+        $endParsed = self::parseHmInput($endHm);
+        if ($startParsed === null || $endParsed === null) {
+            return null;
+        }
+
+        [$sh, $sm] = array_map('intval', explode(':', $startParsed));
+        [$eh, $em] = array_map('intval', explode(':', $endParsed));
 
         $startMinutes = $sh * 60 + $sm;
         $endMinutes = $eh * 60 + $em;
@@ -75,6 +95,24 @@ final class ScheduleTime
         }
 
         return $endMinutes - $startMinutes;
+    }
+
+    public static function endsAfterStarts(
+        \DateTimeImmutable $starts,
+        string $endHm,
+        \DateTimeZone $tz,
+    ): ?\DateTimeImmutable {
+        $endParsed = self::parseHmInput($endHm);
+        if ($endParsed === null) {
+            return null;
+        }
+
+        $ends = self::combineLocalDateAndTime($starts, $endParsed . ':00', $tz);
+        if ($ends <= $starts) {
+            return null;
+        }
+
+        return $ends;
     }
 
     public static function templateStartHm(string $startTime): string

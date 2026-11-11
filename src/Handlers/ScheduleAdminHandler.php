@@ -123,7 +123,10 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:mv:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
-            $flows->set($actorTelegramId, 'reschedule', ['rehearsal_id' => (int) $m[1]]);
+            $flows->set($actorTelegramId, 'reschedule', [
+                'rehearsal_id' => (int) $m[1],
+                'step' => 'datetime',
+            ]);
             $bot->sendMessage($texts->get('schedule.flow_reschedule_datetime'));
 
             return true;
@@ -222,17 +225,33 @@ final class ScheduleAdminHandler
         $ctx = $state['context'];
 
         if ($flow === 'reschedule') {
-            $dt = ScheduleTime::parseUserDateTime($text, $tz);
-            if ($dt === null) {
-                $bot->sendMessage($texts->get('schedule.flow_invalid_datetime'));
+            $step = (string) ($ctx['step'] ?? 'datetime');
+            if ($step === 'datetime') {
+                $dt = ScheduleTime::parseUserDateTime($text, $tz);
+                if ($dt === null) {
+                    $bot->sendMessage($texts->get('schedule.flow_invalid_datetime'));
+
+                    return true;
+                }
+
+                $ctx['starts_at'] = ScheduleTime::toStorage($dt);
+                $ctx['step'] = 'end';
+                $flows->set($telegramId, 'reschedule', $ctx);
+                $bot->sendMessage($texts->get('schedule.flow_reschedule_end_time'));
+
+                return true;
+            }
+
+            $starts = new \DateTimeImmutable((string) ($ctx['starts_at'] ?? ''), $tz);
+            $ends = ScheduleTime::endsAfterStarts($starts, $text, $tz);
+            if ($ends === null) {
+                $bot->sendMessage($texts->get('schedule.flow_invalid_end_time'));
 
                 return true;
             }
 
             $id = (int) ($ctx['rehearsal_id'] ?? 0);
-            $duration = $settings->getInt('rehearsal_default_duration_minutes', 120);
-            $ends = $dt->modify('+' . $duration . ' minutes');
-            $rehearsals->updateSchedule($id, ScheduleTime::toStorage($dt), ScheduleTime::toStorage($ends));
+            $rehearsals->updateSchedule($id, (string) $ctx['starts_at'], ScheduleTime::toStorage($ends));
             $flows->clear($telegramId);
             $bot->sendMessage($texts->get('schedule.admin_rescheduled_ok'));
             $generator->generate($now, $tz);
@@ -335,14 +354,14 @@ final class ScheduleAdminHandler
                 return true;
             }
 
-            if (!preg_match('/^\d{1,2}:\d{2}$/', trim($text))) {
+            $parsed = ScheduleTime::parseHmInput($text);
+            if ($parsed === null) {
                 $bot->sendMessage($texts->get('schedule.flow_invalid_time'));
 
                 return true;
             }
 
-            [$h, $m] = explode(':', trim($text));
-            $time = sprintf('%02d:%02d:00', (int) $h, (int) $m);
+            $time = $parsed . ':00';
 
             $rehearsals->deleteFutureScheduledFromTemplates(ScheduleTime::toStorage($now->setTimezone($tz)));
             $templates->update(
@@ -370,7 +389,8 @@ final class ScheduleAdminHandler
                 return true;
             }
 
-            if (!preg_match('/^\d{1,2}:\d{2}$/', trim($text))) {
+            $endHm = ScheduleTime::parseHmInput($text);
+            if ($endHm === null) {
                 $bot->sendMessage($texts->get('schedule.flow_invalid_end_time'));
 
                 return true;
@@ -378,7 +398,7 @@ final class ScheduleAdminHandler
 
             $duration = ScheduleTime::minutesBetweenHm(
                 ScheduleTime::templateStartHm((string) $tpl['start_time']),
-                trim($text),
+                $endHm,
             );
             if ($duration === null) {
                 $bot->sendMessage($texts->get('schedule.flow_invalid_end_time'));
