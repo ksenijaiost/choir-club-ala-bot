@@ -11,6 +11,7 @@ use App\Domain\VoicePart;
 use App\Repositories\RegistrationRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\MemberBlockService;
 use App\Services\UserIdentitySync;
 use App\Telegram\MenuKeyboard;
 use App\Text\TextRepository;
@@ -27,8 +28,9 @@ final class CallbackQueryHandler
         UserRepository $users,
         RegistrationRepository $registrations,
         AccessControl $access,
+        MemberBlockService $blocks,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -41,6 +43,23 @@ final class CallbackQueryHandler
 
             $actorTelegramId = $callback->from?->id;
             if ($actorTelegramId === null) {
+                return;
+            }
+
+            if (str_starts_with($data, 'bl:')) {
+                MembersAdminHandler::handleCallback($bot, $texts, $users, $access, $blocks, $data, $actorTelegramId);
+
+                return;
+            }
+
+            $actorRow = $users->findByTelegramId($actorTelegramId);
+            if (
+                $actorRow !== null
+                && ($actorRow['status'] ?? '') === UserStatus::BLOCKED
+                && !str_starts_with($data, 'rr:')
+            ) {
+                $bot->answerCallbackQuery(text: $texts->get('registration.blocked'), show_alert: true);
+
                 return;
             }
 

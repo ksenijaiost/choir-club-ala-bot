@@ -1,6 +1,6 @@
 # Схема базы данных
 
-Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (runner — `public/admin/migrate.php`). Миграция `002_*` — роль `admin` вместо `helper`, `voice_part` допускает `NULL` до выбора партии. Миграция `003_*` — роль `owner`.
+Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (runner — `public/admin/migrate.php`). Миграция `002_*` — роль `admin` вместо `helper`, `voice_part` допускает `NULL` до выбора партии. Миграция `003_*` — роль `owner`. Миграция `004_*` — журнал `block_events`.
 
 ## Соглашения
 
@@ -155,6 +155,21 @@
 | `payment_reminder_hour` | `12` | Час напоминаний (Asia/Almaty) |
 | `rehearsal_default_duration_minutes` | `120` | Длительность репетиции по умолчанию |
 
+### `block_events`
+
+Журнал блокировок и разблокировок.
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | PK | |
+| `target_user_id` | FK → users | Кого заблокировали/разблокировали |
+| `actor_user_id` | FK NULL → users | Кто выполнил (`NULL` при `reason=auto`) |
+| `action` | VARCHAR(16) | `block`, `unblock` |
+| `reason` | VARCHAR(16) | `manual`, `auto` |
+| `created_at` | DATETIME | |
+
+При ручной разблокировке у участника обнуляется `users.consecutive_unexcused`.
+
 ### `job_deliveries`
 
 Идемпотентность фоновых рассылок.
@@ -176,6 +191,8 @@ erDiagram
     users ||--o{ attendance_marks : "has"
     users ||--o{ payment_records : "has"
     users ||--o{ materials : "uploaded"
+    users ||--o{ block_events : "target"
+    users ||--o{ block_events : "actor"
 
     schedule_templates ||--o{ rehearsals : "generates"
     rehearsals ||--o{ attendance_marks : "has"
@@ -255,6 +272,6 @@ erDiagram
 
 ## Открытые вопросы (зафиксированы для реализации)
 
-1. Автоматическая **блокировка** при 4-м unexcused или только сообщения — в сценариях заложена блокировка `status=blocked` (рекомендация ТЗ).
+1. Автоматическая **блокировка** при 4-м unexcused — `MemberBlockService::blockAuto()` (журнал `reason=auto`).
 2. **Отклонение** заявки: статус `rejected` vs удаление пользователя — используется `rejected`.
 3. **Дирижёр в БД**: назначение owner; legacy `CONDUCTOR_TELEGRAM_ID` — автосинхронизация при первом действии.

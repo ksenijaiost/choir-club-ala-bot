@@ -197,4 +197,35 @@ final class UserRepository
 
         return $stmt->fetchAll();
     }
+
+    public function resetConsecutiveUnexcused(int $userId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE users SET consecutive_unexcused = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        );
+        $stmt->execute([$userId]);
+    }
+
+    /**
+     * Участники и помощники (не owner/conductor), со статусом active или blocked.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listMembersForBlocking(?string $voicePartFilter = null): array
+    {
+        $sql = 'SELECT * FROM users WHERE role IN (?, ?) AND status IN (?, ?)';
+        $params = [UserRole::MEMBER, UserRole::ADMIN, UserStatus::ACTIVE, UserStatus::BLOCKED];
+
+        if ($voicePartFilter !== null && $voicePartFilter !== '' && $voicePartFilter !== 'all') {
+            $sql .= ' AND voice_part = ?';
+            $params[] = $voicePartFilter;
+        }
+
+        $sql .= ' ORDER BY display_name ASC';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    }
 }

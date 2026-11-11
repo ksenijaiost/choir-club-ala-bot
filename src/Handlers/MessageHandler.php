@@ -134,7 +134,6 @@ final class MessageHandler
         array $user,
         string $text,
     ): void {
-    {
         $labels = MenuKeyboard::allMenuLabels($texts);
         if (!in_array($text, $labels, true)) {
             return;
@@ -148,6 +147,12 @@ final class MessageHandler
 
         if ($text === $texts->get('menu.assign_conductor')) {
             ConductorAdminHandler::openConductorPicker($bot, $texts, $users, $access, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.admin_members')) {
+            MembersAdminHandler::openFilterUi($bot, $texts, $access, $user);
 
             return;
         }
