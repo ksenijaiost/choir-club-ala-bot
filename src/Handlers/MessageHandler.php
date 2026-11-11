@@ -99,6 +99,17 @@ final class MessageHandler
                     return;
                 }
 
+                if ($materials !== null && $telegramId !== null && ProfileHandler::handleFlowMessage(
+                    $bot,
+                    $texts,
+                    $users,
+                    $materials->flows,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
                 if ($materials !== null && $telegramId !== null && SongMemberHandler::handleFlowMessage(
                     $bot,
                     $materials,

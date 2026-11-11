@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Domain\UserRole;
 use App\Domain\VoicePart;
+use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
@@ -29,12 +30,17 @@ final class ProfileHandler
             ? $texts->get('parts.' . $partCode)
             : $texts->get('profile.part_none');
 
-        $keyboard = InlineKeyboardMarkup::make()->addRow(
-            InlineKeyboardButton::make(
-                $texts->get('profile.change_part'),
-                callback_data: 'prf:ch',
-            ),
-        );
+        $keyboard = InlineKeyboardMarkup::make()
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $texts->get('profile.change_name'),
+                    callback_data: 'prf:nm',
+                ),
+                InlineKeyboardButton::make(
+                    $texts->get('profile.change_part'),
+                    callback_data: 'prf:ch',
+                ),
+            );
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
         $bot->sendMessage(
@@ -79,10 +85,59 @@ final class ProfileHandler
         );
     }
 
+    public static function beginRenameFlow(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserFlowRepository $flows,
+        int $telegramId,
+    ): void {
+        $flows->set($telegramId, 'profile_rename', []);
+        $keyboard = InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $texts);
+        $bot->sendMessage($texts->get('profile.ask_name'), reply_markup: $keyboard);
+    }
+
+    public static function handleFlowMessage(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserRepository $users,
+        UserFlowRepository $flows,
+        int $telegramId,
+        string $text,
+    ): bool {
+        $state = $flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== 'profile_rename') {
+            return false;
+        }
+
+        $name = trim($text);
+        $length = mb_strlen($name);
+        if ($length < 1 || $length > 64) {
+            $bot->sendMessage($texts->get('profile.invalid_name'));
+
+            return true;
+        }
+
+        $user = $users->findByTelegramId($telegramId);
+        if ($user === null) {
+            $flows->clear($telegramId);
+
+            return true;
+        }
+
+        $users->updateDisplayName((int) $user['id'], $name);
+        $flows->clear($telegramId);
+        $fresh = $users->findById((int) $user['id']) ?? $user;
+        $bot->sendMessage($texts->get('profile.name_saved'));
+        self::openProfile($bot, $texts, $users, $fresh);
+
+        return true;
+    }
+
     public static function handleCallback(
         Nutgram $bot,
         TextRepository $texts,
         UserRepository $users,
+        UserFlowRepository $flows,
         string $data,
         int $actorTelegramId,
     ): bool {
@@ -93,6 +148,14 @@ final class ProfileHandler
         $user = $users->findByTelegramId($actorTelegramId);
         if ($user === null) {
             $bot->answerCallbackQuery();
+
+            return true;
+        }
+
+        if ($data === 'prf:nm') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::beginRenameFlow($bot, $texts, $flows, $actorTelegramId);
 
             return true;
         }
