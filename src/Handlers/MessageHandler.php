@@ -12,6 +12,7 @@ use App\Telegram\MenuKeyboard;
 use App\Telegram\PartKeyboard;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ChatType;
 
 final class MessageHandler
 {
@@ -28,7 +29,7 @@ final class MessageHandler
             }
 
             $chat = $bot->chat();
-            if ($chat === null || ($chat->type ?? '') !== 'private') {
+            if ($chat === null || $chat->type !== ChatType::PRIVATE) {
                 return;
             }
 
