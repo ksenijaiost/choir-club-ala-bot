@@ -53,6 +53,6 @@ final class Bootstrap
 
     public static function registerHandlers(Nutgram $bot): void
     {
-        HandlerRegistry::register($bot, self::texts());
+        HandlerRegistry::register($bot, self::texts(), self::config(), self::pdo());
     }
 }

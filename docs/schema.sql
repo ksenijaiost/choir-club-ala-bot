@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, -- sqlite: INTEGER PRIMARY KEY AUTOINCREMENT
     telegram_id BIGINT NOT NULL,
     display_name VARCHAR(255) NOT NULL DEFAULT '',
-    voice_part VARCHAR(32) NOT NULL,
+    voice_part VARCHAR(32) NULL,
     role VARCHAR(16) NOT NULL DEFAULT 'member',
     status VARCHAR(16) NOT NULL DEFAULT 'pending',
     consecutive_unexcused INT NOT NULL DEFAULT 0,
@@ -18,11 +18,13 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- sqlite: omit ON UPDATE
     PRIMARY KEY (id),
     UNIQUE KEY uk_users_telegram_id (telegram_id),
-    CONSTRAINT chk_users_role CHECK (role IN ('member', 'helper', 'conductor')),
+    CONSTRAINT chk_users_role CHECK (role IN ('member', 'admin', 'conductor', 'owner')),
     CONSTRAINT chk_users_status CHECK (status IN ('pending', 'active', 'blocked', 'rejected')),
-    CONSTRAINT chk_users_voice_part CHECK (voice_part IN (
-        'soprano_1', 'soprano_2', 'alto_1', 'alto_2', 'tenor', 'baritone', 'bass'
-    ))
+    CONSTRAINT chk_users_voice_part CHECK (
+        voice_part IS NULL OR voice_part IN (
+            'soprano_1', 'soprano_2', 'alto_1', 'alto_2', 'tenor', 'baritone', 'bass'
+        )
+    )
 );
 
 CREATE TABLE IF NOT EXISTS registration_requests (

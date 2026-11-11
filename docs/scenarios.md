@@ -10,7 +10,8 @@ Callback-data и технические детали реализации зде
 - **Главное меню** (Reply Keyboard, только `active` users): кнопки из `menu.*` в `ru.json`.
 - **Inline-кнопки** — там, где указано в шагах.
 - **pending** / **blocked**: любое сообщение или команда → только соответствующий текст; меню не показывается.
-- **Дирижёр** определяется по `CONDUCTOR_TELEGRAM_ID`; в диалогах админа дирижёр и **helper** равны, кроме пунктов «только дирижёр» в ТЗ.
+- **Owner** — `OWNER_TELEGRAM_ID`, без регистрации; назначает дирижёра и помощников.
+- **Дирижёр** — в БД (`role=conductor`) или legacy `CONDUCTOR_TELEGRAM_ID`; в админ-чате модерацию заявок могут **owner**, **дирижёр** и **admin**.
 
 ---
 
@@ -21,7 +22,7 @@ Callback-data и технические детали реализации зде
 | 1 | User | `/start` | `registration.welcome` |
 | 2 | User | Текст имени | `registration.ask_part` + inline: 7 партий (`parts.*`) |
 | 3 | User | Нажатие партии | `registration.pending_user` |
-| 3a | Bot | — | Каждому **helper** + **дирижёру**: `registration.admin_new_request` с `{name}`, `{part}` + inline **Принять** / **Отклонить** |
+| 3a | Bot | — | В чат `ADMIN_CHAT_ID`: `registration.admin_new_request` с `{name}`, `{part}` + inline **Принять** / **Отклонить** |
 | 4a | Admin | **Принять** | User: `registration.accepted`; заявка `accepted`; user `status=active`; главное меню |
 | 4b | Admin | **Отклонить** | User: `registration.rejected`; user `status=rejected` |
 

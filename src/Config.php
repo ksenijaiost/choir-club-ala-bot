@@ -8,6 +8,7 @@ final class Config
 {
     public function __construct(
         public readonly string $botToken,
+        public readonly string $ownerTelegramId,
         public readonly string $conductorTelegramId,
         public readonly string $adminChatId,
         public readonly string $dbConnection,
@@ -28,6 +29,7 @@ final class Config
     {
         return new self(
             botToken: self::envString('BOT_TOKEN'),
+            ownerTelegramId: self::envString('OWNER_TELEGRAM_ID'),
             conductorTelegramId: self::envString('CONDUCTOR_TELEGRAM_ID'),
             adminChatId: self::envString('ADMIN_CHAT_ID'),
             dbConnection: self::envString('DB_CONNECTION', 'sqlite'),

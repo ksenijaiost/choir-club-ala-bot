@@ -1,6 +1,6 @@
 # Схема базы данных
 
-Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (ранner — `public/admin/migrate.php`).
+Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (runner — `public/admin/migrate.php`). Миграция `002_*` — роль `admin` вместо `helper`, `voice_part` допускает `NULL` до выбора партии. Миграция `003_*` — роль `owner`.
 
 ## Соглашения
 
@@ -12,15 +12,15 @@
 
 ### `users`
 
-Участники, помощники; дирижёр **не обязан** быть строкой в таблице (идентифицируется по `CONDUCTOR_TELEGRAM_ID`), но при первом контакте может быть создана запись с `role=conductor` для единообразия FK.
+Участники, помощники, дирижёр и **owner** (создатель бота, `OWNER_TELEGRAM_ID`). Дирижёр в БД — не более одной записи с `role=conductor` (назначает owner). Опционально `CONDUCTOR_TELEGRAM_ID` в `.env` для legacy-автоназначения при первом действии.
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | PK | Внутренний id |
 | `telegram_id` | UNIQUE, NOT NULL | Telegram user id |
 | `display_name` | VARCHAR(255) | Имя в хоре |
-| `voice_part` | VARCHAR(32) | `soprano_1`, `soprano_2`, `alto_1`, `alto_2`, `tenor`, `baritone`, `bass` |
-| `role` | VARCHAR(16) | `member`, `helper`, `conductor` |
+| `voice_part` | VARCHAR(32) NULL | Партия; `NULL` до завершения регистрации |
+| `role` | VARCHAR(16) | `member`, `admin`, `conductor`, `owner` |
 | `status` | VARCHAR(16) | `pending`, `active`, `blocked`, `rejected` |
 | `consecutive_unexcused` | INT DEFAULT 0 | Счётчик подряд неуважительных |
 | `created_at` | DATETIME | |
@@ -257,4 +257,4 @@ erDiagram
 
 1. Автоматическая **блокировка** при 4-м unexcused или только сообщения — в сценариях заложена блокировка `status=blocked` (рекомендация ТЗ).
 2. **Отклонение** заявки: статус `rejected` vs удаление пользователя — используется `rejected`.
-3. **Дирижёр в БД**: синхронизация `role=conductor` при совпадении `telegram_id` с env.
+3. **Дирижёр в БД**: назначение owner; legacy `CONDUCTOR_TELEGRAM_ID` — автосинхронизация при первом действии.

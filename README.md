@@ -102,7 +102,7 @@ php -S localhost:8080 -t public
 2. Загрузите проект по **FTP** или **Git** в панели хостинга (все файлы, кроме `.env`).
 3. Создайте `.env` на сервере (или загрузите вне Git) с prod-настройками:
    - `DB_CONNECTION=mysql`, реквизиты MySQL из панели
-   - `BOT_TOKEN`, `CONDUCTOR_TELEGRAM_ID`, `ADMIN_CHAT_ID`
+   - `BOT_TOKEN`, `OWNER_TELEGRAM_ID`, `ADMIN_CHAT_ID` (опционально `CONDUCTOR_TELEGRAM_ID`)
    - `WEBHOOK_URL=https://…/public/webhook.php`
    - `WEBHOOK_SECRET`, `ADMIN_PAGES_KEY`
 4. Настройте **document root** на каталог `public/` **или** URL с путём `/public/webhook.php` — как принято на вашем аккаунте.
