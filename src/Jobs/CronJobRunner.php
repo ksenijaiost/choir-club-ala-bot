@@ -10,6 +10,7 @@ use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\JobDeliveryRepository;
+use App\Repositories\PaymentRecordRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserRepository;
@@ -19,6 +20,7 @@ use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Services\PaymentTexts;
 use App\Repositories\BlockEventRepository;
 use App\Services\ScheduleGenerator;
 use App\Telegram\NutgramOutbound;
@@ -55,6 +57,8 @@ final class CronJobRunner
             'day_before_reminder' => ['sent' => 0, 'skipped_hour' => true],
             'checkin_open' => ['sent' => 0],
             'checkin_close' => ['closed' => 0, 'marks' => 0],
+            'payment_reminder_1' => ['sent' => 0, 'skipped' => true],
+            'payment_reminder_2' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
         ];
 
         if ($bot === null || trim($config->botToken) === '') {
@@ -98,6 +102,29 @@ final class CronJobRunner
             $sessions,
             $deliveries,
             $attendance,
+        ))->runIfDue($config);
+
+        $settings = new BotSettingsRepository($pdo);
+        $paymentRecords = new PaymentRecordRepository($pdo);
+        $paymentTexts = new PaymentTexts($texts);
+
+        $result['payment_reminder_1'] = (new PaymentReminderFirstJob(
+            $users,
+            $settings,
+            $deliveries,
+            $texts,
+            $paymentTexts,
+            $outbound,
+        ))->runIfDue($config);
+
+        $result['payment_reminder_2'] = (new PaymentReminderSecondJob(
+            $users,
+            $paymentRecords,
+            $settings,
+            $deliveries,
+            $texts,
+            $paymentTexts,
+            $outbound,
         ))->runIfDue($config);
 
         return $result;

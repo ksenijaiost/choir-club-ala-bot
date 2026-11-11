@@ -11,6 +11,9 @@ use App\Domain\UserRole;
 use App\Domain\UserStatus;
 use App\Handlers\AttendanceDeps;
 use App\Handlers\MessageHandler;
+use App\Handlers\PaymentDeps;
+use App\Repositories\PaymentRecordRepository;
+use App\Services\PaymentTexts;
 use App\Handlers\ScheduleDeps;
 use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BotSettingsRepository;
@@ -55,13 +58,14 @@ final class MessageHandlerTest extends TestCase
 
         $schedule = $this->scheduleDeps($config, $pdo, $texts, $users);
         $attendance = $this->attendanceDeps($config, $pdo, $texts, $users);
+        $payments = $this->paymentDeps($config, $pdo, $users, $texts);
         $access = new AccessControl($config);
 
         $bot = Nutgram::fake();
         $bot->setCommonUser($this->makeUser());
         $bot->setCommonChat($this->makeChat(self::TELEGRAM_ID, ChatType::PRIVATE));
 
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $payments);
 
         $bot->hearText('Тест Пользователь')
             ->willStartConversation()
@@ -84,13 +88,14 @@ final class MessageHandlerTest extends TestCase
 
         $schedule = $this->scheduleDeps($config, $pdo, $texts, $users);
         $attendance = $this->attendanceDeps($config, $pdo, $texts, $users);
+        $payments = $this->paymentDeps($config, $pdo, $users, $texts);
         $access = new AccessControl($config);
 
         $bot = Nutgram::fake();
         $bot->setCommonUser($this->makeUser());
         $bot->setCommonChat($this->makeChat(-100_500, ChatType::GROUP));
 
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $payments);
 
         $bot->hearText('Тест Пользователь')
             ->willStartConversation()
@@ -165,6 +170,24 @@ final class MessageHandlerTest extends TestCase
             $presenter,
             $broadcast,
             $users,
+            $texts,
+        );
+    }
+
+    private function paymentDeps(
+        Config $config,
+        \PDO $pdo,
+        UserRepository $users,
+        TextRepository $texts,
+    ): PaymentDeps {
+        $recipients = new NotificationRecipientResolver($config, $users);
+
+        return new PaymentDeps(
+            $config,
+            $users,
+            new PaymentRecordRepository($pdo),
+            new PaymentTexts($texts),
+            $recipients,
             $texts,
         );
     }

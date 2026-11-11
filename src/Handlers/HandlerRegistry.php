@@ -8,6 +8,7 @@ use App\Config;
 use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BlockEventRepository;
 use App\Repositories\BotSettingsRepository;
+use App\Repositories\PaymentRecordRepository;
 use App\Repositories\RegistrationRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
@@ -22,6 +23,7 @@ use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Services\PaymentTexts;
 use App\Services\ScheduleBroadcastService;
 use App\Services\ScheduleGenerator;
 use App\Services\SchedulePresenter;
@@ -68,6 +70,16 @@ final class HandlerRegistry
         $attendanceService = new AttendanceService($marks, $users, $discipline, $recalculator);
         $conductorNotifier = new AttendanceConductorNotifier($recipients, $texts, $outbound);
 
+        $payments = new PaymentRecordRepository($pdo);
+        $paymentDeps = new PaymentDeps(
+            $config,
+            $users,
+            $payments,
+            new PaymentTexts($texts),
+            $recipients,
+            $texts,
+        );
+
         $attendance = new AttendanceDeps(
             $config,
             $users,
@@ -92,11 +104,12 @@ final class HandlerRegistry
             $blockService,
             $schedule,
             $attendance,
+            $paymentDeps,
         );
         StartHandler::register($bot, $texts, $users, $access);
         ConductorAdminHandler::register($bot, $texts, $users, $access);
         HelpersAdminHandler::register($bot, $texts, $users, $access);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService);
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps);
     }
 }

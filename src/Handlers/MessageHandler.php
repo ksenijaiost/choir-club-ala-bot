@@ -23,8 +23,9 @@ final class MessageHandler
         AccessControl $access,
         ScheduleDeps $schedule,
         AttendanceDeps $attendance,
+        PaymentDeps $payments,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -112,7 +113,7 @@ final class MessageHandler
                     return;
                 }
 
-                self::handleActiveMenu($bot, $texts, $users, $access, $schedule, $attendance, $user, $text);
+                self::handleActiveMenu($bot, $texts, $users, $access, $schedule, $attendance, $payments, $user, $text);
 
                 return;
             }
@@ -161,6 +162,7 @@ final class MessageHandler
         AccessControl $access,
         ScheduleDeps $schedule,
         AttendanceDeps $attendance,
+        PaymentDeps $payments,
         array $user,
         string $text,
     ): void {
@@ -213,6 +215,12 @@ final class MessageHandler
 
         if ($text === $texts->get('menu.admin_attendance')) {
             AttendanceAdminHandler::openHome($bot, $texts, $access, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.admin_payment')) {
+            PaymentAdminHandler::openHome($bot, $payments, $access, $user);
 
             return;
         }

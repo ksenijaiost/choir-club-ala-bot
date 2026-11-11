@@ -243,6 +243,21 @@ final class UserRepository
     }
 
     /**
+     * Участники и помощники для напоминаний об оплате (без owner/conductor).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listActivePayers(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM users WHERE status = ? AND role IN (?, ?) ORDER BY display_name ASC'
+        );
+        $stmt->execute([UserStatus::ACTIVE, UserRole::MEMBER, UserRole::ADMIN]);
+
+        return $stmt->fetchAll();
+    }
+
+    /**
      * Участники и помощники (не owner/conductor), со статусом active или blocked.
      *
      * @return list<array<string, mixed>>
