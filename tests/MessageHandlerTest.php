@@ -24,8 +24,8 @@ use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
 use SergiX44\Nutgram\Telegram\Properties\ChatType;
 use SergiX44\Nutgram\Telegram\Types\Chat\Chat;
+use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\User\User;
-use SergiX44\Nutgram\Testing\FakeNutgram;
 
 final class MessageHandlerTest extends TestCase
 {
@@ -44,9 +44,9 @@ final class MessageHandlerTest extends TestCase
         $schedule = $this->scheduleDeps($config, $pdo, $texts, $users);
         $access = new AccessControl($config);
 
-        $bot = FakeNutgram::create();
-        $bot->setCommonUser(new User(id: self::TELEGRAM_ID, is_bot: false, first_name: 'Иван'));
-        $bot->setCommonChat(new Chat(id: self::TELEGRAM_ID, type: ChatType::PRIVATE));
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->makeUser());
+        $bot->setCommonChat($this->makeChat(self::TELEGRAM_ID, ChatType::PRIVATE));
 
         MessageHandler::register($bot, $texts, $users, $access, $schedule);
 
@@ -72,9 +72,9 @@ final class MessageHandlerTest extends TestCase
         $schedule = $this->scheduleDeps($config, $pdo, $texts, $users);
         $access = new AccessControl($config);
 
-        $bot = FakeNutgram::create();
-        $bot->setCommonUser(new User(id: self::TELEGRAM_ID, is_bot: false, first_name: 'Иван'));
-        $bot->setCommonChat(new Chat(id: -100_500, type: ChatType::GROUP));
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->makeUser());
+        $bot->setCommonChat($this->makeChat(-100_500, ChatType::GROUP));
 
         MessageHandler::register($bot, $texts, $users, $access, $schedule);
 
@@ -85,6 +85,25 @@ final class MessageHandlerTest extends TestCase
 
         $user = $users->findByTelegramId(self::TELEGRAM_ID);
         self::assertSame('', trim((string) ($user['display_name'] ?? '')));
+    }
+
+    private function makeUser(): User
+    {
+        $user = new User();
+        $user->id = self::TELEGRAM_ID;
+        $user->is_bot = false;
+        $user->first_name = 'Иван';
+
+        return $user;
+    }
+
+    private function makeChat(int $id, ChatType $type): Chat
+    {
+        $chat = new Chat();
+        $chat->id = $id;
+        $chat->type = $type;
+
+        return $chat;
     }
 
     private function testConfig(): Config
