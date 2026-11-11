@@ -18,6 +18,7 @@
     "wont_come": "Не приду",
     "find_song": "Найти песню",
     "my_recordings": "Мои записи",
+    "my_profile": "Мой профиль",
     "admin_schedule": "Админ: расписание",
     "admin_attendance": "Админ: посещаемость",
     "admin_payment": "Админ: оплата",
@@ -282,7 +283,31 @@
     "pick_member_for_helper": "Выбери участника, которого назначить помощником:",
     "no_members_to_promote": "Нет активных участников для назначения.",
     "helper_appointed": "{name} назначен(а) помощником.",
-    "helper_removed": "{name} больше не помощник."
+    "helper_removed": "{name} больше не помощник.",
+    "role_badge_owner": "владелица",
+    "role_badge_conductor": "дирижёр",
+    "role_badge_helper": "помощник"
+  },
+  "profile": {
+    "card": "Мой профиль\nИмя: {name}\nПартия: {part}",
+    "change_part": "Сменить партию",
+    "pick_part": "Выбери партию:",
+    "part_none": "без партии",
+    "part_none_button": "Без партии",
+    "part_saved": "Партия сохранена",
+    "part_updated": "Твоя партия: {part}",
+    "owner_ask_part": "Укажи свою партию в хоре (можно выбрать «Без партии»)."
+  },
+  "history": {
+    "pick_member": "История участника — выбери человека:",
+    "no_members": "Нет активных участников для просмотра.",
+    "report_header": "История: {name}\nПартия: {part}",
+    "streak_line": "Пропуски подряд без предупреждения: {streak}",
+    "payment_line": "Оплата:\n{current}\n{previous}",
+    "payment_month": "• {month} {year}: {status}",
+    "rehearsals_header": "Последние репетиции:",
+    "warned_with_reason": "{line} — причина: {reason}",
+    "unexcused_no_reason": "{line} (без причины)"
   },
   "errors": {
     "generic": "Что-то пошло не так. Попробуй позже или напиши дирижёру.",

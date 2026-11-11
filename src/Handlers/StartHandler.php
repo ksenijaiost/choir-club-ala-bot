@@ -34,6 +34,9 @@ final class StartHandler
             if ($access->isOwnerTelegramId($telegramId)) {
                 $user = $users->findByTelegramId($telegramId);
                 if ($user !== null) {
+                    if (ProfileHandler::promptOwnerPartIfNeeded($bot, $texts, $user)) {
+                        return;
+                    }
                     self::respondByStatus($bot, $texts, $user);
                 }
 

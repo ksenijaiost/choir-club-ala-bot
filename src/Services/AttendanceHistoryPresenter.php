@@ -41,4 +41,27 @@ final class AttendanceHistoryPresenter
             'mark' => $this->markLabel($mark),
         ]);
     }
+
+    /**
+     * @param array<string, mixed> $markRow with mark, reason_text, starts_at, ends_at
+     */
+    public function formatAdminMemberLine(array $markRow, \DateTimeZone $tz): string
+    {
+        $mark = (string) ($markRow['mark'] ?? '');
+        $reason = trim((string) ($markRow['reason_text'] ?? ''));
+        $base = $this->formatRehearsalLine($markRow, $tz, $mark);
+
+        if ($mark === AttendanceMark::WARNED && $reason !== '') {
+            return $this->texts->get('history.warned_with_reason', [
+                'line' => $base,
+                'reason' => $reason,
+            ]);
+        }
+
+        if ($mark === AttendanceMark::UNEXCUSED && $reason === '') {
+            return $this->texts->get('history.unexcused_no_reason', ['line' => $base]);
+        }
+
+        return $base;
+    }
 }

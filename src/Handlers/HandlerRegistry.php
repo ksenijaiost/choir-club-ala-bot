@@ -18,6 +18,7 @@ use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\UserRolePresenter;
 use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceDiscipline;
 use App\Services\AttendanceHistoryPresenter;
@@ -98,6 +99,18 @@ final class HandlerRegistry
             $texts,
         );
 
+        $rolePresenter = new UserRolePresenter($texts);
+        $adminHistory = new AdminHistoryContext(
+            $config,
+            $users,
+            $marks,
+            $payments,
+            $texts,
+            new AttendanceHistoryPresenter($texts),
+            new PaymentTexts($texts),
+            $rolePresenter,
+        );
+
         $attendance = new AttendanceDeps(
             $config,
             $users,
@@ -125,12 +138,13 @@ final class HandlerRegistry
             $attendance,
             $paymentDeps,
             $materials,
+            $adminHistory,
         );
         MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
         StartHandler::register($bot, $texts, $users, $access);
         ConductorAdminHandler::register($bot, $texts, $users, $access);
         HelpersAdminHandler::register($bot, $texts, $users, $access);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService);
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory);
     }
 }

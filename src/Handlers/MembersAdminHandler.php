@@ -9,6 +9,7 @@ use App\Domain\VoicePart;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\MemberBlockService;
+use App\Services\UserRolePresenter;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuKeyboard;
@@ -94,7 +95,7 @@ final class MembersAdminHandler
         string $filter,
         int $page = 0,
     ): void {
-        $all = $users->listMembersForBlocking($filter === 'all' ? null : $filter);
+        $all = $users->listSingingMembersForAdmin($filter === 'all' ? null : $filter);
         $members = InlineMenuHelper::pageSlice($all, $page);
         $total = count($all);
         $filterLabel = $filter === 'all'
@@ -111,6 +112,8 @@ final class MembersAdminHandler
             $texts->get('admin.members_list_header', ['filter' => $filterLabel]),
         ];
 
+        $roles = new UserRolePresenter($texts);
+
         $keyboard = InlineKeyboardMarkup::make();
         foreach ($members as $member) {
             $statusKey = ($member['status'] ?? '') === UserStatus::BLOCKED
@@ -119,15 +122,17 @@ final class MembersAdminHandler
             $partCode = (string) ($member['voice_part'] ?? '');
             $partLabel = $partCode !== '' ? $texts->get('parts.' . $partCode) : '—';
 
+            $badge = $roles->singingRoleBadge($member);
+            $name = (string) $member['display_name'];
             $lines[] = $texts->get('admin.member_row', [
-                'name' => (string) $member['display_name'],
+                'name' => $badge !== '' ? $name . ' · ' . $badge : $name,
                 'part' => $partLabel,
                 'status' => $texts->get($statusKey),
             ]);
 
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
-                    text: (string) $member['display_name'],
+                    text: $roles->displayNameWithBadge($member),
                     callback_data: 'bl:p:' . (int) $member['id'],
                 ),
             );

@@ -34,8 +34,9 @@ final class CallbackQueryHandler
         AttendanceDeps $attendance,
         PaymentDeps $payments,
         MaterialsDeps $materials,
+        AdminHistoryContext $adminHistory,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -128,6 +129,21 @@ final class CallbackQueryHandler
                     $data,
                     $actorTelegramId,
                 );
+
+                return;
+            }
+
+            if (str_starts_with($data, 'hst:')) {
+                $actorRow = $users->findByTelegramId($actorTelegramId);
+                if ($actorRow !== null) {
+                    AdminHistoryHandler::handleCallback($bot, $adminHistory, $access, $actorRow, $data);
+                }
+
+                return;
+            }
+
+            if (str_starts_with($data, 'prf:')) {
+                ProfileHandler::handleCallback($bot, $texts, $users, $data, $actorTelegramId);
 
                 return;
             }

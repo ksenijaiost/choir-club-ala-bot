@@ -55,6 +55,11 @@ final class UserRepository
 
     public function updateVoicePart(int $userId, string $voicePart): void
     {
+        $this->setVoicePart($userId, $voicePart);
+    }
+
+    public function setVoicePart(int $userId, ?string $voicePart): void
+    {
         $stmt = $this->pdo->prepare('UPDATE users SET voice_part = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
         $stmt->execute([$voicePart, $userId]);
     }
@@ -78,7 +83,7 @@ final class UserRepository
             $this->create(
                 $telegramId,
                 $displayName !== '' ? $displayName : 'Owner',
-                'tenor',
+                null,
                 UserRole::OWNER,
                 UserStatus::ACTIVE,
             );
@@ -285,8 +290,32 @@ final class UserRepository
 
     public function listMembersForBlocking(?string $voicePartFilter = null): array
     {
-        $sql = 'SELECT * FROM users WHERE role IN (?, ?) AND status IN (?, ?)';
-        $params = [UserRole::MEMBER, UserRole::ADMIN, UserStatus::ACTIVE, UserStatus::BLOCKED];
+        return $this->listSingingMembersForAdmin($voicePartFilter, true);
+    }
+
+    /**
+     * Участники хора в админке: member, admin, owner; conductor — если указана партия.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listSingingMembersForAdmin(?string $voicePartFilter = null, bool $includeBlocked = true): array
+    {
+        $statuses = $includeBlocked
+            ? [UserStatus::ACTIVE, UserStatus::BLOCKED]
+            : [UserStatus::ACTIVE];
+
+        $placeholders = implode(', ', array_fill(0, count($statuses), '?'));
+        $sql = "SELECT * FROM users WHERE status IN ({$placeholders}) AND (
+            role IN (?, ?, ?)
+            OR (role = ? AND voice_part IS NOT NULL AND trim(voice_part) != '')
+        )";
+        $params = [
+            ...$statuses,
+            UserRole::MEMBER,
+            UserRole::ADMIN,
+            UserRole::OWNER,
+            UserRole::CONDUCTOR,
+        ];
 
         if ($voicePartFilter !== null && $voicePartFilter !== '' && $voicePartFilter !== 'all') {
             $sql .= ' AND voice_part = ?';
@@ -298,6 +327,6 @@ final class UserRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
 
-        return $stmt->fetchAll();
+        return $stmt->fetchAll() ?: [];
     }
 }

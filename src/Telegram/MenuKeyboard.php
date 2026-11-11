@@ -29,6 +29,10 @@ final class MenuKeyboard
             $texts->get('menu.my_recordings'),
         ];
 
+        $rows[] = [
+            $texts->get('menu.my_profile'),
+        ];
+
         if (in_array($role, [UserRole::ADMIN, UserRole::CONDUCTOR, UserRole::OWNER], true)) {
             $rows[] = [
                 $texts->get('menu.admin_schedule'),
@@ -78,6 +82,7 @@ final class MenuKeyboard
             $texts->get('menu.wont_come'),
             $texts->get('menu.find_song'),
             $texts->get('menu.my_recordings'),
+            $texts->get('menu.my_profile'),
             $texts->get('menu.admin_schedule'),
             $texts->get('menu.admin_attendance'),
             $texts->get('menu.admin_payment'),

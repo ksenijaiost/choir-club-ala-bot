@@ -25,8 +25,9 @@ final class MessageHandler
         AttendanceDeps $attendance,
         PaymentDeps $payments,
         ?MaterialsDeps $materials = null,
+        ?AdminHistoryContext $adminHistory = null,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -251,6 +252,18 @@ final class MessageHandler
 
         if ($text === $texts->get('menu.my_recordings') && $materials !== null) {
             SongMemberHandler::openMyRecordings($bot, $materials, $materials->delivery, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.my_profile')) {
+            ProfileHandler::openProfile($bot, $texts, $users, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.admin_history') && $adminHistory !== null) {
+            AdminHistoryHandler::openHome($bot, $access, $user, $adminHistory);
 
             return;
         }
