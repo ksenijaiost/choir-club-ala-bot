@@ -85,4 +85,14 @@ final class RehearsalRepository
         );
         $stmt->execute(['cancelled', $id]);
     }
+
+    public function deleteFutureScheduledFromTemplates(string $fromLocalDateTime): int
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM rehearsals WHERE status = ? AND template_id IS NOT NULL AND starts_at >= ?'
+        );
+        $stmt->execute(['scheduled', $fromLocalDateTime]);
+
+        return $stmt->rowCount();
+    }
 }

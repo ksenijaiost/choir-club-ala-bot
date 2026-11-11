@@ -1,6 +1,6 @@
 # Схема базы данных
 
-Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (runner — `public/admin/migrate.php`). Миграция `002_*` — роль `admin` вместо `helper`, `voice_part` допускает `NULL` до выбора партии. Миграция `003_*` — роль `owner`. Миграция `004_*` — журнал `block_events`. Миграция `005_*` — `user_flows`, индекс слотов, seed шаблонов.
+Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (runner — `public/admin/migrate.php`). Миграция `002_*` — роль `admin` вместо `helper`, `voice_part` допускает `NULL` до выбора партии. Миграция `003_*` — роль `owner`. Миграция `004_*` — журнал `block_events`. Миграция `005_*` — `user_flows`, индекс слотов, seed шаблонов. Миграция `006_*` — шаблоны по умолчанию (ср/сб, адрес), пересоздание будущих слотов.
 
 ## Соглашения
 
@@ -41,7 +41,7 @@
 
 ### `schedule_templates`
 
-Шаблон расписания (2 дня в неделю по умолчанию).
+Шаблон расписания (2 дня в неделю по умолчанию). После миграции `006_*`: среда (3) **19:30**, суббота (6) **16:00**, `duration_minutes` **120**, адрес **комьюнити-центр**; время окончания в слотах — поле `rehearsals.ends_at` (start + duration).
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
@@ -61,8 +61,8 @@
 |---------|-----|----------|
 | `id` | PK | |
 | `template_id` | FK NULL | NULL для внеплановых |
-| `starts_at` | DATETIME | Начало (UTC или локальное + TZ в приложении — единообразно в коде) |
-| `ends_at` | DATETIME | Конец (для окна check-in) |
+| `starts_at` | DATETIME | Начало (локальное время в поясе `TIMEZONE`, хранится как `Y-m-d H:i:s`) |
+| `ends_at` | DATETIME | Конец (check-in и подсчёт пропусков; в UI «19:30–21:30») |
 | `address` | VARCHAR(512) | Может переопределять шаблон |
 | `status` | VARCHAR(16) | `scheduled`, `cancelled`, `completed` |
 | `created_at` | DATETIME | |

@@ -31,6 +31,57 @@ final class ScheduleTime
         return $local->format('H:i');
     }
 
+    public static function formatLocalTimeRange(
+        \DateTimeImmutable $starts,
+        \DateTimeImmutable $ends,
+        \DateTimeZone $tz,
+    ): string {
+        return self::formatLocalTime($starts, $tz) . '–' . self::formatLocalTime($ends, $tz);
+    }
+
+    /**
+     * @param array<string, mixed> $rehearsalRow
+     */
+    public static function formatRehearsalTimeRange(array $rehearsalRow, \DateTimeZone $tz): string
+    {
+        $starts = new \DateTimeImmutable((string) $rehearsalRow['starts_at'], $tz);
+        $ends = new \DateTimeImmutable((string) $rehearsalRow['ends_at'], $tz);
+
+        return self::formatLocalTimeRange($starts, $ends, $tz);
+    }
+
+    public static function formatTemplateTimeRange(string $startTime, int $durationMinutes, \DateTimeZone $tz): string
+    {
+        $start = new \DateTimeImmutable('2000-01-01 ' . substr($startTime, 0, 8), $tz);
+        $end = $start->modify('+' . $durationMinutes . ' minutes');
+
+        return self::formatLocalTimeRange($start, $end, $tz);
+    }
+
+    public static function minutesBetweenHm(string $startHm, string $endHm): ?int
+    {
+        if (!preg_match('/^\d{1,2}:\d{2}$/', $startHm) || !preg_match('/^\d{1,2}:\d{2}$/', $endHm)) {
+            return null;
+        }
+
+        [$sh, $sm] = array_map('intval', explode(':', $startHm));
+        [$eh, $em] = array_map('intval', explode(':', $endHm));
+
+        $startMinutes = $sh * 60 + $sm;
+        $endMinutes = $eh * 60 + $em;
+
+        if ($endMinutes <= $startMinutes) {
+            return null;
+        }
+
+        return $endMinutes - $startMinutes;
+    }
+
+    public static function templateStartHm(string $startTime): string
+    {
+        return substr($startTime, 0, 5);
+    }
+
     public static function toStorage(\DateTimeImmutable $dt): string
     {
         return $dt->format('Y-m-d H:i:s');

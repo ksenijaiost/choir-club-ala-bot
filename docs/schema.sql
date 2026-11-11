@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS registration_requests (
     CONSTRAINT chk_reg_req_status CHECK (status IN ('pending', 'accepted', 'rejected'))
 );
 
+-- Defaults seeded/updated in migrations 005–006: Wed 19:30 + Sat 16:00, 120 min, address «комьюнити-центр».
 CREATE TABLE IF NOT EXISTS schedule_templates (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     weekday TINYINT UNSIGNED NOT NULL,

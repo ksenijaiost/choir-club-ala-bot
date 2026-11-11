@@ -28,18 +28,19 @@ final class SchedulePresenter
 
         foreach ($rows as $row) {
             $starts = new \DateTimeImmutable((string) $row['starts_at'], $tz);
+            $timeRange = ScheduleTime::formatRehearsalTimeRange($row, $tz);
             $isCancelled = ($row['status'] ?? '') === 'cancelled';
 
             if ($isCancelled) {
                 $lines[] = $this->texts->get('schedule.item_cancelled', [
                     'date' => ScheduleTime::formatLocalDate($starts, $tz),
-                    'time' => ScheduleTime::formatLocalTime($starts, $tz),
+                    'time' => $timeRange,
                     'address' => (string) $row['address'],
                 ]);
             } else {
                 $lines[] = $this->texts->get('schedule.item', [
                     'date' => ScheduleTime::formatLocalDate($starts, $tz),
-                    'time' => ScheduleTime::formatLocalTime($starts, $tz),
+                    'time' => $timeRange,
                     'address' => (string) $row['address'],
                 ]);
             }

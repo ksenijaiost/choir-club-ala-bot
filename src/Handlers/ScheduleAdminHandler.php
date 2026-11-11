@@ -99,7 +99,7 @@ final class ScheduleAdminHandler
 
         if ($data === 'sch:adm:tpl') {
             $bot->answerCallbackQuery();
-            self::sendTemplateList($bot, $texts, $templates);
+            self::sendTemplateList($bot, $texts, $templates, $tz);
 
             return true;
         }
@@ -152,6 +152,14 @@ final class ScheduleAdminHandler
             $bot->answerCallbackQuery();
             $flows->set($actorTelegramId, 'template_time', ['template_id' => (int) $m[1]]);
             $bot->sendMessage($texts->get('schedule.flow_template_time'));
+
+            return true;
+        }
+
+        if (preg_match('/^sch:adm:tpl:(\d+):end$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            $flows->set($actorTelegramId, 'template_end', ['template_id' => (int) $m[1]]);
+            $bot->sendMessage($texts->get('schedule.flow_template_end_time'));
 
             return true;
         }
@@ -301,6 +309,7 @@ final class ScheduleAdminHandler
                 return true;
             }
 
+            $rehearsals->deleteFutureScheduledFromTemplates(ScheduleTime::toStorage($now->setTimezone($tz)));
             $templates->update(
                 $templateId,
                 (int) $tpl['weekday'],
@@ -335,11 +344,54 @@ final class ScheduleAdminHandler
             [$h, $m] = explode(':', trim($text));
             $time = sprintf('%02d:%02d:00', (int) $h, (int) $m);
 
+            $rehearsals->deleteFutureScheduledFromTemplates(ScheduleTime::toStorage($now->setTimezone($tz)));
             $templates->update(
                 $templateId,
                 (int) $tpl['weekday'],
                 $time,
                 (int) $tpl['duration_minutes'],
+                (string) $tpl['address'],
+                (int) $tpl['is_active'] === 1,
+            );
+            $flows->clear($telegramId);
+            $generator->generate($now, $tz);
+            $bot->sendMessage($texts->get('schedule.template_saved'));
+            $broadcast->notifyScheduleChanged($bot);
+
+            return true;
+        }
+
+        if ($flow === 'template_end') {
+            $templateId = (int) ($ctx['template_id'] ?? 0);
+            $tpl = $templates->findById($templateId);
+            if ($tpl === null) {
+                $flows->clear($telegramId);
+
+                return true;
+            }
+
+            if (!preg_match('/^\d{1,2}:\d{2}$/', trim($text))) {
+                $bot->sendMessage($texts->get('schedule.flow_invalid_end_time'));
+
+                return true;
+            }
+
+            $duration = ScheduleTime::minutesBetweenHm(
+                ScheduleTime::templateStartHm((string) $tpl['start_time']),
+                trim($text),
+            );
+            if ($duration === null) {
+                $bot->sendMessage($texts->get('schedule.flow_invalid_end_time'));
+
+                return true;
+            }
+
+            $rehearsals->deleteFutureScheduledFromTemplates(ScheduleTime::toStorage($now->setTimezone($tz)));
+            $templates->update(
+                $templateId,
+                (int) $tpl['weekday'],
+                (string) $tpl['start_time'],
+                $duration,
                 (string) $tpl['address'],
                 (int) $tpl['is_active'] === 1,
             );
@@ -367,6 +419,7 @@ final class ScheduleAdminHandler
                 return true;
             }
 
+            $rehearsals->deleteFutureScheduledFromTemplates(ScheduleTime::toStorage($now->setTimezone($tz)));
             $templates->update(
                 $templateId,
                 $day,
@@ -403,7 +456,7 @@ final class ScheduleAdminHandler
         $keyboard = InlineKeyboardMarkup::make();
         foreach ($rows as $row) {
             $starts = new \DateTimeImmutable((string) $row['starts_at'], $tz);
-            $label = ScheduleTime::formatLocalDate($starts, $tz) . ' ' . ScheduleTime::formatLocalTime($starts, $tz);
+            $label = ScheduleTime::formatLocalDate($starts, $tz) . ' ' . ScheduleTime::formatRehearsalTimeRange($row, $tz);
             if (($row['status'] ?? '') === 'cancelled') {
                 $label .= ' (' . $texts->get('schedule.tag_cancelled') . ')';
             }
@@ -444,8 +497,12 @@ final class ScheduleAdminHandler
         );
     }
 
-    private static function sendTemplateList(Nutgram $bot, TextRepository $texts, ScheduleTemplateRepository $templates): void
-    {
+    private static function sendTemplateList(
+        Nutgram $bot,
+        TextRepository $texts,
+        ScheduleTemplateRepository $templates,
+        \DateTimeZone $tz,
+    ): void {
         $all = $templates->listAll();
         if ($all === []) {
             $bot->sendMessage($texts->get('schedule.templates_empty'));
@@ -458,9 +515,14 @@ final class ScheduleAdminHandler
 
         foreach ($all as $tpl) {
             $wd = (int) $tpl['weekday'];
+            $timeRange = ScheduleTime::formatTemplateTimeRange(
+                (string) $tpl['start_time'],
+                (int) $tpl['duration_minutes'],
+                $tz,
+            );
             $lines[] = $texts->get('schedule.template_row', [
                 'weekday' => (string) $wd,
-                'time' => substr((string) $tpl['start_time'], 0, 5),
+                'time' => $timeRange,
                 'address' => (string) $tpl['address'],
             ]);
             $keyboard = $keyboard->addRow(
@@ -497,6 +559,7 @@ final class ScheduleAdminHandler
                 InlineKeyboardButton::make($texts->get('schedule.tpl_edit_time'), callback_data: 'sch:adm:tpl:' . $id . ':time'),
             )
             ->addRow(
+                InlineKeyboardButton::make($texts->get('schedule.tpl_edit_end'), callback_data: 'sch:adm:tpl:' . $id . ':end'),
                 InlineKeyboardButton::make($texts->get('schedule.tpl_edit_address'), callback_data: 'sch:adm:tpl:' . $id . ':addr'),
             );
 
