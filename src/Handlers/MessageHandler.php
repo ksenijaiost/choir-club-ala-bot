@@ -136,7 +136,19 @@ final class MessageHandler
                     return;
                 }
 
-                self::handleActiveMenu($bot, $texts, $users, $access, $schedule, $attendance, $payments, $materials, $user, $text);
+                self::handleActiveMenu(
+                    $bot,
+                    $texts,
+                    $users,
+                    $access,
+                    $schedule,
+                    $attendance,
+                    $payments,
+                    $materials,
+                    $adminHistory,
+                    $user,
+                    $text,
+                );
 
                 return;
             }
@@ -187,6 +199,7 @@ final class MessageHandler
         AttendanceDeps $attendance,
         PaymentDeps $payments,
         ?MaterialsDeps $materials,
+        ?AdminHistoryContext $adminHistory,
         array $user,
         string $text,
     ): void {

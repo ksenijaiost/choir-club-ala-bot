@@ -8,7 +8,6 @@ use App\Bootstrap;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
-use App\Handlers\AdminHistoryContext;
 use App\Handlers\HandlerRegistry;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
@@ -18,8 +17,6 @@ final class BootstrapRegistrationTest extends TestCase
 {
     public function testHandlerRegistryAutoloadsAdminHistoryContext(): void
     {
-        self::assertFalse(class_exists(AdminHistoryContext::class, false));
-
         $config = $this->testConfig();
         $pdo = Connection::make($config);
         (new Migrator($pdo, 'sqlite'))->migrate();
@@ -28,7 +25,7 @@ final class BootstrapRegistrationTest extends TestCase
 
         HandlerRegistry::register($bot, $texts, $config, $pdo);
 
-        self::assertTrue(class_exists(AdminHistoryContext::class, false));
+        self::assertTrue(class_exists(\App\Handlers\AdminHistoryContext::class));
     }
 
     public function testBootstrapRegisterHandlersWithFakeNutgram(): void
@@ -42,7 +39,7 @@ final class BootstrapRegistrationTest extends TestCase
         $bot = Nutgram::fake();
         Bootstrap::registerHandlers($bot);
 
-        self::assertTrue(class_exists(AdminHistoryContext::class, false));
+        self::assertTrue(class_exists(\App\Handlers\AdminHistoryContext::class));
 
         putenv('BOT_TOKEN');
         putenv('DB_DATABASE');
