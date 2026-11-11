@@ -6,58 +6,91 @@ $root = dirname(__DIR__);
 $composer = trim((string) shell_exec('command -v composer 2>/dev/null'));
 
 if ($composer !== '') {
-    passthru(escapeshellarg($composer) . ' dump-autoload --strict-psr --no-ansi -d ' . escapeshellarg($root), $code);
+    $command = escapeshellarg($composer)
+        . ' dump-autoload --optimize --strict-psr --dry-run --no-ansi -d '
+        . escapeshellarg($root)
+        . ' 2>&1';
 
-    exit((int) $code);
+    $output = [];
+    $code = 0;
+    exec($command, $output, $code);
+    $text = implode("\n", $output);
+
+    $dryRunUnsupported = $code !== 0
+        && (preg_match('/unknown option [`\']?--dry-run/i', $text) === 1
+            || preg_match('/The "--dry-run" option does not exist/i', $text) === 1);
+
+    if (!$dryRunUnsupported) {
+        if ($text !== '') {
+            fwrite($code === 0 ? STDOUT : STDERR, $text . "\n");
+        }
+
+        exit($code);
+    }
+
+    fwrite(STDERR, "Composer does not support --dry-run for dump-autoload; using fallback scanner.\n");
 }
 
-$src = $root . '/src';
-$errors = [];
+exit(runManualPsr4Check($root));
 
-$iterator = new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator($src, FilesystemIterator::SKIP_DOTS),
-);
+/**
+ * @return int 0 on success, 1 on violations
+ */
+function runManualPsr4Check(string $root): int
+{
+    $src = $root . '/src';
+    $errors = [];
 
-/** @var SplFileInfo $file */
-foreach ($iterator as $file) {
-    if ($file->getExtension() !== 'php') {
-        continue;
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($src, FilesystemIterator::SKIP_DOTS),
+    );
+
+    /** @var SplFileInfo $file */
+    foreach ($iterator as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+
+        $content = file_get_contents($file->getPathname());
+        if ($content === false) {
+            continue;
+        }
+
+        if (!preg_match('/^\s*namespace\s+App\\\\([^;]+)\s*;/m', $content, $namespaceMatch)) {
+            continue;
+        }
+
+        if (!preg_match('/^\s*(?:final\s+|abstract\s+)?class\s+(\w+)/m', $content, $classMatch)) {
+            continue;
+        }
+
+        $subNamespace = $namespaceMatch[1];
+        $className = $classMatch[1];
+        $expectedRelative = str_replace('\\', '/', $subNamespace) . '/' . $className . '.php';
+        $expectedPath = $src . '/' . $expectedRelative;
+        $actualPath = $file->getPathname();
+
+        $expectedReal = realpath($expectedPath);
+        $actualReal = realpath($actualPath);
+
+        if ($expectedReal === false || $actualReal === false || $expectedReal !== $actualReal) {
+            $fqcn = 'App\\' . $subNamespace . '\\' . $className;
+            $errors[] = sprintf(
+                '%s must be in %s (found %s)',
+                $fqcn,
+                $expectedRelative,
+                str_replace($root . '/', '', $actualPath),
+            );
+        }
     }
 
-    $content = file_get_contents($file->getPathname());
-    if ($content === false) {
-        continue;
+    if ($errors !== []) {
+        fwrite(STDERR, "PSR-4 autoload violations:\n" . implode("\n", $errors) . "\n");
+
+        return 1;
     }
 
-    if (!preg_match('/^\s*namespace\s+App\\\\([^;]+)\s*;/m', $content, $namespaceMatch)) {
-        continue;
-    }
+    fwrite(STDOUT, "PSR-4 autoload check passed (fallback scanner).\n");
 
-    if (!preg_match('/^\s*(?:final\s+|abstract\s+)?class\s+(\w+)/m', $content, $classMatch)) {
-        continue;
-    }
-
-    $subNamespace = $namespaceMatch[1];
-    $className = $classMatch[1];
-    $expectedRelative = str_replace('\\', '/', $subNamespace) . '/' . $className . '.php';
-    $expectedPath = $src . '/' . $expectedRelative;
-    $actualPath = $file->getPathname();
-
-    if (realpath($expectedPath) !== realpath($actualPath)) {
-        $fqcn = 'App\\' . $subNamespace . '\\' . $className;
-        $errors[] = sprintf(
-            '%s must be in %s (found %s)',
-            $fqcn,
-            $expectedRelative,
-            str_replace($root . '/', '', $actualPath),
-        );
-    }
+    return 0;
 }
-
-if ($errors !== []) {
-    fwrite(STDERR, "PSR-4 autoload violations:\n" . implode("\n", $errors) . "\n");
-    exit(1);
-}
-
-fwrite(STDOUT, "PSR-4 autoload check passed (composer not in PATH, used fallback scanner).\n");
-exit(0);
