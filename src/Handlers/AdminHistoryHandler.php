@@ -22,9 +22,6 @@ final class AdminHistoryHandler
     /**
      * @param array<string, mixed> $actor
      */
-    /**
-     * @param array<string, mixed> $actor
-     */
     public static function openHome(
         Nutgram $bot,
         AccessControl $access,
@@ -189,20 +186,5 @@ final class AdminHistoryHandler
         }
 
         return false;
-    }
-}
-
-final class AdminHistoryContext
-{
-    public function __construct(
-        public readonly \App\Config $config,
-        public readonly \App\Repositories\UserRepository $users,
-        public readonly \App\Repositories\AttendanceMarkRepository $marks,
-        public readonly PaymentRecordRepository $payments,
-        public readonly TextRepository $texts,
-        public readonly AttendanceHistoryPresenter $history,
-        public readonly PaymentTexts $paymentTexts,
-        public readonly UserRolePresenter $roles,
-    ) {
     }
 }

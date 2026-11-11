@@ -22,7 +22,11 @@
         }
     },
     "scripts": {
-        "test": "phpunit"
+        "autoload-check": "php bin/psr4-check.php",
+        "test": [
+            "@autoload-check",
+            "phpunit"
+        ]
     },
     "config": {
         "sort-packages": true,
