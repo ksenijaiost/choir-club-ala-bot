@@ -27,7 +27,7 @@ final class UserRepositoryMaterialsAccessTest extends TestCase
         self::assertNotEmpty($users->listActivePayers());
     }
 
-    public function testCanUploadMaterialsOnlyAdminAndConductor(): void
+    public function testCanUploadMaterialsForStaffAndOwner(): void
     {
         $access = new AccessControl($this->testConfig());
 
@@ -38,7 +38,7 @@ final class UserRepositoryMaterialsAccessTest extends TestCase
 
         self::assertTrue($access->canUploadMaterials($admin));
         self::assertTrue($access->canUploadMaterials($conductor));
-        self::assertFalse($access->canUploadMaterials($owner));
+        self::assertTrue($access->canUploadMaterials($owner));
         self::assertFalse($access->canUploadMaterials($member));
     }
 

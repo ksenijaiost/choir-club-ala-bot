@@ -124,7 +124,7 @@ final class AccessControl
     }
 
     /**
-     * Загрузка материалов в админ-чат — только помощники и дирижёр.
+     * Загрузка и управление материалами — владелица, помощники и дирижёр.
      *
      * @param array<string, mixed> $user
      */
@@ -136,6 +136,6 @@ final class AccessControl
 
         $role = (string) ($user['role'] ?? '');
 
-        return $role === UserRole::ADMIN || $role === UserRole::CONDUCTOR;
+        return in_array($role, [UserRole::OWNER, UserRole::ADMIN, UserRole::CONDUCTOR], true);
     }
 }
