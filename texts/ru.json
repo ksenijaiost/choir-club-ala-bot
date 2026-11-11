@@ -27,6 +27,11 @@
     "admin_materials": "Админ: материалы",
     "assign_conductor": "Назначить дирижёра"
   },
+  "ui": {
+    "menu_closed": "Закрыто",
+    "close": "✖ Закрыть",
+    "back": "‹ Назад"
+  },
   "buttons": {
     "yes": "Да",
     "no": "Нет",

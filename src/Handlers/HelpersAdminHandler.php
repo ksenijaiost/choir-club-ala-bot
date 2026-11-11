@@ -7,6 +7,8 @@ namespace App\Handlers;
 use App\Domain\UserRole;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -89,20 +91,23 @@ final class HelpersAdminHandler
             ),
         );
 
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
+
         $bot->sendMessage(text: implode("\n", $lines), reply_markup: $keyboard);
     }
 
-    public static function sendMemberPicker(Nutgram $bot, TextRepository $texts, UserRepository $users): void
+    public static function sendMemberPicker(Nutgram $bot, TextRepository $texts, UserRepository $users, int $page = 0): void
     {
-        $members = $users->listActiveMembers();
-        if ($members === []) {
+        $all = $users->listActiveMembers();
+        $total = count($all);
+        if ($total === 0) {
             $bot->sendMessage($texts->get('admin.no_members_to_promote'));
 
             return;
         }
 
         $keyboard = InlineKeyboardMarkup::make();
-        foreach ($members as $member) {
+        foreach (InlineMenuHelper::pageSlice($all, $page) as $member) {
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
                     text: (string) $member['display_name'],
@@ -110,6 +115,15 @@ final class HelpersAdminHandler
                 ),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $texts,
+            $page,
+            $total,
+            'hp:pg:',
+            'hp:home',
+        );
 
         $bot->sendMessage(
             text: $texts->get('admin.pick_member_for_helper'),
@@ -136,9 +150,25 @@ final class HelpersAdminHandler
             return true;
         }
 
+        if ($data === 'hp:home') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendHelpersList($bot, $texts, $users);
+
+            return true;
+        }
+
         if ($data === 'hp:pick') {
             $bot->answerCallbackQuery();
-            self::sendMemberPicker($bot, $texts, $users);
+            self::sendMemberPicker($bot, $texts, $users, 0);
+
+            return true;
+        }
+
+        if (preg_match('/^hp:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendMemberPicker($bot, $texts, $users, (int) $m[1]);
 
             return true;
         }

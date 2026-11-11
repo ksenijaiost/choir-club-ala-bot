@@ -17,6 +17,7 @@ use App\Services\ScheduleGenerator;
 use App\Services\SchedulePresenter;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -47,6 +48,8 @@ final class ScheduleAdminHandler
             ->addRow(
                 InlineKeyboardButton::make($texts->get('schedule.admin_add'), callback_data: 'sch:adm:add'),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
         $bot->sendMessage($texts->get('schedule.admin_menu'), reply_markup: $keyboard);
     }
@@ -93,7 +96,15 @@ final class ScheduleAdminHandler
 
         if ($data === 'sch:adm:list') {
             $bot->answerCallbackQuery();
-            self::sendRehearsalAdminList($bot, $texts, $rehearsals, $now, $tz);
+            self::sendRehearsalAdminList($bot, $texts, $rehearsals, $now, $tz, 0);
+
+            return true;
+        }
+
+        if (preg_match('/^sch:adm:l:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendRehearsalAdminList($bot, $texts, $rehearsals, $now, $tz, (int) $m[1]);
 
             return true;
         }
@@ -476,13 +487,24 @@ final class ScheduleAdminHandler
         RehearsalRepository $rehearsals,
         \DateTimeImmutable $now,
         \DateTimeZone $tz,
+        int $page,
     ): void {
-        $rows = $rehearsals->listFrom(ScheduleTime::toStorage($now->setTimezone($tz)), 12);
-        if ($rows === []) {
+        $localNow = $now->setTimezone($tz);
+        $from = ScheduleTime::toStorage($localNow->modify('-90 days'));
+        $pivot = ScheduleTime::toStorage($localNow);
+        $total = $rehearsals->countFrom($from);
+        if ($total === 0) {
             $bot->sendMessage($texts->get('schedule.empty'));
 
             return;
         }
+
+        $rows = $rehearsals->listFromNearest(
+            $from,
+            $pivot,
+            $page * InlineMenuHelper::PAGE_SIZE,
+            InlineMenuHelper::PAGE_SIZE,
+        );
 
         $keyboard = InlineKeyboardMarkup::make();
         foreach ($rows as $row) {
@@ -496,6 +518,15 @@ final class ScheduleAdminHandler
                 InlineKeyboardButton::make($label, callback_data: 'sch:adm:r:' . (int) $row['id']),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $texts,
+            $page,
+            $total,
+            'sch:adm:l:pg:',
+            'sch:adm:list',
+        );
 
         $bot->sendMessage($texts->get('schedule.admin_list_prompt'), reply_markup: $keyboard);
     }
@@ -521,6 +552,8 @@ final class ScheduleAdminHandler
             ->addRow(
                 InlineKeyboardButton::make($texts->get('schedule.action_cancel'), callback_data: 'sch:adm:cancel:' . $id),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'sch:adm:list');
 
         $bot->sendMessage(
             $texts->get('schedule.admin_rehearsal_card', ['id' => (string) $id]),
@@ -568,6 +601,8 @@ final class ScheduleAdminHandler
             InlineKeyboardButton::make($texts->get('schedule.admin_regen'), callback_data: 'sch:adm:regen'),
         );
 
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'sch:adm:tpl');
+
         $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
     }
 
@@ -593,6 +628,8 @@ final class ScheduleAdminHandler
                 InlineKeyboardButton::make($texts->get('schedule.tpl_edit_end'), callback_data: 'sch:adm:tpl:' . $id . ':end'),
                 InlineKeyboardButton::make($texts->get('schedule.tpl_edit_address'), callback_data: 'sch:adm:tpl:' . $id . ':addr'),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'sch:adm:tpl');
 
         $bot->sendMessage($texts->get('schedule.template_edit_menu', ['id' => (string) $id]), reply_markup: $keyboard);
     }

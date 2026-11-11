@@ -6,6 +6,8 @@ namespace App\Handlers;
 
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -49,7 +51,7 @@ final class ConductorAdminHandler
         self::sendConductorUi($bot, $texts, $users);
     }
 
-    public static function sendConductorUi(Nutgram $bot, TextRepository $texts, UserRepository $users): void
+    public static function sendConductorUi(Nutgram $bot, TextRepository $texts, UserRepository $users, int $page = 0): void
     {
         $current = $users->findActiveConductor();
         $lines = [$texts->get('admin.conductor_manage_header')];
@@ -62,8 +64,9 @@ final class ConductorAdminHandler
             ]);
         }
 
-        $candidates = $users->listActiveConductorCandidates();
-        if ($candidates === []) {
+        $all = $users->listActiveConductorCandidates();
+        $total = count($all);
+        if ($total === 0) {
             $lines[] = $texts->get('admin.no_conductor_candidates');
             $bot->sendMessage(implode("\n", $lines));
 
@@ -71,7 +74,7 @@ final class ConductorAdminHandler
         }
 
         $keyboard = InlineKeyboardMarkup::make();
-        foreach ($candidates as $candidate) {
+        foreach (InlineMenuHelper::pageSlice($all, $page) as $candidate) {
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
                     text: (string) $candidate['display_name'],
@@ -79,6 +82,8 @@ final class ConductorAdminHandler
                 ),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter($keyboard, $texts, $page, $total, 'oc:pg:');
 
         $bot->sendMessage(text: implode("\n", $lines), reply_markup: $keyboard);
     }
@@ -98,6 +103,14 @@ final class ConductorAdminHandler
         $actor = $users->findByTelegramId($actorTelegramId);
         if ($actor === null || !$access->isOwner($actor)) {
             $bot->answerCallbackQuery(text: $texts->get('admin.only_owner'), show_alert: true);
+
+            return true;
+        }
+
+        if (preg_match('/^oc:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendConductorUi($bot, $texts, $users, (int) $m[1]);
 
             return true;
         }

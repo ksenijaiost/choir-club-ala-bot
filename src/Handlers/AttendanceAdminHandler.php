@@ -10,6 +10,7 @@ use App\Services\AccessControl;
 use App\Services\AttendanceHistoryPresenter;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -33,6 +34,8 @@ final class AttendanceAdminHandler
                 InlineKeyboardButton::make($texts->get('attendance.by_rehearsal'), callback_data: 'atd:rh'),
                 InlineKeyboardButton::make($texts->get('attendance.by_member'), callback_data: 'atd:ms'),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
         $bot->sendMessage($texts->get('attendance.admin_home'), reply_markup: $keyboard);
     }
@@ -61,11 +64,20 @@ final class AttendanceAdminHandler
         $tz = new \DateTimeZone($deps->config->timezone);
         $now = Clock::now($deps->config)->setTimezone($tz);
         $from = ScheduleTime::toStorage($now->modify('-90 days'));
+        $pivot = ScheduleTime::toStorage($now);
 
         if ($data === 'atd:rh') {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendRehearsalPicker($bot, $texts, $deps, $from);
+            self::sendRehearsalPicker($bot, $texts, $deps, $from, $pivot, $tz, 0);
+
+            return true;
+        }
+
+        if (preg_match('/^atd:rh:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendRehearsalPicker($bot, $texts, $deps, $from, $pivot, $tz, (int) $m[1]);
 
             return true;
         }
@@ -73,7 +85,15 @@ final class AttendanceAdminHandler
         if ($data === 'atd:ms') {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendMemberPicker($bot, $texts, $deps);
+            self::sendMemberPicker($bot, $texts, $deps, 0);
+
+            return true;
+        }
+
+        if (preg_match('/^atd:ms:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendMemberPicker($bot, $texts, $deps, (int) $m[1]);
 
             return true;
         }
@@ -81,7 +101,15 @@ final class AttendanceAdminHandler
         if (preg_match('/^atd:rh:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendRehearsalAttendance($bot, $texts, $deps, $deps->history, $tz, (int) $m[1]);
+            self::sendRehearsalAttendance($bot, $texts, $deps, $deps->history, $tz, (int) $m[1], 0);
+
+            return true;
+        }
+
+        if (preg_match('/^atd:rhp:(\d+):(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendRehearsalAttendance($bot, $texts, $deps, $deps->history, $tz, (int) $m[1], (int) $m[2]);
 
             return true;
         }
@@ -129,18 +157,27 @@ final class AttendanceAdminHandler
         TextRepository $texts,
         AttendanceDeps $deps,
         string $fromLocal,
+        string $pivotLocal,
+        \DateTimeZone $tz,
+        int $page,
     ): void {
-        $rows = $deps->rehearsals->listFrom($fromLocal, 25);
-        if ($rows === []) {
+        $total = $deps->rehearsals->countFrom($fromLocal);
+        if ($total === 0) {
             $bot->sendMessage($texts->get('attendance.no_rehearsals'));
 
             return;
         }
 
+        $rows = $deps->rehearsals->listFromNearest(
+            $fromLocal,
+            $pivotLocal,
+            $page * InlineMenuHelper::PAGE_SIZE,
+            InlineMenuHelper::PAGE_SIZE,
+        );
+
         $keyboard = InlineKeyboardMarkup::make();
         foreach ($rows as $row) {
             $id = (int) $row['id'];
-            $tz = new \DateTimeZone($deps->config->timezone);
             $starts = new \DateTimeImmutable((string) $row['starts_at'], $tz);
             $label = ScheduleTime::formatLocalDate($starts, $tz) . ' '
                 . ScheduleTime::formatRehearsalTimeRange($row, $tz);
@@ -148,6 +185,14 @@ final class AttendanceAdminHandler
                 InlineKeyboardButton::make($label, callback_data: 'atd:rh:' . $id),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $texts,
+            $page,
+            $total,
+            'atd:rh:pg:',
+        );
 
         $bot->sendMessage($texts->get('attendance.rehearsal_pick'), reply_markup: $keyboard);
     }
@@ -159,6 +204,7 @@ final class AttendanceAdminHandler
         AttendanceHistoryPresenter $presenter,
         \DateTimeZone $tz,
         int $rehearsalId,
+        int $page,
     ): void {
         $rehearsal = $deps->rehearsals->findById($rehearsalId);
         if ($rehearsal === null) {
@@ -181,8 +227,12 @@ final class AttendanceAdminHandler
             $marksByUser[(int) $markRow['user_id']] = (string) $markRow['mark'];
         }
 
+        $participants = $deps->users->listActiveParticipants();
+        $total = count($participants);
+        $slice = InlineMenuHelper::pageSlice($participants, $page);
+
         $keyboard = InlineKeyboardMarkup::make();
-        foreach ($deps->users->listActiveParticipants() as $user) {
+        foreach ($slice as $user) {
             $uid = (int) $user['id'];
             $name = (string) ($user['display_name'] ?? '');
             $mark = $marksByUser[$uid] ?? null;
@@ -195,8 +245,13 @@ final class AttendanceAdminHandler
             );
         }
 
-        $keyboard = $keyboard->addRow(
-            InlineKeyboardButton::make($texts->get('attendance.back'), callback_data: 'atd:rh'),
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $texts,
+            $page,
+            $total,
+            'atd:rhp:' . $rehearsalId . ':',
+            'atd:rh',
         );
 
         $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
@@ -232,10 +287,9 @@ final class AttendanceAdminHandler
                     $texts->get('attendance.mark_unexcused'),
                     callback_data: 'atd:mk:' . $rehearsalId . ':' . $userId . ':u',
                 ),
-            )
-            ->addRow(
-                InlineKeyboardButton::make($texts->get('attendance.back'), callback_data: 'atd:rh:' . $rehearsalId),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'atd:rhp:' . $rehearsalId . ':0');
 
         $bot->sendMessage(
             $texts->get('attendance.manual_pick', ['name' => (string) ($user['display_name'] ?? '')]),
@@ -270,10 +324,18 @@ final class AttendanceAdminHandler
         ]));
     }
 
-    private static function sendMemberPicker(Nutgram $bot, TextRepository $texts, AttendanceDeps $deps): void
+    private static function sendMemberPicker(Nutgram $bot, TextRepository $texts, AttendanceDeps $deps, int $page): void
     {
+        $all = $deps->users->listActiveParticipants();
+        $total = count($all);
+        if ($total === 0) {
+            $bot->sendMessage($texts->get('attendance.member_pick'));
+
+            return;
+        }
+
         $keyboard = InlineKeyboardMarkup::make();
-        foreach ($deps->users->listActiveParticipants() as $user) {
+        foreach (InlineMenuHelper::pageSlice($all, $page) as $user) {
             $uid = (int) $user['id'];
             $name = (string) ($user['display_name'] ?? '');
             $streak = (int) ($user['consecutive_unexcused'] ?? 0);
@@ -282,6 +344,14 @@ final class AttendanceAdminHandler
                 InlineKeyboardButton::make($label, callback_data: 'atd:ms:' . $uid),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $texts,
+            $page,
+            $total,
+            'atd:ms:pg:',
+        );
 
         $bot->sendMessage($texts->get('attendance.member_pick'), reply_markup: $keyboard);
     }
@@ -316,8 +386,10 @@ final class AttendanceAdminHandler
             }
         }
 
-        $keyboard = InlineKeyboardMarkup::make()->addRow(
-            InlineKeyboardButton::make($texts->get('attendance.back'), callback_data: 'atd:ms'),
+        $keyboard = InlineMenuHelper::appendFooter(
+            InlineKeyboardMarkup::make(),
+            $texts,
+            'atd:ms',
         );
 
         $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);

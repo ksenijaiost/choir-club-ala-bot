@@ -8,6 +8,7 @@ use App\Domain\MaterialType;
 use App\Domain\VoicePart;
 use App\Services\SongDeliveryService;
 use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -28,6 +29,40 @@ final class SongsCallbackHandler
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
             SongMemberHandler::sendMaterialCatalog($bot, $deps, (int) $m[1]);
+
+            return true;
+        }
+
+        if (preg_match('/^snd:sr:pg:(\d+)$/', $data, $m) === 1) {
+            $telegramId = $bot->userId();
+            $query = '';
+            if ($telegramId !== null) {
+                $state = $deps->flows->get($telegramId);
+                if (($state['flow'] ?? '') === 'song_search') {
+                    $query = trim((string) (($state['context']['query'] ?? '')));
+                }
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            if ($query !== '') {
+                SongMemberHandler::sendSearchResults($bot, $deps, $query, (int) $m[1]);
+            }
+
+            return true;
+        }
+
+        if (preg_match('/^snd:my:pg:([a-z0-9_]+):(\d+)$/', $data, $m) === 1) {
+            $part = $m[1];
+            if (!VoicePart::isValid($part)) {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            SongMemberHandler::sendMyRecordingsPage($bot, $deps, $part, (int) $m[2]);
 
             return true;
         }
@@ -128,6 +163,8 @@ final class SongsCallbackHandler
 
             return;
         }
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'snd:pk:' . $songId);
 
         $bot->sendMessage(
             $deps->texts->get('songs.pick_part_for_recordings', ['title' => (string) $song['title']]),

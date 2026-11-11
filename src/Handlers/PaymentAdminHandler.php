@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Clock;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -38,6 +39,8 @@ final class PaymentAdminHandler
             );
         }
 
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts);
+
         $bot->sendMessage($deps->texts->get('payment.admin_pick_month'), reply_markup: $keyboard);
     }
 
@@ -48,6 +51,34 @@ final class PaymentAdminHandler
         array $actor,
         string $data,
     ): bool {
+        if ($data === 'pay:adm:home') {
+            if (!$access->hasConductorPrivileges($actor)) {
+                $bot->answerCallbackQuery(text: $deps->texts->get('admin.only_conductor_or_owner'), show_alert: true);
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::openHome($bot, $deps, $access, $actor);
+
+            return true;
+        }
+
+        if (preg_match('/^pay:adm:(\d{4}):(\d{1,2}):pg:(\d+)$/', $data, $m) === 1) {
+            if (!$access->hasConductorPrivileges($actor)) {
+                $bot->answerCallbackQuery(text: $deps->texts->get('admin.only_conductor_or_owner'), show_alert: true);
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendMonthMemberList($bot, $deps, (int) $m[1], (int) $m[2], (int) $m[3]);
+
+            return true;
+        }
+
         if (preg_match('/^pay:adm:(\d{4}):(\d{1,2})$/', $data, $m) !== 1) {
             return false;
         }
@@ -62,13 +93,26 @@ final class PaymentAdminHandler
         $month = (int) $m[2];
         $bot->answerCallbackQuery();
         CallbackUi::clearKeyboard($bot);
+        self::sendMonthMemberList($bot, $deps, $year, $month, 0);
 
+        return true;
+    }
+
+    private static function sendMonthMemberList(
+        Nutgram $bot,
+        PaymentDeps $deps,
+        int $year,
+        int $month,
+        int $page,
+    ): void {
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
         $lines = [$deps->texts->get('payment.admin_list_header', $placeholders)];
 
+        $all = $deps->users->listActivePayers();
+        $total = count($all);
         $keyboard = InlineKeyboardMarkup::make();
 
-        foreach ($deps->users->listActivePayers() as $user) {
+        foreach (InlineMenuHelper::pageSlice($all, $page) as $user) {
             $uid = (int) $user['id'];
             $name = (string) ($user['display_name'] ?? '');
             $row = $deps->payments->find($uid, $year, $month);
@@ -85,9 +129,16 @@ final class PaymentAdminHandler
             }
         }
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $deps->texts,
+            $page,
+            $total,
+            'pay:adm:' . $year . ':' . $month . ':pg:',
+            'pay:adm:home',
+        );
 
-        return true;
+        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
     }
 
     /**

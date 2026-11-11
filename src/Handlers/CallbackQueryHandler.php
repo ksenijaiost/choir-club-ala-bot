@@ -13,6 +13,7 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\MemberBlockService;
 use App\Services\UserIdentitySync;
+use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuKeyboard;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -47,6 +48,12 @@ final class CallbackQueryHandler
 
             $actorTelegramId = $callback->from?->id;
             if ($actorTelegramId === null) {
+                return;
+            }
+
+            if ($data === InlineMenuHelper::CLOSE_CALLBACK) {
+                InlineMenuHelper::handleClose($bot, $schedule->flows, $texts, $actorTelegramId);
+
                 return;
             }
 

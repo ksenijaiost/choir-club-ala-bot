@@ -8,6 +8,7 @@ use App\Domain\MaterialType;
 use App\Domain\VoicePart;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
 
 final class MaterialsCallbackHandler
@@ -25,6 +26,30 @@ final class MaterialsCallbackHandler
 
         if (!$access->canUploadMaterials($actor)) {
             $bot->answerCallbackQuery(text: $deps->texts->get('materials.upload_forbidden'), show_alert: true);
+
+            return true;
+        }
+
+        if (preg_match('/^mat:up:sn:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            MaterialsFlowHandler::sendSongPicker($bot, $deps, (int) $m[1]);
+
+            return true;
+        }
+
+        if ($data === 'mat:up:back:sn') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            MaterialsFlowHandler::sendSongPicker($bot, $deps, 0);
+
+            return true;
+        }
+
+        if ($data === 'mat:up:back:tp') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            MaterialsFlowHandler::sendTypePicker($bot, $deps);
 
             return true;
         }
@@ -166,6 +191,14 @@ final class MaterialsCallbackHandler
             return true;
         }
 
+        if (preg_match('/^mat:mg:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendManagementSongPicker($bot, $deps, (int) $m[1]);
+
+            return true;
+        }
+
         if (preg_match('/^mat:mg:sn:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
@@ -220,14 +253,22 @@ final class MaterialsCallbackHandler
         return false;
     }
 
-    public static function openManagementHome(Nutgram $bot, MaterialsDeps $deps): void
+    public static function openManagementHome(Nutgram $bot, MaterialsDeps $deps, int $page = 0): void
     {
-        $songs = $deps->songs->listRecent(25);
-        if ($songs === []) {
+        $total = $deps->songs->countAll();
+        if ($total === 0) {
             $bot->sendMessage($deps->texts->get('materials.pick_song_empty'));
 
             return;
         }
+
+        self::sendManagementSongPicker($bot, $deps, $page);
+    }
+
+    private static function sendManagementSongPicker(Nutgram $bot, MaterialsDeps $deps, int $page): void
+    {
+        $total = $deps->songs->countAll();
+        $songs = $deps->songs->listAlphabetical($page * InlineMenuHelper::PAGE_SIZE, InlineMenuHelper::PAGE_SIZE);
 
         $keyboard = \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make();
         foreach ($songs as $song) {
@@ -241,6 +282,14 @@ final class MaterialsCallbackHandler
                 ),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $deps->texts,
+            $page,
+            $total,
+            'mat:mg:pg:',
+        );
 
         $bot->sendMessage($deps->texts->get('materials.manage_pick_song'), reply_markup: $keyboard);
     }
@@ -264,6 +313,8 @@ final class MaterialsCallbackHandler
                 ),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:mg:pg:0');
 
         $bot->sendMessage(
             $deps->texts->get('materials.manage_pick_part', ['title' => (string) $song['title']]),
@@ -316,6 +367,12 @@ final class MaterialsCallbackHandler
             );
             $index++;
         }
+
+        $keyboard = InlineMenuHelper::appendFooter(
+            $keyboard,
+            $deps->texts,
+            'mat:mg:sn:' . $songId,
+        );
 
         $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
     }

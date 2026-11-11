@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Telegram;
 
 use App\Domain\VoicePart;
+use App\Telegram\InlineMenuHelper;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -32,6 +33,6 @@ final class PartKeyboard
             $keyboard = $keyboard->addRow(...$row);
         }
 
-        return $keyboard;
+        return InlineMenuHelper::appendFooter($keyboard, $texts);
     }
 }

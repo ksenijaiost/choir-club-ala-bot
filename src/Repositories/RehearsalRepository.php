@@ -62,6 +62,36 @@ final class RehearsalRepository
         return $stmt->fetchAll() ?: [];
     }
 
+    public function countFrom(string $fromLocal): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM rehearsals WHERE starts_at >= ?');
+        $stmt->execute([$fromLocal]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listFromNearest(string $fromLocal, string $pivotLocal, int $offset, int $limit): array
+    {
+        $isSqlite = $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite';
+        $order = $isSqlite
+            ? 'ABS(strftime(\'%s\', starts_at) - strftime(\'%s\', ?)) ASC, starts_at ASC'
+            : 'ABS(TIMESTAMPDIFF(SECOND, starts_at, ?)) ASC, starts_at ASC';
+
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM rehearsals WHERE starts_at >= ? ORDER BY {$order} LIMIT ? OFFSET ?"
+        );
+        $stmt->bindValue(1, $fromLocal);
+        $stmt->bindValue(2, $pivotLocal);
+        $stmt->bindValue(3, $limit, \PDO::PARAM_INT);
+        $stmt->bindValue(4, $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
     public function updateSchedule(int $id, string $startsAt, string $endsAt): void
     {
         $stmt = $this->pdo->prepare(

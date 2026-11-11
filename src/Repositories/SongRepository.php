@@ -42,10 +42,26 @@ final class SongRepository
      */
     public function listRecent(int $limit = 25): array
     {
+        return $this->listAlphabetical(0, $limit);
+    }
+
+    public function countAll(): int
+    {
+        $stmt = $this->pdo->query('SELECT COUNT(*) FROM songs');
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listAlphabetical(int $offset, int $limit): array
+    {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM songs ORDER BY title_normalized ASC LIMIT ?'
+            'SELECT * FROM songs ORDER BY title_normalized ASC LIMIT ? OFFSET ?'
         );
         $stmt->bindValue(1, $limit, \PDO::PARAM_INT);
+        $stmt->bindValue(2, $offset, \PDO::PARAM_INT);
         $stmt->execute();
 
         return $stmt->fetchAll() ?: [];

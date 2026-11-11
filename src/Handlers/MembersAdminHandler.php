@@ -9,6 +9,8 @@ use App\Domain\VoicePart;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\MemberBlockService;
+use App\Telegram\CallbackUi;
+use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuKeyboard;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -77,6 +79,8 @@ final class MembersAdminHandler
             $keyboard = $keyboard->addRow(...$row);
         }
 
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
+
         $bot->sendMessage(
             text: $texts->get('admin.members_pick_filter'),
             reply_markup: $keyboard,
@@ -88,13 +92,16 @@ final class MembersAdminHandler
         TextRepository $texts,
         UserRepository $users,
         string $filter,
+        int $page = 0,
     ): void {
-        $members = $users->listMembersForBlocking($filter === 'all' ? null : $filter);
+        $all = $users->listMembersForBlocking($filter === 'all' ? null : $filter);
+        $members = InlineMenuHelper::pageSlice($all, $page);
+        $total = count($all);
         $filterLabel = $filter === 'all'
             ? $texts->get('admin.members_filter_all')
             : $texts->get('parts.' . $filter);
 
-        if ($members === []) {
+        if ($total === 0) {
             $bot->sendMessage($texts->get('admin.members_list_empty', ['filter' => $filterLabel]));
 
             return;
@@ -125,6 +132,15 @@ final class MembersAdminHandler
                 ),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $texts,
+            $page,
+            $total,
+            'bl:pg:' . $filter . ':',
+            'bl:menu',
+        );
 
         $bot->sendMessage(text: implode("\n", $lines), reply_markup: $keyboard);
     }
@@ -172,6 +188,8 @@ final class MembersAdminHandler
             );
         }
 
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'bl:menu');
+
         $bot->sendMessage(text: $text, reply_markup: $keyboard);
     }
 
@@ -191,6 +209,29 @@ final class MembersAdminHandler
         $actor = $users->findByTelegramId($actorTelegramId);
         if ($actor === null || !$access->hasConductorPrivileges($actor)) {
             $bot->answerCallbackQuery(text: $texts->get('admin.only_conductor_or_owner'), show_alert: true);
+
+            return true;
+        }
+
+        if ($data === 'bl:menu') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::openFilterUi($bot, $texts, $access, $actor);
+
+            return true;
+        }
+
+        if (preg_match('/^bl:pg:(.+):(\d+)$/', $data, $m) === 1) {
+            $filter = $m[1];
+            if ($filter !== 'all' && !VoicePart::isValid($filter)) {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendMemberList($bot, $texts, $users, $filter, (int) $m[2]);
 
             return true;
         }

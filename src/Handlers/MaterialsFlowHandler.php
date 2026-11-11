@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Domain\MaterialType;
 use App\Domain\VoicePart;
+use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -13,9 +14,10 @@ use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
 final class MaterialsFlowHandler
 {
-    public static function sendSongPicker(Nutgram $bot, MaterialsDeps $deps, ?int $chatId = null): void
+    public static function sendSongPicker(Nutgram $bot, MaterialsDeps $deps, int $page = 0, ?int $chatId = null): void
     {
-        $songs = $deps->songs->listRecent(20);
+        $total = $deps->songs->countAll();
+        $songs = $deps->songs->listAlphabetical($page * InlineMenuHelper::PAGE_SIZE, InlineMenuHelper::PAGE_SIZE);
         $keyboard = InlineKeyboardMarkup::make()
             ->addRow(
                 InlineKeyboardButton::make(
@@ -33,8 +35,16 @@ final class MaterialsFlowHandler
             );
         }
 
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $deps->texts,
+            $page,
+            $total,
+            'mat:up:sn:pg:',
+        );
+
         $text = $deps->texts->get('materials.ask_song');
-        if ($songs === []) {
+        if ($total === 0) {
             $text .= "\n\n" . $deps->texts->get('materials.pick_song_empty');
         }
 
@@ -66,6 +76,8 @@ final class MaterialsFlowHandler
                     callback_data: 'mat:up:tp:' . MaterialType::RECORDING,
                 ),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:sn');
 
         $bot->sendMessage($deps->texts->get('materials.ask_type'), reply_markup: $keyboard);
     }
@@ -104,9 +116,11 @@ final class MaterialsFlowHandler
             $doneLabel .= ' ⚠';
         }
 
-        return $keyboard->addRow(
+        $keyboard = $keyboard->addRow(
             InlineKeyboardButton::make($doneLabel, callback_data: 'mat:up:pt:go'),
         );
+
+        return InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:tp');
     }
 
     public static function sendRecordingPartPicker(Nutgram $bot, MaterialsDeps $deps, int $telegramId): void
@@ -167,6 +181,8 @@ final class MaterialsFlowHandler
                     callback_data: 'mat:up:rp:n',
                 ),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:tp');
 
         $bot->sendMessage(
             $deps->texts->get($key, ['title' => (string) $song['title']]),

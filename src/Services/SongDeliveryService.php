@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Domain\MaterialType;
 use App\Repositories\MaterialRepository;
+use App\Telegram\InlineMenuHelper;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 
@@ -41,6 +42,8 @@ final class SongDeliveryService
                     callback_data: 'snd:pr:' . (int) $song['id'],
                 ),
             );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $this->texts);
 
         $bot->sendMessage(
             $this->texts->get('songs.card_header', ['title' => $title]),
