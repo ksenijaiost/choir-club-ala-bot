@@ -9,8 +9,10 @@ use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\BlockEventRepository;
 use App\Repositories\BotSettingsRepository;
+use App\Repositories\MaterialRepository;
 use App\Repositories\PaymentRecordRepository;
 use App\Repositories\RegistrationRepository;
+use App\Repositories\SongRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserFlowRepository;
@@ -22,6 +24,7 @@ use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\MaterialsService;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
 use App\Services\PaymentTexts;
@@ -81,6 +84,18 @@ final class HandlerRegistry
             $texts,
         );
 
+        $songRepo = new SongRepository($pdo);
+        $materialRepo = new MaterialRepository($pdo);
+        $materials = new MaterialsDeps(
+            $config,
+            $users,
+            $flows,
+            $songRepo,
+            $materialRepo,
+            new MaterialsService($materialRepo, $songRepo, $texts),
+            $texts,
+        );
+
         $attendance = new AttendanceDeps(
             $config,
             $users,
@@ -107,11 +122,13 @@ final class HandlerRegistry
             $schedule,
             $attendance,
             $paymentDeps,
+            $materials,
         );
+        MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
         StartHandler::register($bot, $texts, $users, $access);
         ConductorAdminHandler::register($bot, $texts, $users, $access);
         HelpersAdminHandler::register($bot, $texts, $users, $access);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService);
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials);
     }
 }

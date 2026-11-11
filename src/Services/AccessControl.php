@@ -122,4 +122,20 @@ final class AccessControl
 
         return (string) $chatId === $configured;
     }
+
+    /**
+     * Загрузка материалов в админ-чат — только помощники и дирижёр.
+     *
+     * @param array<string, mixed> $user
+     */
+    public function canUploadMaterials(array $user): bool
+    {
+        if (($user['status'] ?? '') !== UserStatus::ACTIVE) {
+            return false;
+        }
+
+        $role = (string) ($user['role'] ?? '');
+
+        return $role === UserRole::ADMIN || $role === UserRole::CONDUCTOR;
+    }
 }

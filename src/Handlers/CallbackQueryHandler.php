@@ -32,8 +32,9 @@ final class CallbackQueryHandler
         ScheduleDeps $schedule,
         AttendanceDeps $attendance,
         PaymentDeps $payments,
+        MaterialsDeps $materials,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -46,6 +47,15 @@ final class CallbackQueryHandler
 
             $actorTelegramId = $callback->from?->id;
             if ($actorTelegramId === null) {
+                return;
+            }
+
+            if (str_starts_with($data, 'mat:')) {
+                $actorRow = $users->findByTelegramId($actorTelegramId);
+                if ($actorRow !== null && MaterialsCallbackHandler::handle($bot, $materials, $access, $actorRow, $data)) {
+                    return;
+                }
+
                 return;
             }
 
