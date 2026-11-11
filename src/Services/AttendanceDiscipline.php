@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Domain\UserRole;
 use App\Repositories\UserRepository;
 use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
@@ -32,7 +33,7 @@ final class AttendanceDiscipline
             $this->outbound->sendMessage($telegramId, $this->texts->get('discipline.third_strike'));
         }
 
-        if ($count >= 4) {
+        if ($count >= 4 && !$this->isExemptFromAutoBlock($user)) {
             $name = (string) ($user['display_name'] ?? '');
             $partCode = (string) ($user['voice_part'] ?? '');
             $part = $partCode !== '' ? $this->texts->get('parts.' . $partCode) : '—';
@@ -53,8 +54,17 @@ final class AttendanceDiscipline
             try {
                 $this->blocks->blockAuto($userId);
             } catch (\InvalidArgumentException) {
-                // owner/conductor — не блокируем
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    private function isExemptFromAutoBlock(array $user): bool
+    {
+        $role = (string) ($user['role'] ?? '');
+
+        return $role === UserRole::OWNER || $role === UserRole::CONDUCTOR;
     }
 }

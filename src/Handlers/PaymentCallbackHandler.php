@@ -58,7 +58,11 @@ final class PaymentCallbackHandler
         }
 
         $role = (string) ($user['role'] ?? '');
-        if ($role !== UserRole::MEMBER && $role !== UserRole::ADMIN) {
+        if (
+            $role !== UserRole::MEMBER
+            && $role !== UserRole::ADMIN
+            && $role !== UserRole::OWNER
+        ) {
             $bot->answerCallbackQuery();
 
             return;

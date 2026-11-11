@@ -228,31 +228,37 @@ final class UserRepository
     }
 
     /**
-     * Участники посещаемости: active member/admin/conductor.
+     * Участники посещаемости: active member/admin/conductor/owner.
      *
      * @return list<array<string, mixed>>
      */
     public function listActiveParticipants(): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM users WHERE status = ? AND role IN (?, ?, ?) ORDER BY id ASC'
+            'SELECT * FROM users WHERE status = ? AND role IN (?, ?, ?, ?) ORDER BY id ASC'
         );
-        $stmt->execute([UserStatus::ACTIVE, UserRole::MEMBER, UserRole::ADMIN, UserRole::CONDUCTOR]);
+        $stmt->execute([
+            UserStatus::ACTIVE,
+            UserRole::MEMBER,
+            UserRole::ADMIN,
+            UserRole::CONDUCTOR,
+            UserRole::OWNER,
+        ]);
 
         return $stmt->fetchAll();
     }
 
     /**
-     * Участники и помощники для напоминаний об оплате (без owner/conductor).
+     * Участники, помощники и владелица для напоминаний об оплате.
      *
      * @return list<array<string, mixed>>
      */
     public function listActivePayers(): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM users WHERE status = ? AND role IN (?, ?) ORDER BY display_name ASC'
+            'SELECT * FROM users WHERE status = ? AND role IN (?, ?, ?) ORDER BY display_name ASC'
         );
-        $stmt->execute([UserStatus::ACTIVE, UserRole::MEMBER, UserRole::ADMIN]);
+        $stmt->execute([UserStatus::ACTIVE, UserRole::MEMBER, UserRole::ADMIN, UserRole::OWNER]);
 
         return $stmt->fetchAll();
     }
