@@ -20,8 +20,9 @@ final class MessageHandler
         TextRepository $texts,
         UserRepository $users,
         AccessControl $access,
+        ScheduleDeps $schedule,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -84,7 +85,23 @@ final class MessageHandler
             }
 
             if ($status === UserStatus::ACTIVE) {
-                self::handleActiveMenu($bot, $texts, $users, $access, $user, $text);
+                if ($telegramId !== null && ScheduleAdminHandler::handleFlowMessage(
+                    $bot,
+                    $texts,
+                    $schedule->config,
+                    $schedule->rehearsals,
+                    $schedule->templates,
+                    $schedule->flows,
+                    $schedule->generator,
+                    $schedule->broadcast,
+                    $schedule->settings,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
+                self::handleActiveMenu($bot, $texts, $users, $access, $schedule, $user, $text);
 
                 return;
             }
@@ -131,6 +148,7 @@ final class MessageHandler
         TextRepository $texts,
         UserRepository $users,
         AccessControl $access,
+        ScheduleDeps $schedule,
         array $user,
         string $text,
     ): void {
@@ -153,6 +171,24 @@ final class MessageHandler
 
         if ($text === $texts->get('menu.admin_members')) {
             MembersAdminHandler::openFilterUi($bot, $texts, $access, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.schedule')) {
+            ScheduleMemberHandler::sendUpcoming(
+                $bot,
+                $texts,
+                $schedule->config,
+                $schedule->generator,
+                $schedule->presenter,
+            );
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.admin_schedule')) {
+            ScheduleAdminHandler::openAdminHome($bot, $texts, $access, $user);
 
             return;
         }

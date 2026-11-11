@@ -1,6 +1,6 @@
 # Схема базы данных
 
-Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (runner — `public/admin/migrate.php`). Миграция `002_*` — роль `admin` вместо `helper`, `voice_part` допускает `NULL` до выбора партии. Миграция `003_*` — роль `owner`. Миграция `004_*` — журнал `block_events`.
+Схема рассчитана на **MySQL 8+** (production на shared hosting) и **SQLite 3** (локальная разработка). Эталон DDL: [schema.sql](schema.sql). **Применение в коде:** SQL-файлы в каталоге `migrations/mysql/` и `migrations/sqlite/` (runner — `public/admin/migrate.php`). Миграция `002_*` — роль `admin` вместо `helper`, `voice_part` допускает `NULL` до выбора партии. Миграция `003_*` — роль `owner`. Миграция `004_*` — журнал `block_events`. Миграция `005_*` — `user_flows`, индекс слотов, seed шаблонов.
 
 ## Соглашения
 
@@ -154,6 +154,19 @@
 | `payment_reminder_day_2` | `1` | День второго напоминания |
 | `payment_reminder_hour` | `12` | Час напоминаний (Asia/Almaty) |
 | `rehearsal_default_duration_minutes` | `120` | Длительность репетиции по умолчанию |
+
+### `user_flows`
+
+Временное состояние пошаговых админ-диалогов (перенос репетиции, шаблоны).
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `telegram_id` | PK | |
+| `flow` | VARCHAR(32) | Код сценария |
+| `context` | TEXT | JSON |
+| `updated_at` | DATETIME | |
+
+Уникальный индекс `rehearsals(template_id, starts_at)` — защита от дублей автогенерации.
 
 ### `block_events`
 

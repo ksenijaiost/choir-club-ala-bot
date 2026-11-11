@@ -143,6 +143,16 @@ CREATE TABLE IF NOT EXISTS bot_settings (
     PRIMARY KEY (setting_key)
 );
 
+CREATE TABLE IF NOT EXISTS user_flows (
+    telegram_id BIGINT NOT NULL,
+    flow VARCHAR(32) NOT NULL,
+    context TEXT NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (telegram_id)
+);
+
+CREATE UNIQUE INDEX uk_rehearsals_template_slot ON rehearsals (template_id, starts_at);
+
 CREATE TABLE IF NOT EXISTS block_events (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     target_user_id BIGINT UNSIGNED NOT NULL,

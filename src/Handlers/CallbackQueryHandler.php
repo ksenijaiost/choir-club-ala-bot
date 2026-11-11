@@ -29,8 +29,9 @@ final class CallbackQueryHandler
         RegistrationRepository $registrations,
         AccessControl $access,
         MemberBlockService $blocks,
+        ScheduleDeps $schedule,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -43,6 +44,27 @@ final class CallbackQueryHandler
 
             $actorTelegramId = $callback->from?->id;
             if ($actorTelegramId === null) {
+                return;
+            }
+
+            if (str_starts_with($data, 'sch:')) {
+                ScheduleAdminHandler::handleCallback(
+                    $bot,
+                    $texts,
+                    $config,
+                    $access,
+                    $schedule->templates,
+                    $schedule->rehearsals,
+                    $schedule->flows,
+                    $schedule->generator,
+                    $schedule->broadcast,
+                    $schedule->presenter,
+                    $schedule->settings,
+                    $users,
+                    $data,
+                    $actorTelegramId,
+                );
+
                 return;
             }
 

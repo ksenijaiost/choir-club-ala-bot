@@ -211,6 +211,21 @@ final class UserRepository
      *
      * @return list<array<string, mixed>>
      */
+    /**
+     * @return list<int>
+     */
+    public function listAllActiveTelegramIds(): array
+    {
+        $stmt = $this->pdo->prepare('SELECT telegram_id FROM users WHERE status = ? ORDER BY id ASC');
+        $stmt->execute([UserStatus::ACTIVE]);
+        $ids = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $ids[] = (int) $row['telegram_id'];
+        }
+
+        return $ids;
+    }
+
     public function listMembersForBlocking(?string $voicePartFilter = null): array
     {
         $sql = 'SELECT * FROM users WHERE role IN (?, ?) AND status IN (?, ?)';
