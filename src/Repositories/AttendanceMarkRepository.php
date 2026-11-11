@@ -123,4 +123,10 @@ final class AttendanceMarkRepository
 
         return $row === null ? null : (string) ($row['mark'] ?? '');
     }
+
+    public function delete(int $rehearsalId, int $userId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM attendance_marks WHERE rehearsal_id = ? AND user_id = ?');
+        $stmt->execute([$rehearsalId, $userId]);
+    }
 }

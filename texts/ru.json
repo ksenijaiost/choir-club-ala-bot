@@ -55,7 +55,10 @@
   "common": {
     "soon": "Скоро будет",
     "use_part_buttons": "Выбери партию кнопками ниже.",
-    "invalid_name": "Напиши имя текстом (от 2 до 100 символов)."
+    "invalid_name": "Напиши имя текстом (от 2 до 100 символов).",
+    "inline_answer_yes": "Ответ: Да ✅",
+    "inline_answer_no": "Ответ: Нет",
+    "inline_answer_skip": "Ответ: причину пропустили"
   },
   "registration": {
     "welcome": "Привет! Это бот хора Club Ala 🎶\n\nКак тебя представлять в списках? Напиши имя и фамилию (или так, как привыкли в хоре).",
@@ -89,6 +92,7 @@
     "action_address": "Адрес",
     "action_cancel": "Отменить",
     "admin_cancelled_ok": "Репетиция отменена. Участники уведомлены.",
+    "inline_cancelled": "Ответ: отменено",
     "admin_rescheduled_ok": "Репетиция перенесена. Участники уведомлены.",
     "admin_address_ok": "Адрес обновлён. Участники уведомлены.",
     "admin_added_ok": "Разовая репетиция добавлена. Участники уведомлены.",
@@ -137,7 +141,10 @@
     "ask_reason_optional": "Можешь написать причину одним сообщением или нажми «Пропустить».",
     "confirmed": "Предупредил дирижёра. До встречи!",
     "notify_conductor": "Предупреждение об отсутствии:\n{name}, {part}\nРепетиция: {rehearsal_date}\nПричина: {reason}",
-    "forward_reason": "Причина отсутствия от {name} (репетиция {rehearsal_date}):\n\n{reason}"
+    "forward_reason": "Причина отсутствия от {name} (репетиция {rehearsal_date}):\n\n{reason}",
+    "changed_mind": "{name} передумал(а) и придёт на репетицию {rehearsal_date}.",
+    "rehearsal_picked": "Репетиция: {rehearsal}",
+    "use_day_before_to_change": "Ты уже отметил(а), что не придёшь. Чтобы передумать — нажми «Да» в напоминании накануне."
   },
   "discipline": {
     "third_strike": "У тебя 3 пропуска! До изгнания из хора у тебя осталась одна попытка!",
@@ -170,7 +177,9 @@
     "status_awaiting": "⏳ ждёт подтверждения",
     "status_unpaid": "❌ не оплачено",
     "admin_pick_month": "Оплата — выбери месяц:",
-    "admin_confirmed_ok": "Оплата подтверждена"
+    "admin_confirmed_ok": "Оплата подтверждена",
+    "inline_answer_claimed": "Ответ: Я оплатил(а) ✅",
+    "inline_answer_confirmed": "Ответ: подтверждено ✅"
   },
   "songs": {
     "ask_title": "Напиши часть названия песни — найду без учёта регистра.",
@@ -211,6 +220,9 @@
     "rehearsal_card": "Репетиция {date} {time}\n{address}",
     "manual_pick": "Отметка для {name}:",
     "manual_saved": "Сохранено",
+    "inline_mark_attended": "Ответ: был ✅",
+    "inline_mark_warned": "Ответ: предупредил",
+    "inline_mark_unexcused": "Ответ: пропуск",
     "manual_result": "{name}: счётчик подряд пропусков = {streak}",
     "back": "← Назад",
     "monthly_summary_header": "Сводка за {month} {year}:"

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Clock;
+use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
 use App\Domain\UserStatus;
 use App\Services\ScheduleTime;
+use App\Telegram\CallbackUi;
 use SergiX44\Nutgram\Nutgram;
 
 final class AttendanceCallbackHandler
@@ -57,23 +59,56 @@ final class AttendanceCallbackHandler
             return;
         }
 
-        $bot->answerCallbackQuery();
-
-        if ($yes) {
-            $bot->sendMessage($deps->texts->get('reminder.will_attend'));
-
-            return;
-        }
-
         $rehearsal = $deps->rehearsals->findById($rehearsalId);
         if ($rehearsal === null || ($rehearsal['status'] ?? '') !== 'scheduled') {
+            $bot->answerCallbackQuery();
+
             return;
         }
+
+        $tz = new \DateTimeZone($deps->config->timezone);
+        $starts = new \DateTimeImmutable((string) $rehearsal['starts_at'], $tz);
+        $now = Clock::now($deps->config)->setTimezone($tz);
+        if ($now >= $starts) {
+            $bot->answerCallbackQuery(text: $deps->texts->get('absence.too_late'), show_alert: true);
+
+            return;
+        }
+
+        $userId = (int) $user['id'];
+        $existing = $deps->marks->find($rehearsalId, $userId);
+        if ($yes) {
+            $hadWarned = $existing !== null && ($existing['mark'] ?? '') === AttendanceMark::WARNED;
+
+            if ($hadWarned) {
+                $notifiedConductor = trim((string) ($existing['reason_text'] ?? '')) !== '';
+                $deps->attendance->clearPlannedAbsence($user, $rehearsalId);
+                if ($notifiedConductor) {
+                    $deps->conductor->notifyChangedMind($user, $rehearsal, $tz);
+                }
+            }
+
+            $deps->flows->clear($telegramId);
+            $bot->answerCallbackQuery();
+            CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_yes'));
+
+            return;
+        }
+
+        if ($existing !== null && ($existing['mark'] ?? '') === AttendanceMark::WARNED) {
+            $bot->answerCallbackQuery(text: $deps->texts->get('absence.use_day_before_to_change'), show_alert: true);
+
+            return;
+        }
+
+        $bot->answerCallbackQuery();
+        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_no'));
 
         $deps->attendance->recordWarned($user, $rehearsalId, AttendanceSource::DAY_BEFORE, null);
         $deps->flows->set($telegramId, 'absence_reason', [
             'rehearsal_id' => $rehearsalId,
             'source' => AttendanceSource::DAY_BEFORE,
+            'conductor_notified' => false,
         ]);
 
         $bot->sendMessage(
@@ -109,6 +144,7 @@ final class AttendanceCallbackHandler
 
         if ($now >= $ends) {
             $bot->answerCallbackQuery(text: $deps->texts->get('checkin.expired'), show_alert: true);
+            CallbackUi::clearKeyboard($bot);
 
             return;
         }
@@ -123,6 +159,7 @@ final class AttendanceCallbackHandler
         $existing = $deps->marks->find($rehearsalId, (int) $user['id']);
         if ($existing !== null) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
 
             return;
         }
@@ -131,13 +168,13 @@ final class AttendanceCallbackHandler
 
         if ($yes) {
             $deps->attendance->recordAttended($user, $rehearsalId);
-            $bot->sendMessage($deps->texts->get('checkin.thanks_yes'));
+            CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_yes'));
 
             return;
         }
 
         $deps->attendance->recordUnexcused($user, $rehearsalId, AttendanceSource::CHECKIN);
-        $bot->sendMessage($deps->texts->get('checkin.thanks_no'));
+        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_no'));
     }
 
     private static function handleWontComePick(
@@ -171,20 +208,34 @@ final class AttendanceCallbackHandler
 
         $existing = $deps->marks->find($rehearsalId, (int) $user['id']);
         if ($existing !== null) {
+            if (($existing['mark'] ?? '') === AttendanceMark::WARNED) {
+                $bot->answerCallbackQuery();
+                CallbackUi::clearKeyboard($bot);
+
+                return;
+            }
+
             $bot->answerCallbackQuery(text: $deps->texts->get('absence.already_marked'), show_alert: true);
 
             return;
         }
 
         $bot->answerCallbackQuery();
+        CallbackUi::clearKeyboard($bot);
+
         $deps->attendance->recordWarned($user, $rehearsalId, AttendanceSource::ABSENCE_BUTTON, null);
         $deps->flows->set($telegramId, 'absence_reason', [
             'rehearsal_id' => $rehearsalId,
             'source' => AttendanceSource::ABSENCE_BUTTON,
+            'conductor_notified' => false,
         ]);
 
+        $startsLabel = ScheduleTime::formatLocalDate($starts, $tz) . ' '
+            . ScheduleTime::formatRehearsalTimeRange($rehearsal, $tz);
         $bot->sendMessage(
-            $deps->texts->get('absence.ask_reason_optional'),
+            $deps->texts->get('absence.rehearsal_picked', ['rehearsal' => $startsLabel])
+            . "\n\n"
+            . $deps->texts->get('absence.ask_reason_optional'),
             reply_markup: $deps->messages->reasonPromptKeyboard(),
         );
     }
@@ -194,6 +245,7 @@ final class AttendanceCallbackHandler
         $state = $deps->flows->get($telegramId);
         if ($state === null || ($state['flow'] ?? '') !== 'absence_reason') {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
 
             return true;
         }
@@ -203,6 +255,7 @@ final class AttendanceCallbackHandler
         $source = (string) ($ctx['source'] ?? AttendanceSource::ABSENCE_BUTTON);
 
         $bot->answerCallbackQuery();
+        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_skip'));
         AttendanceMemberHandler::finishReasonSkip($bot, $deps, $telegramId, $source, $rehearsalId);
 
         return true;

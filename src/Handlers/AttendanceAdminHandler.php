@@ -9,6 +9,7 @@ use App\Domain\AttendanceMark;
 use App\Services\AccessControl;
 use App\Services\AttendanceHistoryPresenter;
 use App\Services\ScheduleTime;
+use App\Telegram\CallbackUi;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -63,6 +64,7 @@ final class AttendanceAdminHandler
 
         if ($data === 'atd:rh') {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             self::sendRehearsalPicker($bot, $texts, $deps, $from);
 
             return true;
@@ -70,6 +72,7 @@ final class AttendanceAdminHandler
 
         if ($data === 'atd:ms') {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             self::sendMemberPicker($bot, $texts, $deps);
 
             return true;
@@ -77,6 +80,7 @@ final class AttendanceAdminHandler
 
         if (preg_match('/^atd:rh:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             self::sendRehearsalAttendance($bot, $texts, $deps, $deps->history, $tz, (int) $m[1]);
 
             return true;
@@ -84,6 +88,7 @@ final class AttendanceAdminHandler
 
         if (preg_match('/^atd:mb:(\d+):(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             self::sendMarkPicker(
                 $bot,
                 $texts,
@@ -98,12 +103,19 @@ final class AttendanceAdminHandler
         if (preg_match('/^atd:mk:(\d+):(\d+):(a|w|u)$/', $data, $m) === 1) {
             self::applyManualMark($bot, $texts, $deps, (int) $m[1], (int) $m[2], $m[3]);
             $bot->answerCallbackQuery(text: $texts->get('attendance.manual_saved'));
+            $answer = match ($m[3]) {
+                'a' => $texts->get('attendance.inline_mark_attended'),
+                'w' => $texts->get('attendance.inline_mark_warned'),
+                default => $texts->get('attendance.inline_mark_unexcused'),
+            };
+            CallbackUi::finalizeWithAnswer($bot, $answer);
 
             return true;
         }
 
         if (preg_match('/^atd:ms:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             self::sendMemberHistory($bot, $texts, $deps, $deps->history, $tz, (int) $m[1]);
 
             return true;

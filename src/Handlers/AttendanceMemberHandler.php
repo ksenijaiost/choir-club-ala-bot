@@ -100,6 +100,8 @@ final class AttendanceMemberHandler
         }
 
         $tz = new \DateTimeZone($deps->config->timezone);
+        $deps->attendance->appendReason($rehearsalId, (int) $user['id'], '—');
+
         if ($source === AttendanceSource::DAY_BEFORE) {
             $deps->conductor->forwardDayBeforeReason($user, $rehearsal, '—', $tz);
         } else {

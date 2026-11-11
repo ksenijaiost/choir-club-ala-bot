@@ -43,6 +43,28 @@ final class AttendanceConductorNotifier
      * @param array<string, mixed> $user
      * @param array<string, mixed> $rehearsal
      */
+    public function notifyChangedMind(array $user, array $rehearsal, \DateTimeZone $tz): void
+    {
+        $conductorTg = $this->recipients->resolveTelegramId();
+        if ($conductorTg === null) {
+            return;
+        }
+
+        $starts = new \DateTimeImmutable((string) $rehearsal['starts_at'], $tz);
+        $this->outbound->sendMessage(
+            $conductorTg,
+            $this->texts->get('absence.changed_mind', [
+                'name' => (string) ($user['display_name'] ?? ''),
+                'rehearsal_date' => ScheduleTime::formatLocalDate($starts, $tz) . ' '
+                    . ScheduleTime::formatRehearsalTimeRange($rehearsal, $tz),
+            ]),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $rehearsal
+     */
     public function notifyPlannedAbsence(array $user, array $rehearsal, string $reason, \DateTimeZone $tz): void
     {
         $conductorTg = $this->recipients->resolveTelegramId();

@@ -70,4 +70,14 @@ final class AttendanceService
 
         return $this->recalculator->recalculateForUser($userId);
     }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public function clearPlannedAbsence(array $user, int $rehearsalId): void
+    {
+        $userId = (int) $user['id'];
+        $this->marks->delete($rehearsalId, $userId);
+        $this->users->resetConsecutiveUnexcused($userId);
+    }
 }

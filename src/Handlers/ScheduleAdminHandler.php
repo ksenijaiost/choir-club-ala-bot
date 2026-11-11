@@ -16,6 +16,7 @@ use App\Services\ScheduleBroadcastService;
 use App\Services\ScheduleGenerator;
 use App\Services\SchedulePresenter;
 use App\Services\ScheduleTime;
+use App\Telegram\CallbackUi;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -106,6 +107,7 @@ final class ScheduleAdminHandler
 
         if ($data === 'sch:adm:add') {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             $duration = $settings->getInt('rehearsal_default_duration_minutes', 120);
             $flows->set($actorTelegramId, 'add_extra', ['step' => 'datetime', 'duration' => $duration]);
             $bot->sendMessage($texts->get('schedule.flow_add_datetime'));
@@ -116,6 +118,7 @@ final class ScheduleAdminHandler
         if (preg_match('/^sch:adm:r:(\d+)$/', $data, $m) === 1) {
             $id = (int) $m[1];
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             self::sendRehearsalActions($bot, $texts, $rehearsals, $id);
 
             return true;
@@ -123,6 +126,7 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:mv:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             $flows->set($actorTelegramId, 'reschedule', [
                 'rehearsal_id' => (int) $m[1],
                 'step' => 'datetime',
@@ -134,6 +138,7 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:addr:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             $flows->set($actorTelegramId, 'change_address', ['rehearsal_id' => (int) $m[1]]);
             $bot->sendMessage($texts->get('schedule.flow_change_address'));
 
@@ -144,6 +149,7 @@ final class ScheduleAdminHandler
             $id = (int) $m[1];
             $rehearsals->cancel($id);
             $bot->answerCallbackQuery();
+            CallbackUi::finalizeWithAnswer($bot, $texts->get('schedule.inline_cancelled'));
             $bot->sendMessage($texts->get('schedule.admin_cancelled_ok'));
             $generator->generate($now, $tz);
             $broadcast->notifyScheduleChanged($bot);
@@ -153,6 +159,7 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:tpl:(\d+):time$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             $flows->set($actorTelegramId, 'template_time', ['template_id' => (int) $m[1]]);
             $bot->sendMessage($texts->get('schedule.flow_template_time'));
 
@@ -161,6 +168,7 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:tpl:(\d+):end$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             $flows->set($actorTelegramId, 'template_end', ['template_id' => (int) $m[1]]);
             $bot->sendMessage($texts->get('schedule.flow_template_end_time'));
 
@@ -169,6 +177,7 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:tpl:(\d+):wd$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             $flows->set($actorTelegramId, 'template_weekday', ['template_id' => (int) $m[1]]);
             $bot->sendMessage($texts->get('schedule.flow_template_weekday'));
 
@@ -177,6 +186,7 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:tpl:(\d+):addr$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             $flows->set($actorTelegramId, 'template_address', ['template_id' => (int) $m[1]]);
             $bot->sendMessage($texts->get('schedule.flow_template_address'));
 
@@ -185,6 +195,7 @@ final class ScheduleAdminHandler
 
         if (preg_match('/^sch:adm:tpl:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
             self::sendTemplateActions($bot, $texts, $templates, (int) $m[1]);
 
             return true;

@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Domain\UserRole;
 use App\Domain\UserStatus;
 use App\Services\AccessControl;
+use App\Telegram\CallbackUi;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -65,6 +66,7 @@ final class PaymentCallbackHandler
 
         $deps->payments->claimByMember((int) $user['id'], $year, $month);
         $bot->answerCallbackQuery();
+        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('payment.inline_answer_claimed'));
         $bot->sendMessage($deps->texts->get('payment.member_marked'));
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
@@ -111,6 +113,7 @@ final class PaymentCallbackHandler
 
         $deps->payments->confirmByConductor($memberUserId, $year, $month, (int) $conductor['id']);
         $bot->answerCallbackQuery(text: $deps->texts->get('payment.admin_confirmed_ok'));
+        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('payment.inline_answer_confirmed'));
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
         $bot->sendMessage(

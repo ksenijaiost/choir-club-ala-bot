@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Clock;
 use App\Services\AccessControl;
+use App\Telegram\CallbackUi;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -60,6 +61,7 @@ final class PaymentAdminHandler
         $year = (int) $m[1];
         $month = (int) $m[2];
         $bot->answerCallbackQuery();
+        CallbackUi::clearKeyboard($bot);
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
         $lines = [$deps->texts->get('payment.admin_list_header', $placeholders)];
