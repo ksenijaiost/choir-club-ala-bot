@@ -48,6 +48,22 @@ final class CallbackQueryHandler
                 return;
             }
 
+            if (str_starts_with($data, 'atd:')) {
+                $actorRow = $users->findByTelegramId($actorTelegramId);
+                if ($actorRow !== null) {
+                    AttendanceAdminHandler::handleCallback(
+                        $bot,
+                        $texts,
+                        $access,
+                        $attendance,
+                        $actorRow,
+                        $data,
+                    );
+                }
+
+                return;
+            }
+
             if (str_starts_with($data, 'att:')) {
                 AttendanceCallbackHandler::handle($bot, $attendance, $data, $actorTelegramId);
 

@@ -15,6 +15,7 @@ final class AttendanceDiscipline
         private readonly TextRepository $texts,
         private readonly NotificationRecipientResolver $recipients,
         private readonly TelegramOutbound $outbound,
+        private readonly MemberBlockService $blocks,
     ) {
     }
 
@@ -47,6 +48,12 @@ final class AttendanceDiscipline
                         'part' => $part,
                     ]),
                 );
+            }
+
+            try {
+                $this->blocks->blockAuto($userId);
+            } catch (\InvalidArgumentException) {
+                // owner/conductor — не блокируем
             }
         }
     }

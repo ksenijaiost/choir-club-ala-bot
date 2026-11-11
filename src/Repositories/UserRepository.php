@@ -219,6 +219,14 @@ final class UserRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function setConsecutiveUnexcused(int $userId, int $value): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE users SET consecutive_unexcused = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        );
+        $stmt->execute([$value, $userId]);
+    }
+
     /**
      * Участники посещаемости: active member/admin/conductor.
      *

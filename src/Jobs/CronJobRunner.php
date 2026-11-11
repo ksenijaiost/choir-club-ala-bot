@@ -16,7 +16,10 @@ use App\Repositories\UserRepository;
 use App\Services\AttendanceDiscipline;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Repositories\BlockEventRepository;
 use App\Services\ScheduleGenerator;
 use App\Telegram\NutgramOutbound;
 use App\Telegram\TelegramOutbound;
@@ -63,8 +66,11 @@ final class CronJobRunner
         $marks = new AttendanceMarkRepository($pdo);
         $sessions = new CheckInSessionRepository($pdo);
         $recipients = new NotificationRecipientResolver($config, $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound);
-        $attendance = new AttendanceService($marks, $users, $discipline);
+        $blockEvents = new BlockEventRepository($pdo);
+        $blocks = new MemberBlockService($users, $blockEvents);
+        $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
+        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator);
 
         $result['day_before_reminder'] = (new DayBeforeReminderJob(
             $rehearsals,
@@ -113,8 +119,11 @@ final class CronJobRunner
         $sessions = new CheckInSessionRepository($pdo);
         $messages = new AttendanceMessageFactory($texts);
         $recipients = new NotificationRecipientResolver($config, $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound);
-        $attendance = new AttendanceService($marks, $users, $discipline);
+        $blockEvents = new BlockEventRepository($pdo);
+        $blocks = new MemberBlockService($users, $blockEvents);
+        $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
+        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator);
 
         return [
             'day_before_reminder' => (new DayBeforeReminderJob(

@@ -21,9 +21,13 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceDiscipline;
+use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Repositories\BlockEventRepository;
 use App\Services\ScheduleBroadcastService;
 use App\Tests\Support\RecordingTelegramOutbound;
 use App\Services\ScheduleGenerator;
@@ -176,8 +180,10 @@ final class MessageHandlerTest extends TestCase
         $marks = new AttendanceMarkRepository($pdo);
         $outbound = new RecordingTelegramOutbound();
         $recipients = new NotificationRecipientResolver($config, $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound);
-        $service = new AttendanceService($marks, $users, $discipline);
+        $blocks = new MemberBlockService($users, new BlockEventRepository($pdo));
+        $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
+        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
+        $service = new AttendanceService($marks, $users, $discipline, $recalculator);
 
         return new AttendanceDeps(
             $config,
@@ -188,6 +194,8 @@ final class MessageHandlerTest extends TestCase
             $service,
             new AttendanceMessageFactory($texts),
             new AttendanceConductorNotifier($recipients, $texts, $outbound),
+            $recalculator,
+            new AttendanceHistoryPresenter($texts),
             $texts,
         );
     }

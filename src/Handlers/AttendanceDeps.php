@@ -10,8 +10,10 @@ use App\Repositories\RehearsalRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AttendanceConductorNotifier;
+use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Text\TextRepository;
 
 final class AttendanceDeps
@@ -25,6 +27,8 @@ final class AttendanceDeps
         public readonly AttendanceService $attendance,
         public readonly AttendanceMessageFactory $messages,
         public readonly AttendanceConductorNotifier $conductor,
+        public readonly ConsecutiveUnexcusedRecalculator $recalculator,
+        public readonly AttendanceHistoryPresenter $history,
         public readonly TextRepository $texts,
     ) {
     }

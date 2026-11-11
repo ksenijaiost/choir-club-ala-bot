@@ -15,6 +15,7 @@ final class AttendanceService
         private readonly AttendanceMarkRepository $marks,
         private readonly UserRepository $users,
         private readonly AttendanceDiscipline $discipline,
+        private readonly ConsecutiveUnexcusedRecalculator $recalculator,
     ) {
     }
 
@@ -61,5 +62,12 @@ final class AttendanceService
         }
 
         $this->marks->upsert($rehearsalId, $userId, AttendanceMark::WARNED, AttendanceSource::DAY_BEFORE, $reason);
+    }
+
+    public function recordManual(int $userId, int $rehearsalId, string $mark): int
+    {
+        $this->marks->upsert($rehearsalId, $userId, $mark, AttendanceSource::MANUAL, null);
+
+        return $this->recalculator->recalculateForUser($userId);
     }
 }

@@ -211,6 +211,12 @@ final class MessageHandler
             return;
         }
 
+        if ($text === $texts->get('menu.admin_attendance')) {
+            AttendanceAdminHandler::openHome($bot, $texts, $access, $user);
+
+            return;
+        }
+
         $bot->sendMessage($texts->get('common.soon'));
     }
 }

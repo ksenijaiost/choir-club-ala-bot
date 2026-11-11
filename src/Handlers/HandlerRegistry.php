@@ -16,8 +16,10 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceDiscipline;
+use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
 use App\Services\ScheduleBroadcastService;
@@ -61,8 +63,9 @@ final class HandlerRegistry
         $marks = new AttendanceMarkRepository($pdo);
         $outbound = new NutgramOutbound($bot);
         $recipients = new NotificationRecipientResolver($config, $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound);
-        $attendanceService = new AttendanceService($marks, $users, $discipline);
+        $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
+        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blockService);
+        $attendanceService = new AttendanceService($marks, $users, $discipline, $recalculator);
         $conductorNotifier = new AttendanceConductorNotifier($recipients, $texts, $outbound);
 
         $attendance = new AttendanceDeps(
@@ -74,6 +77,8 @@ final class HandlerRegistry
             $attendanceService,
             new AttendanceMessageFactory($texts),
             $conductorNotifier,
+            $recalculator,
+            new AttendanceHistoryPresenter($texts),
             $texts,
         );
 
