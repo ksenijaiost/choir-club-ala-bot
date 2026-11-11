@@ -94,6 +94,19 @@
 | `started_at` | DATETIME | |
 | `closed_at` | DATETIME NULL | |
 
+### `check_in_prompts`
+
+Сообщения check-in с инлайн-кнопками (для снятия клавиатуры при `checkin_close`).
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `rehearsal_id` | FK | Репетиция |
+| `user_id` | FK | Участник |
+| `chat_id` | BIGINT | Чат Telegram |
+| `message_id` | BIGINT | ID сообщения с вопросом |
+| `created_at` | DATETIME | |
+| PRIMARY KEY | (`rehearsal_id`, `user_id`) | |
+
 ### `payment_records`
 
 Оплата за календарный месяц (год+месяц как период).

@@ -34,7 +34,7 @@ final class AttendanceConductorNotifier
                 'name' => (string) ($user['display_name'] ?? ''),
                 'rehearsal_date' => ScheduleTime::formatLocalDate($starts, $tz) . ' '
                     . ScheduleTime::formatRehearsalTimeRange($rehearsal, $tz),
-                'reason' => $reason,
+                'reason' => $this->displayReason($reason),
             ]),
         );
     }
@@ -83,8 +83,18 @@ final class AttendanceConductorNotifier
                 'part' => $part,
                 'rehearsal_date' => ScheduleTime::formatLocalDate($starts, $tz) . ' '
                     . ScheduleTime::formatRehearsalTimeRange($rehearsal, $tz),
-                'reason' => $reason !== '' ? $reason : '—',
+                'reason' => $this->displayReason($reason),
             ]),
         );
+    }
+
+    private function displayReason(string $reason): string
+    {
+        $trimmed = trim($reason);
+        if ($trimmed === '' || $trimmed === '—') {
+            return $this->texts->get('absence.reason_not_given');
+        }
+
+        return $reason;
     }
 }

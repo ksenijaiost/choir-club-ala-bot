@@ -14,6 +14,7 @@ use App\Handlers\AttendanceCallbackHandler;
 use App\Handlers\AttendanceDeps;
 use App\Handlers\AttendanceMemberHandler;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\CheckInSessionRepository;
 use App\Repositories\BlockEventRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\UserFlowRepository;
@@ -174,6 +175,7 @@ final class AttendanceDayBeforeRevertTest extends TestCase
             $recalculator,
             new AttendanceHistoryPresenter($texts),
             $texts,
+            new CheckInSessionRepository($pdo),
         );
     }
 }

@@ -138,12 +138,19 @@ final class AttendanceCallbackHandler
             return;
         }
 
+        if ($deps->checkInSessions->isClosed($rehearsalId)) {
+            $bot->answerCallbackQuery(text: $deps->texts->get('checkin.already_closed'), show_alert: true);
+            CallbackUi::clearKeyboard($bot);
+
+            return;
+        }
+
         $tz = new \DateTimeZone($deps->config->timezone);
         $now = Clock::now($deps->config)->setTimezone($tz);
         $ends = new \DateTimeImmutable((string) $rehearsal['ends_at'], $tz);
 
         if ($now >= $ends) {
-            $bot->answerCallbackQuery(text: $deps->texts->get('checkin.expired'), show_alert: true);
+            $bot->answerCallbackQuery(text: $deps->texts->get('checkin.already_closed'), show_alert: true);
             CallbackUi::clearKeyboard($bot);
 
             return;

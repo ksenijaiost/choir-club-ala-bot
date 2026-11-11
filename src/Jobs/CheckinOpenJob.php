@@ -8,6 +8,7 @@ use App\Clock;
 use App\Config;
 use App\Domain\AttendanceMark;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\CheckInPromptRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\JobDeliveryRepository;
 use App\Repositories\RehearsalRepository;
@@ -24,6 +25,7 @@ final class CheckinOpenJob
         private readonly UserRepository $users,
         private readonly AttendanceMarkRepository $marks,
         private readonly CheckInSessionRepository $sessions,
+        private readonly CheckInPromptRepository $prompts,
         private readonly JobDeliveryRepository $deliveries,
         private readonly AttendanceMessageFactory $messages,
         private readonly TextRepository $texts,
@@ -60,7 +62,11 @@ final class CheckinOpenJob
                     continue;
                 }
 
-                $this->outbound->sendMessage((int) $user['telegram_id'], $text, $keyboard);
+                $chatId = (int) $user['telegram_id'];
+                $messageId = $this->outbound->sendMessage($chatId, $text, $keyboard);
+                if ($messageId !== null) {
+                    $this->prompts->save($rehearsalId, $userId, $chatId, $messageId);
+                }
                 $sent++;
             }
         }

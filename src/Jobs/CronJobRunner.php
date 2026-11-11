@@ -8,6 +8,7 @@ use App\Clock;
 use App\Config;
 use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BotSettingsRepository;
+use App\Repositories\CheckInPromptRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\JobDeliveryRepository;
 use App\Repositories\PaymentRecordRepository;
@@ -69,6 +70,7 @@ final class CronJobRunner
         $messages = new AttendanceMessageFactory($texts);
         $marks = new AttendanceMarkRepository($pdo);
         $sessions = new CheckInSessionRepository($pdo);
+        $prompts = new CheckInPromptRepository($pdo);
         $recipients = new NotificationRecipientResolver($config, $users);
         $blockEvents = new BlockEventRepository($pdo);
         $blocks = new MemberBlockService($users, $blockEvents);
@@ -89,6 +91,7 @@ final class CronJobRunner
             $users,
             $marks,
             $sessions,
+            $prompts,
             $deliveries,
             $messages,
             $texts,
@@ -100,8 +103,11 @@ final class CronJobRunner
             $users,
             $marks,
             $sessions,
+            $prompts,
             $deliveries,
             $attendance,
+            $texts,
+            $outbound,
         ))->runIfDue($config);
 
         $settings = new BotSettingsRepository($pdo);
@@ -144,6 +150,7 @@ final class CronJobRunner
         $deliveries = new JobDeliveryRepository($pdo);
         $marks = new AttendanceMarkRepository($pdo);
         $sessions = new CheckInSessionRepository($pdo);
+        $prompts = new CheckInPromptRepository($pdo);
         $messages = new AttendanceMessageFactory($texts);
         $recipients = new NotificationRecipientResolver($config, $users);
         $blockEvents = new BlockEventRepository($pdo);
@@ -165,6 +172,7 @@ final class CronJobRunner
                 $users,
                 $marks,
                 $sessions,
+                $prompts,
                 $deliveries,
                 $messages,
                 $texts,
@@ -175,8 +183,11 @@ final class CronJobRunner
                 $users,
                 $marks,
                 $sessions,
+                $prompts,
                 $deliveries,
                 $attendance,
+                $texts,
+                $outbound,
             ))->runIfDue($config),
         ];
     }

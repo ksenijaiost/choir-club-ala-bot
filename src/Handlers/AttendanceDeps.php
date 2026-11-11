@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Config;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\CheckInSessionRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
@@ -30,6 +31,7 @@ final class AttendanceDeps
         public readonly ConsecutiveUnexcusedRecalculator $recalculator,
         public readonly AttendanceHistoryPresenter $history,
         public readonly TextRepository $texts,
+        public readonly CheckInSessionRepository $checkInSessions,
     ) {
     }
 }

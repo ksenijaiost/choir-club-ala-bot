@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Config;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\CheckInSessionRepository;
 use App\Repositories\BlockEventRepository;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\PaymentRecordRepository;
@@ -92,6 +93,7 @@ final class HandlerRegistry
             $recalculator,
             new AttendanceHistoryPresenter($texts),
             $texts,
+            new CheckInSessionRepository($pdo),
         );
 
         CallbackQueryHandler::register(

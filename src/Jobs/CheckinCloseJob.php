@@ -8,12 +8,15 @@ use App\Clock;
 use App\Config;
 use App\Domain\AttendanceSource;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\CheckInPromptRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\JobDeliveryRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\UserRepository;
 use App\Services\AttendanceService;
 use App\Services\ScheduleTime;
+use App\Telegram\TelegramOutbound;
+use App\Text\TextRepository;
 
 final class CheckinCloseJob
 {
@@ -22,8 +25,11 @@ final class CheckinCloseJob
         private readonly UserRepository $users,
         private readonly AttendanceMarkRepository $marks,
         private readonly CheckInSessionRepository $sessions,
+        private readonly CheckInPromptRepository $prompts,
         private readonly JobDeliveryRepository $deliveries,
         private readonly AttendanceService $attendance,
+        private readonly TextRepository $texts,
+        private readonly TelegramOutbound $outbound,
     ) {
     }
 
@@ -44,6 +50,19 @@ final class CheckinCloseJob
             if ($this->sessions->isClosed($rehearsalId)) {
                 continue;
             }
+
+            $questionText = $this->texts->get('checkin.question');
+            $closedSuffix = $this->texts->get('checkin.closed_suffix');
+
+            foreach ($this->prompts->listForRehearsal($rehearsalId) as $prompt) {
+                $this->outbound->closeCheckinPrompt(
+                    (int) $prompt['chat_id'],
+                    (int) $prompt['message_id'],
+                    $questionText,
+                    $closedSuffix,
+                );
+            }
+            $this->prompts->deleteForRehearsal($rehearsalId);
 
             foreach ($this->users->listActiveParticipants() as $user) {
                 $userId = (int) $user['id'];

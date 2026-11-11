@@ -16,6 +16,7 @@ use App\Repositories\PaymentRecordRepository;
 use App\Services\PaymentTexts;
 use App\Handlers\ScheduleDeps;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\CheckInSessionRepository;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
@@ -220,6 +221,7 @@ final class MessageHandlerTest extends TestCase
             $recalculator,
             new AttendanceHistoryPresenter($texts),
             $texts,
+            new CheckInSessionRepository($pdo),
         );
     }
 }
