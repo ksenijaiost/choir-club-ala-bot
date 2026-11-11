@@ -158,4 +158,22 @@ final class MaterialRepository
 
         return $stmt->fetchAll() ?: [];
     }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listSongsWithRecordingsForPart(string $voicePart): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT s.id, s.title, COUNT(m.id) AS recording_count
+             FROM materials m
+             INNER JOIN songs s ON s.id = m.song_id
+             WHERE m.type = ? AND m.voice_part = ? AND m.is_current = 1
+             GROUP BY s.id, s.title
+             ORDER BY s.title_normalized ASC'
+        );
+        $stmt->execute([MaterialType::RECORDING, $voicePart]);
+
+        return $stmt->fetchAll() ?: [];
+    }
 }

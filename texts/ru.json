@@ -191,7 +191,9 @@
     "card_header": "🎵 {title}",
     "no_material": "Для этой песни материал пока не загружен.",
     "my_recordings_header": "Записи для твоей партии ({part}):",
-    "my_recordings_empty": "Пока нет записей для партии {part}."
+    "my_recordings_empty": "Пока нет записей для партии {part}.",
+    "my_recordings_need_part": "Сначала укажи партию в профиле (или попроси дирижёра обновить данные).",
+    "pick_part_for_recordings": "Записи партий — «{title}». Выбери партию:"
   },
   "materials": {
     "duplicate_card": "Этот файл уже загружен:\nПесня: {song}\nТип: {type}\nПартия: {part}\nКто: {uploader}\nКогда: {uploaded_at}",

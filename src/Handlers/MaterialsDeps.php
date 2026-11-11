@@ -10,6 +10,7 @@ use App\Repositories\SongRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\MaterialsService;
+use App\Services\SongDeliveryService;
 use App\Text\TextRepository;
 
 final class MaterialsDeps
@@ -21,6 +22,7 @@ final class MaterialsDeps
         public readonly SongRepository $songs,
         public readonly MaterialRepository $materials,
         public readonly MaterialsService $service,
+        public readonly SongDeliveryService $delivery,
         public readonly TextRepository $texts,
     ) {
     }

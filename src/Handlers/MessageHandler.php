@@ -98,6 +98,16 @@ final class MessageHandler
                     return;
                 }
 
+                if ($materials !== null && $telegramId !== null && SongMemberHandler::handleFlowMessage(
+                    $bot,
+                    $materials,
+                    $materials->delivery,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
                 if ($telegramId !== null && ScheduleAdminHandler::handleFlowMessage(
                     $bot,
                     $texts,
@@ -229,6 +239,18 @@ final class MessageHandler
 
         if ($text === $texts->get('menu.admin_materials') && $materials !== null) {
             MaterialsAdminHandler::openHome($bot, $texts, $access, $materials, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.find_song') && $materials !== null) {
+            SongMemberHandler::beginSearch($bot, $materials, (int) $user['telegram_id']);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.my_recordings') && $materials !== null) {
+            SongMemberHandler::openMyRecordings($bot, $materials, $materials->delivery, $user);
 
             return;
         }

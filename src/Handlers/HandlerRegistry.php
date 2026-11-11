@@ -25,6 +25,7 @@ use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MaterialsService;
+use App\Services\SongDeliveryService;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
 use App\Services\PaymentTexts;
@@ -93,6 +94,7 @@ final class HandlerRegistry
             $songRepo,
             $materialRepo,
             new MaterialsService($materialRepo, $songRepo, $texts),
+            new SongDeliveryService($materialRepo, $texts),
             $texts,
         );
 

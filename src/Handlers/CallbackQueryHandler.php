@@ -50,6 +50,14 @@ final class CallbackQueryHandler
                 return;
             }
 
+            if (str_starts_with($data, 'snd:')) {
+                if (SongsCallbackHandler::handle($bot, $materials, $materials->delivery, $data)) {
+                    return;
+                }
+
+                return;
+            }
+
             if (str_starts_with($data, 'mat:')) {
                 $actorRow = $users->findByTelegramId($actorTelegramId);
                 if ($actorRow !== null && MaterialsCallbackHandler::handle($bot, $materials, $access, $actorRow, $data)) {
