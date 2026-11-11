@@ -24,6 +24,14 @@ final class SongsCallbackHandler
             return false;
         }
 
+        if (preg_match('/^snd:cat:pg:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            SongMemberHandler::sendMaterialCatalog($bot, $deps, (int) $m[1]);
+
+            return true;
+        }
+
         if (preg_match('/^snd:pk:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
@@ -106,13 +114,9 @@ final class SongsCallbackHandler
 
         $keyboard = InlineKeyboardMarkup::make();
         $hasRows = false;
-        foreach (VoicePart::CODES as $code) {
-            $count = count($deps->materials->listCurrentRecordings($songId, $code));
-            if ($count === 0) {
-                continue;
-            }
-
+        foreach ($deps->materials->listPartsWithRecordingsForSong($songId) as $code) {
             $hasRows = true;
+            $count = $deps->materials->countRecordingsForPart($songId, $code);
             $label = $deps->texts->get('parts.' . $code) . ' (' . $count . ')';
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make($label, callback_data: 'snd:rp:' . $songId . ':' . $code),

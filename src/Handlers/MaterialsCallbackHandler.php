@@ -72,7 +72,9 @@ final class MaterialsCallbackHandler
             $deps->flows->set((int) $actor['telegram_id'], 'material_upload', $ctx);
 
             if ($type === MaterialType::RECORDING) {
-                MaterialsFlowHandler::sendPartPicker($bot, $deps);
+                $ctx['selected_parts'] = [];
+                $deps->flows->set((int) $actor['telegram_id'], 'material_upload', $ctx);
+                MaterialsFlowHandler::sendRecordingPartPicker($bot, $deps, (int) $actor['telegram_id']);
 
                 return true;
             }
@@ -82,7 +84,7 @@ final class MaterialsCallbackHandler
             return true;
         }
 
-        if (preg_match('/^mat:up:pt:([a-z0-9_]+)$/', $data, $m) === 1) {
+        if (preg_match('/^mat:up:pt:t:([a-z0-9_]+)$/', $data, $m) === 1) {
             $part = $m[1];
             if (!VoicePart::isValid($part)) {
                 $bot->answerCallbackQuery();
@@ -90,18 +92,58 @@ final class MaterialsCallbackHandler
                 return true;
             }
 
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
-
-            $state = $deps->flows->get((int) $actor['telegram_id']);
+            $telegramId = (int) $actor['telegram_id'];
+            $state = $deps->flows->get($telegramId);
             if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+                $bot->answerCallbackQuery();
+
                 return true;
             }
 
             $ctx = $state['context'];
-            $ctx['voice_part'] = $part;
+            $selected = $deps->service->normalizeVoiceParts($ctx['selected_parts'] ?? []);
+            if (in_array($part, $selected, true)) {
+                $selected = array_values(array_filter($selected, static fn (string $p): bool => $p !== $part));
+            } else {
+                $selected[] = $part;
+                sort($selected);
+            }
+
+            $ctx['selected_parts'] = $selected;
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
+
+            $bot->answerCallbackQuery();
+            $chatId = (int) ($ctx['part_picker_chat_id'] ?? 0);
+            $messageId = (int) ($ctx['part_picker_message_id'] ?? 0);
+            if ($chatId !== 0 && $messageId !== 0) {
+                MaterialsFlowHandler::refreshRecordingPartPicker($bot, $deps, $chatId, $messageId, $selected);
+            }
+
+            return true;
+        }
+
+        if ($data === 'mat:up:pt:go') {
+            $telegramId = (int) $actor['telegram_id'];
+            $state = $deps->flows->get($telegramId);
+            if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $ctx = $state['context'];
+            $selected = $deps->service->normalizeVoiceParts($ctx['selected_parts'] ?? []);
+            if ($selected === []) {
+                $bot->answerCallbackQuery(text: $deps->texts->get('materials.pick_parts_none'), show_alert: true);
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $ctx['selected_parts'] = $selected;
             $ctx['step'] = 'save';
-            $deps->flows->set((int) $actor['telegram_id'], 'material_upload', $ctx);
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
             MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
 
             return true;
@@ -213,10 +255,11 @@ final class MaterialsCallbackHandler
         }
 
         $keyboard = \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make();
-        foreach (\App\Domain\VoicePart::CODES as $code) {
+        foreach ($deps->materials->listPartsWithRecordingsForSong($songId) as $code) {
+            $count = $deps->materials->countRecordingsForPart($songId, $code);
             $keyboard = $keyboard->addRow(
                 \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
-                    $deps->texts->get('parts.' . $code),
+                    $deps->texts->get('parts.' . $code) . ' (' . $count . ')',
                     callback_data: 'mat:mg:rec:' . $songId . ':' . $code,
                 ),
             );
@@ -259,7 +302,8 @@ final class MaterialsCallbackHandler
         $index = 1;
         foreach ($rows as $row) {
             $id = (int) $row['id'];
-            $lines[] = $index . '. ' . ($row['uploaded_at'] ?? '');
+            $partsLabel = $deps->service->formatVoicePartsLabel($row['voice_parts'] ?? []);
+            $lines[] = $index . '. ' . ($row['uploaded_at'] ?? '') . ' — ' . $partsLabel;
             $keyboard = $keyboard->addRow(
                 \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
                     '✏️ #' . $index,

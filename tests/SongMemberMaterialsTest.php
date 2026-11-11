@@ -29,6 +29,51 @@ final class SongMemberMaterialsTest extends TestCase
         self::assertCount(2, $matches);
     }
 
+    public function testCatalogListsSongsWithCurrentMaterials(): void
+    {
+        $pdo = Connection::make($this->testConfig());
+        (new Migrator($pdo, 'sqlite'))->migrate();
+
+        $users = new UserRepository($pdo);
+        $uploaderId = $users->create(7000, 'Админ', 'tenor', UserRole::ADMIN, UserStatus::ACTIVE);
+
+        $songs = new SongRepository($pdo);
+        $withMaterials = $songs->create('Есть материалы');
+        $songs->create('Пустая песня');
+
+        $materials = new MaterialRepository($pdo);
+        $materials->insert($withMaterials, MaterialType::NOTES, null, 'n1', 'nu1', $uploaderId, null, true);
+
+        self::assertSame(1, $songs->countWithCurrentMaterials());
+        $page = $songs->listWithCurrentMaterials(0, 10);
+        self::assertCount(1, $page);
+        self::assertSame('Есть материалы', $page[0]['title']);
+    }
+
+    public function testRecordingWithTwoPartsVisibleForBothInMyRecordingsQuery(): void
+    {
+        $pdo = Connection::make($this->testConfig());
+        (new Migrator($pdo, 'sqlite'))->migrate();
+
+        $users = new UserRepository($pdo);
+        $uploaderId = $users->create(7002, 'Админ', 'soprano_1', UserRole::ADMIN, UserStatus::ACTIVE);
+
+        $songs = new SongRepository($pdo);
+        $songId = $songs->create('Хоровая');
+
+        $materials = new MaterialRepository($pdo);
+        $materials->insertRecording($songId, ['soprano_1', 'alto_1'], 'f1', 'u1', $uploaderId, null);
+
+        $forSoprano = $materials->listSongsWithRecordingsForPart('soprano_1');
+        $forAlto = $materials->listSongsWithRecordingsForPart('alto_1');
+
+        self::assertCount(1, $forSoprano);
+        self::assertCount(1, $forAlto);
+        self::assertSame('Хоровая', $forSoprano[0]['title']);
+        self::assertSame(1, (int) $forSoprano[0]['recording_count']);
+        self::assertSame(1, (int) $forAlto[0]['recording_count']);
+    }
+
     public function testMyRecordingsListsSongsForPart(): void
     {
         $pdo = Connection::make($this->testConfig());
@@ -42,9 +87,9 @@ final class SongMemberMaterialsTest extends TestCase
         $s2 = $songs->create('Песня Б');
 
         $materials = new MaterialRepository($pdo);
-        $materials->insert($s1, MaterialType::RECORDING, 'tenor', 'f1', 'u1', $uploaderId, null, true);
-        $materials->insert($s1, MaterialType::RECORDING, 'tenor', 'f2', 'u2', $uploaderId, null, true);
-        $materials->insert($s2, MaterialType::RECORDING, 'bass', 'f3', 'u3', $uploaderId, null, true);
+        $materials->insertRecording($s1, ['tenor'], 'f1', 'u1', $uploaderId, null);
+        $materials->insertRecording($s1, ['tenor'], 'f2', 'u2', $uploaderId, null);
+        $materials->insertRecording($s2, ['bass'], 'f3', 'u3', $uploaderId, null);
 
         $forTenor = $materials->listSongsWithRecordingsForPart('tenor');
         self::assertCount(1, $forTenor);

@@ -14,6 +14,7 @@ final class SongDeliveryService
     public function __construct(
         private readonly MaterialRepository $materials,
         private readonly TextRepository $texts,
+        private readonly MaterialsService $materialsService,
     ) {
     }
 
@@ -87,7 +88,8 @@ final class SongDeliveryService
 
         $type = (string) ($material['type'] ?? '');
         if ($type === MaterialType::RECORDING) {
-            $bot->sendAudio(audio: $fileId);
+            $caption = $this->materialsService->recordingCaption($material);
+            $bot->sendAudio(audio: $fileId, caption: $caption !== '' ? $caption : null);
 
             return;
         }

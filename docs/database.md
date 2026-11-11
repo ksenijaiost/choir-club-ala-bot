@@ -140,7 +140,7 @@
 | `id` | PK | |
 | `song_id` | FK | |
 | `type` | VARCHAR(16) | `notes`, `translit`, `recording` |
-| `voice_part` | VARCHAR(32) NULL | NULL для notes/translit; для recording — партия |
+| `voice_part` | VARCHAR(32) NULL | Устарело для recording (см. `material_voice_parts`); для notes/translit — всегда NULL |
 | `telegram_file_id` | VARCHAR(512) | |
 | `telegram_file_unique_id` | VARCHAR(128) UNIQUE | Защита от дубликатов |
 | `is_current` | BOOLEAN | Текущая версия (notes/translit) |
@@ -148,6 +148,17 @@
 | `uploaded_by_user_id` | FK | |
 | `uploaded_at` | DATETIME | |
 | `admin_chat_message_id` | BIGINT NULL | |
+
+### `material_voice_parts`
+
+Связь записи (`materials.type = recording`) с одной или несколькими партиями. Одна строка в `materials` — один файл; партии не дублируют файл.
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `material_id` | FK → `materials.id` | |
+| `voice_part` | VARCHAR(32) | Код партии |
+
+Миграция `008_*` создаёт таблицу и переносит старые `materials.voice_part` для записей.
 
 ### `bot_settings`
 

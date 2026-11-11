@@ -97,8 +97,8 @@ final class MaterialsUploadTest extends TestCase
         $materials = new MaterialRepository($pdo);
         $service = new MaterialsService($materials, $songs, $texts);
 
-        $service->saveUpload($uploader, $songId, MaterialType::RECORDING, 'tenor', 'r1', 'ru1', null, true);
-        $service->saveUpload($uploader, $songId, MaterialType::RECORDING, 'tenor', 'r2', 'ru2', null, true);
+        $service->saveUpload($uploader, $songId, MaterialType::RECORDING, ['tenor'], 'r1', 'ru1', null, true);
+        $service->saveUpload($uploader, $songId, MaterialType::RECORDING, ['tenor'], 'r2', 'ru2', null, true);
 
         self::assertCount(2, $materials->listCurrentRecordings($songId, 'tenor'));
     }

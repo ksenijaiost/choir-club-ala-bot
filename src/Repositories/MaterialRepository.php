@@ -28,7 +28,13 @@ final class MaterialRepository
         $stmt->execute([$fileUniqueId]);
         $row = $stmt->fetch();
 
-        return $row === false ? null : $row;
+        if ($row === false) {
+            return null;
+        }
+
+        $row['voice_parts'] = $this->listVoiceParts((int) $row['id']);
+
+        return $row;
     }
 
     /**
@@ -40,7 +46,50 @@ final class MaterialRepository
         $stmt->execute([$id]);
         $row = $stmt->fetch();
 
-        return $row === false ? null : $row;
+        if ($row === false) {
+            return null;
+        }
+
+        $row['voice_parts'] = $this->listVoiceParts($id);
+
+        return $row;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listVoiceParts(int $materialId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT voice_part FROM material_voice_parts WHERE material_id = ? ORDER BY voice_part ASC'
+        );
+        $stmt->execute([$materialId]);
+        $parts = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            $parts[] = (string) $row['voice_part'];
+        }
+
+        return $parts;
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    public function setVoiceParts(int $materialId, array $parts): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM material_voice_parts WHERE material_id = ?');
+        $stmt->execute([$materialId]);
+
+        if ($parts === []) {
+            return;
+        }
+
+        $insert = $this->pdo->prepare(
+            'INSERT INTO material_voice_parts (material_id, voice_part) VALUES (?, ?)'
+        );
+        foreach ($parts as $part) {
+            $insert->execute([$materialId, $part]);
+        }
     }
 
     /**
@@ -90,6 +139,8 @@ final class MaterialRepository
         ?int $adminChatMessageId,
         bool $isCurrent = true,
     ): int {
+        $storedPart = MaterialType::isSingleton($type) ? null : null;
+
         $stmt = $this->pdo->prepare(
             'INSERT INTO materials (
                 song_id, type, voice_part, telegram_file_id, telegram_file_unique_id,
@@ -99,7 +150,7 @@ final class MaterialRepository
         $stmt->execute([
             $songId,
             $type,
-            $voicePart,
+            $storedPart,
             $fileId,
             $fileUniqueId,
             $isCurrent ? 1 : 0,
@@ -110,25 +161,67 @@ final class MaterialRepository
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function replaceFile(
-        int $materialId,
+    /**
+     * @param list<string> $voiceParts
+     */
+    public function insertRecording(
+        int $songId,
+        array $voiceParts,
         string $fileId,
         string $fileUniqueId,
         int $uploadedByUserId,
         ?int $adminChatMessageId,
-    ): void {
-        $stmt = $this->pdo->prepare(
-            'UPDATE materials SET
-                telegram_file_id = ?,
-                telegram_file_unique_id = ?,
-                uploaded_by_user_id = ?,
-                uploaded_at = CURRENT_TIMESTAMP,
-                admin_chat_message_id = ?,
-                is_current = 1,
-                archived_at = NULL
-             WHERE id = ?'
+    ): int {
+        $id = $this->insert(
+            $songId,
+            MaterialType::RECORDING,
+            null,
+            $fileId,
+            $fileUniqueId,
+            $uploadedByUserId,
+            $adminChatMessageId,
+            true,
         );
-        $stmt->execute([$fileId, $fileUniqueId, $uploadedByUserId, $adminChatMessageId, $materialId]);
+        $this->setVoiceParts($id, $voiceParts);
+
+        return $id;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listPartsWithRecordingsForSong(int $songId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT mvp.voice_part FROM material_voice_parts mvp
+             INNER JOIN materials m ON m.id = mvp.material_id
+             WHERE m.song_id = ? AND m.type = ? AND m.is_current = 1
+             ORDER BY mvp.voice_part ASC'
+        );
+        $stmt->execute([$songId, MaterialType::RECORDING]);
+        $parts = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            $parts[] = (string) $row['voice_part'];
+        }
+
+        return $parts;
+    }
+
+    public function countRecordingsForPart(int $songId, string $voicePart): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(DISTINCT m.id) FROM materials m
+             INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
+             WHERE m.song_id = ? AND m.type = ? AND mvp.voice_part = ? AND m.is_current = 1'
+        );
+        $stmt->execute([$songId, MaterialType::RECORDING, $voicePart]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function songHasRecordingsForPart(int $songId, string $voicePart): bool
+    {
+        return $this->countRecordingsForPart($songId, $voicePart) > 0;
     }
 
     /**
@@ -137,11 +230,32 @@ final class MaterialRepository
     public function listCurrentRecordings(int $songId, string $voicePart): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM materials
-             WHERE song_id = ? AND type = ? AND voice_part = ? AND is_current = 1
-             ORDER BY uploaded_at DESC'
+            'SELECT DISTINCT m.* FROM materials m
+             INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
+             WHERE m.song_id = ? AND m.type = ? AND mvp.voice_part = ? AND m.is_current = 1
+             ORDER BY m.uploaded_at DESC'
         );
         $stmt->execute([$songId, MaterialType::RECORDING, $voicePart]);
+        $rows = $stmt->fetchAll() ?: [];
+
+        return $this->attachVoiceParts($rows);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listSongsWithRecordingsForPart(string $voicePart): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT s.id, s.title, COUNT(DISTINCT m.id) AS recording_count
+             FROM materials m
+             INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
+             INNER JOIN songs s ON s.id = m.song_id
+             WHERE m.type = ? AND mvp.voice_part = ? AND m.is_current = 1
+             GROUP BY s.id, s.title
+             ORDER BY s.title_normalized ASC'
+        );
+        $stmt->execute([MaterialType::RECORDING, $voicePart]);
 
         return $stmt->fetchAll() ?: [];
     }
@@ -152,28 +266,23 @@ final class MaterialRepository
     public function listCurrentForSong(int $songId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM materials WHERE song_id = ? AND is_current = 1 ORDER BY type, voice_part, uploaded_at DESC'
+            'SELECT * FROM materials WHERE song_id = ? AND is_current = 1 ORDER BY type, uploaded_at DESC'
         );
         $stmt->execute([$songId]);
 
-        return $stmt->fetchAll() ?: [];
+        return $this->attachVoiceParts($stmt->fetchAll() ?: []);
     }
 
     /**
+     * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
-    public function listSongsWithRecordingsForPart(string $voicePart): array
+    private function attachVoiceParts(array $rows): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.title, COUNT(m.id) AS recording_count
-             FROM materials m
-             INNER JOIN songs s ON s.id = m.song_id
-             WHERE m.type = ? AND m.voice_part = ? AND m.is_current = 1
-             GROUP BY s.id, s.title
-             ORDER BY s.title_normalized ASC'
-        );
-        $stmt->execute([MaterialType::RECORDING, $voicePart]);
+        foreach ($rows as $i => $row) {
+            $rows[$i]['voice_parts'] = $this->listVoiceParts((int) $row['id']);
+        }
 
-        return $stmt->fetchAll() ?: [];
+        return $rows;
     }
 }

@@ -12,10 +12,55 @@ use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class SongMemberHandler
 {
+    private const CATALOG_PAGE_SIZE = 10;
+
     public static function beginSearch(Nutgram $bot, MaterialsDeps $deps, int $telegramId): void
     {
         $deps->flows->set($telegramId, 'song_search', []);
+        self::sendMaterialCatalog($bot, $deps, 0);
         $bot->sendMessage($deps->texts->get('songs.ask_title'));
+    }
+
+    public static function sendMaterialCatalog(Nutgram $bot, MaterialsDeps $deps, int $page): void
+    {
+        $total = $deps->songs->countWithCurrentMaterials();
+        if ($total === 0) {
+            $bot->sendMessage($deps->texts->get('songs.catalog_empty'));
+
+            return;
+        }
+
+        $offset = $page * self::CATALOG_PAGE_SIZE;
+        $songs = $deps->songs->listWithCurrentMaterials($offset, self::CATALOG_PAGE_SIZE);
+        $keyboard = InlineKeyboardMarkup::make();
+
+        foreach ($songs as $song) {
+            $id = (int) $song['id'];
+            $title = (string) ($song['title'] ?? '');
+            $label = mb_strlen($title) > 42 ? mb_substr($title, 0, 39) . '…' : $title;
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($label, callback_data: 'snd:pk:' . $id),
+            );
+        }
+
+        $nav = [];
+        if ($page > 0) {
+            $nav[] = InlineKeyboardButton::make('‹', callback_data: 'snd:cat:pg:' . ($page - 1));
+        }
+        if ($offset + count($songs) < $total) {
+            $nav[] = InlineKeyboardButton::make('›', callback_data: 'snd:cat:pg:' . ($page + 1));
+        }
+        if ($nav !== []) {
+            $keyboard = $keyboard->addRow(...$nav);
+        }
+
+        $bot->sendMessage(
+            $deps->texts->get('songs.catalog_header', [
+                'page' => (string) ($page + 1),
+                'pages' => (string) max(1, (int) ceil($total / self::CATALOG_PAGE_SIZE)),
+            ]),
+            reply_markup: $keyboard,
+        );
     }
 
     public static function handleFlowMessage(

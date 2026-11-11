@@ -151,6 +151,13 @@ CREATE TABLE IF NOT EXISTS materials (
     CONSTRAINT chk_materials_type CHECK (type IN ('notes', 'translit', 'recording'))
 );
 
+CREATE TABLE IF NOT EXISTS material_voice_parts (
+    material_id BIGINT UNSIGNED NOT NULL,
+    voice_part VARCHAR(32) NOT NULL,
+    PRIMARY KEY (material_id, voice_part),
+    CONSTRAINT fk_mvp_material FOREIGN KEY (material_id) REFERENCES materials (id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS bot_settings (
     setting_key VARCHAR(64) NOT NULL,
     setting_value TEXT NOT NULL,

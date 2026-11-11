@@ -9,6 +9,7 @@ use App\Domain\VoicePart;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
+use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
 final class MaterialsFlowHandler
 {
@@ -69,15 +70,24 @@ final class MaterialsFlowHandler
         $bot->sendMessage($deps->texts->get('materials.ask_type'), reply_markup: $keyboard);
     }
 
-    public static function sendPartPicker(Nutgram $bot, MaterialsDeps $deps): void
+    /**
+     * @param list<string> $selected
+     */
+    public static function buildRecordingPartKeyboard(MaterialsDeps $deps, array $selected): InlineKeyboardMarkup
     {
+        $selectedMap = array_fill_keys($selected, true);
         $keyboard = InlineKeyboardMarkup::make();
         $row = [];
 
         foreach (VoicePart::CODES as $code) {
+            $label = $deps->texts->get('parts.' . $code);
+            if (isset($selectedMap[$code])) {
+                $label = '✅ ' . $label;
+            }
+
             $row[] = InlineKeyboardButton::make(
-                $deps->texts->get('parts.' . $code),
-                callback_data: 'mat:up:pt:' . $code,
+                $label,
+                callback_data: 'mat:up:pt:t:' . $code,
             );
             if (count($row) === 2) {
                 $keyboard = $keyboard->addRow(...$row);
@@ -89,7 +99,53 @@ final class MaterialsFlowHandler
             $keyboard = $keyboard->addRow(...$row);
         }
 
-        $bot->sendMessage($deps->texts->get('materials.ask_part'), reply_markup: $keyboard);
+        $doneLabel = $deps->texts->get('buttons.parts_done');
+        if ($selected === []) {
+            $doneLabel .= ' ⚠';
+        }
+
+        return $keyboard->addRow(
+            InlineKeyboardButton::make($doneLabel, callback_data: 'mat:up:pt:go'),
+        );
+    }
+
+    public static function sendRecordingPartPicker(Nutgram $bot, MaterialsDeps $deps, int $telegramId): void
+    {
+        $message = $bot->sendMessage(
+            $deps->texts->get('materials.ask_part_multi'),
+            reply_markup: self::buildRecordingPartKeyboard($deps, []),
+        );
+
+        if ($message instanceof Message) {
+            $state = $deps->flows->get($telegramId);
+            if ($state !== null && ($state['flow'] ?? '') === 'material_upload') {
+                $ctx = $state['context'];
+                $ctx['selected_parts'] = [];
+                $ctx['part_picker_message_id'] = (int) $message->message_id;
+                $ctx['part_picker_chat_id'] = (int) $message->chat->id;
+                $deps->flows->set($telegramId, 'material_upload', $ctx);
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $selected
+     */
+    public static function refreshRecordingPartPicker(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $chatId,
+        int $messageId,
+        array $selected,
+    ): void {
+        try {
+            $bot->editMessageReplyMarkup(
+                chat_id: $chatId,
+                message_id: $messageId,
+                reply_markup: self::buildRecordingPartKeyboard($deps, $selected),
+            );
+        } catch (\Throwable) {
+        }
     }
 
     public static function sendReplaceConfirm(Nutgram $bot, MaterialsDeps $deps, int $songId, string $type): void
@@ -168,14 +224,17 @@ final class MaterialsFlowHandler
         $ctx = $state['context'];
         $songId = (int) ($ctx['song_id'] ?? 0);
         $type = (string) ($ctx['type'] ?? '');
-        $voicePart = isset($ctx['voice_part']) ? (string) $ctx['voice_part'] : null;
+        $voiceParts = null;
+        if ($type === MaterialType::RECORDING) {
+            $voiceParts = $deps->service->normalizeVoiceParts($ctx['selected_parts'] ?? []);
+        }
 
         try {
             $result = $deps->service->saveUpload(
                 $user,
                 $songId,
                 $type,
-                $voicePart,
+                $voiceParts,
                 (string) $ctx['file_id'],
                 (string) $ctx['file_unique_id'],
                 isset($ctx['admin_chat_message_id']) ? (int) $ctx['admin_chat_message_id'] : null,
@@ -199,8 +258,9 @@ final class MaterialsFlowHandler
         $deps->flows->clear($telegramId);
 
         $chatId = (int) ($ctx['admin_chat_id'] ?? 0);
+        $partList = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
         $lines = [
-            $deps->service->uploadSuccessText($result['song'], $type, $voicePart),
+            $deps->service->uploadSuccessText($result['song'], $type, $partList),
         ];
         if ($result['archived_previous'] !== null) {
             $lines[] = $deps->texts->get('materials.archived_notice');

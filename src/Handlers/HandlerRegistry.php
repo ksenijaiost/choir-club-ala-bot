@@ -94,7 +94,7 @@ final class HandlerRegistry
             $songRepo,
             $materialRepo,
             new MaterialsService($materialRepo, $songRepo, $texts),
-            new SongDeliveryService($materialRepo, $texts),
+            new SongDeliveryService($materialRepo, $texts, new MaterialsService($materialRepo, $songRepo, $texts)),
             $texts,
         );
 
