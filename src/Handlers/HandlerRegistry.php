@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Config;
+use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BlockEventRepository;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\RegistrationRepository;
@@ -13,10 +14,16 @@ use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\AttendanceConductorNotifier;
+use App\Services\AttendanceDiscipline;
+use App\Services\AttendanceMessageFactory;
+use App\Services\AttendanceService;
 use App\Services\MemberBlockService;
+use App\Services\NotificationRecipientResolver;
 use App\Services\ScheduleBroadcastService;
 use App\Services\ScheduleGenerator;
 use App\Services\SchedulePresenter;
+use App\Telegram\NutgramOutbound;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 
@@ -51,11 +58,40 @@ final class HandlerRegistry
             $texts,
         );
 
-        CallbackQueryHandler::register($bot, $texts, $config, $users, $registrations, $access, $blockService, $schedule);
+        $marks = new AttendanceMarkRepository($pdo);
+        $outbound = new NutgramOutbound($bot);
+        $recipients = new NotificationRecipientResolver($config, $users);
+        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound);
+        $attendanceService = new AttendanceService($marks, $users, $discipline);
+        $conductorNotifier = new AttendanceConductorNotifier($recipients, $texts, $outbound);
+
+        $attendance = new AttendanceDeps(
+            $config,
+            $users,
+            $rehearsals,
+            $marks,
+            $flows,
+            $attendanceService,
+            new AttendanceMessageFactory($texts),
+            $conductorNotifier,
+            $texts,
+        );
+
+        CallbackQueryHandler::register(
+            $bot,
+            $texts,
+            $config,
+            $users,
+            $registrations,
+            $access,
+            $blockService,
+            $schedule,
+            $attendance,
+        );
         StartHandler::register($bot, $texts, $users, $access);
         ConductorAdminHandler::register($bot, $texts, $users, $access);
         HelpersAdminHandler::register($bot, $texts, $users, $access);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService);
-        MessageHandler::register($bot, $texts, $users, $access, $schedule);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance);
     }
 }

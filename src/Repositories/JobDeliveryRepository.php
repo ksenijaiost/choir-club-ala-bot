@@ -25,4 +25,33 @@ final class JobDeliveryRepository
         );
         $stmt->execute([$jobKey, $jobType, $relatedId]);
     }
+
+    public function tryClaim(string $jobKey, string $jobType, ?int $relatedId = null): bool
+    {
+        if ($this->wasDelivered($jobKey)) {
+            return false;
+        }
+
+        try {
+            $this->record($jobKey, $jobType, $relatedId);
+
+            return true;
+        } catch (\PDOException $e) {
+            if ($this->isUniqueViolation($e)) {
+                return false;
+            }
+
+            throw $e;
+        }
+    }
+
+    private function isUniqueViolation(\PDOException $e): bool
+    {
+        $code = (string) $e->getCode();
+        $message = $e->getMessage();
+
+        return $code === '23000'
+            || str_contains($message, 'UNIQUE constraint failed')
+            || str_contains($message, 'Duplicate entry');
+    }
 }

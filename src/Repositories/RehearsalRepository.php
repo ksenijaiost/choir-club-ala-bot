@@ -95,4 +95,59 @@ final class RehearsalRepository
 
         return $stmt->rowCount();
     }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listScheduledOnLocalDay(string $dayYmd): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM rehearsals WHERE status = ? AND starts_at >= ? AND starts_at <= ? ORDER BY starts_at ASC'
+        );
+        $stmt->execute(['scheduled', $dayYmd . ' 00:00:00', $dayYmd . ' 23:59:59']);
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listUpcomingScheduled(string $fromLocal, int $limit = 10): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM rehearsals WHERE status = ? AND starts_at > ? ORDER BY starts_at ASC LIMIT ?'
+        );
+        $stmt->bindValue(1, 'scheduled');
+        $stmt->bindValue(2, $fromLocal);
+        $stmt->bindValue(3, $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listOngoingScheduled(string $nowLocal): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM rehearsals WHERE status = ? AND starts_at <= ? AND ends_at > ? ORDER BY starts_at ASC'
+        );
+        $stmt->execute(['scheduled', $nowLocal, $nowLocal]);
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listScheduledEnded(string $nowLocal): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM rehearsals WHERE status = ? AND ends_at <= ? ORDER BY ends_at ASC'
+        );
+        $stmt->execute(['scheduled', $nowLocal]);
+
+        return $stmt->fetchAll() ?: [];
+    }
 }

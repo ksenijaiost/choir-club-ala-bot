@@ -30,8 +30,9 @@ final class CallbackQueryHandler
         AccessControl $access,
         MemberBlockService $blocks,
         ScheduleDeps $schedule,
+        AttendanceDeps $attendance,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -44,6 +45,12 @@ final class CallbackQueryHandler
 
             $actorTelegramId = $callback->from?->id;
             if ($actorTelegramId === null) {
+                return;
+            }
+
+            if (str_starts_with($data, 'att:')) {
+                AttendanceCallbackHandler::handle($bot, $attendance, $data, $actorTelegramId);
+
                 return;
             }
 

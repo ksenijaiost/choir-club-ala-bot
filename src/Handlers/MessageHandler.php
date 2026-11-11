@@ -22,8 +22,9 @@ final class MessageHandler
         UserRepository $users,
         AccessControl $access,
         ScheduleDeps $schedule,
+        AttendanceDeps $attendance,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -86,6 +87,15 @@ final class MessageHandler
             }
 
             if ($status === UserStatus::ACTIVE) {
+                if ($telegramId !== null && AttendanceMemberHandler::handleFlowMessage(
+                    $bot,
+                    $attendance,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
                 if ($telegramId !== null && ScheduleAdminHandler::handleFlowMessage(
                     $bot,
                     $texts,
@@ -102,7 +112,7 @@ final class MessageHandler
                     return;
                 }
 
-                self::handleActiveMenu($bot, $texts, $users, $access, $schedule, $user, $text);
+                self::handleActiveMenu($bot, $texts, $users, $access, $schedule, $attendance, $user, $text);
 
                 return;
             }
@@ -150,6 +160,7 @@ final class MessageHandler
         UserRepository $users,
         AccessControl $access,
         ScheduleDeps $schedule,
+        AttendanceDeps $attendance,
         array $user,
         string $text,
     ): void {
@@ -184,6 +195,12 @@ final class MessageHandler
                 $schedule->generator,
                 $schedule->presenter,
             );
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.wont_come')) {
+            AttendanceMemberHandler::openWontComePicker($bot, $attendance);
 
             return;
         }

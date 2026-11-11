@@ -206,6 +206,34 @@ final class UserRepository
         $stmt->execute([$userId]);
     }
 
+    public function incrementConsecutiveUnexcused(int $userId): int
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE users SET consecutive_unexcused = consecutive_unexcused + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        );
+        $stmt->execute([$userId]);
+
+        $stmt = $this->pdo->prepare('SELECT consecutive_unexcused FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([$userId]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Участники посещаемости: active member/admin/conductor.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listActiveParticipants(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM users WHERE status = ? AND role IN (?, ?, ?) ORDER BY id ASC'
+        );
+        $stmt->execute([UserStatus::ACTIVE, UserRole::MEMBER, UserRole::ADMIN, UserRole::CONDUCTOR]);
+
+        return $stmt->fetchAll();
+    }
+
     /**
      * Участники и помощники (не owner/conductor), со статусом active или blocked.
      *

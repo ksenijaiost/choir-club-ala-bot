@@ -9,15 +9,23 @@ use App\Database\Connection;
 use App\Database\Migrator;
 use App\Domain\UserRole;
 use App\Domain\UserStatus;
+use App\Handlers\AttendanceDeps;
 use App\Handlers\MessageHandler;
 use App\Handlers\ScheduleDeps;
+use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\AttendanceConductorNotifier;
+use App\Services\AttendanceDiscipline;
+use App\Services\AttendanceMessageFactory;
+use App\Services\AttendanceService;
+use App\Services\NotificationRecipientResolver;
 use App\Services\ScheduleBroadcastService;
+use App\Tests\Support\RecordingTelegramOutbound;
 use App\Services\ScheduleGenerator;
 use App\Services\SchedulePresenter;
 use App\Text\TextRepository;
@@ -42,13 +50,14 @@ final class MessageHandlerTest extends TestCase
         $users->create(self::TELEGRAM_ID, '', null, UserRole::MEMBER, UserStatus::PENDING);
 
         $schedule = $this->scheduleDeps($config, $pdo, $texts, $users);
+        $attendance = $this->attendanceDeps($config, $pdo, $texts, $users);
         $access = new AccessControl($config);
 
         $bot = Nutgram::fake();
         $bot->setCommonUser($this->makeUser());
         $bot->setCommonChat($this->makeChat(self::TELEGRAM_ID, ChatType::PRIVATE));
 
-        MessageHandler::register($bot, $texts, $users, $access, $schedule);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance);
 
         $bot->hearText('Тест Пользователь')
             ->willStartConversation()
@@ -70,13 +79,14 @@ final class MessageHandlerTest extends TestCase
         $users->create(self::TELEGRAM_ID, '', null, UserRole::MEMBER, UserStatus::PENDING);
 
         $schedule = $this->scheduleDeps($config, $pdo, $texts, $users);
+        $attendance = $this->attendanceDeps($config, $pdo, $texts, $users);
         $access = new AccessControl($config);
 
         $bot = Nutgram::fake();
         $bot->setCommonUser($this->makeUser());
         $bot->setCommonChat($this->makeChat(-100_500, ChatType::GROUP));
 
-        MessageHandler::register($bot, $texts, $users, $access, $schedule);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance);
 
         $bot->hearText('Тест Пользователь')
             ->willStartConversation()
@@ -151,6 +161,33 @@ final class MessageHandlerTest extends TestCase
             $presenter,
             $broadcast,
             $users,
+            $texts,
+        );
+    }
+
+    private function attendanceDeps(
+        Config $config,
+        \PDO $pdo,
+        TextRepository $texts,
+        UserRepository $users,
+    ): AttendanceDeps {
+        $rehearsals = new RehearsalRepository($pdo);
+        $flows = new UserFlowRepository($pdo);
+        $marks = new AttendanceMarkRepository($pdo);
+        $outbound = new RecordingTelegramOutbound();
+        $recipients = new NotificationRecipientResolver($config, $users);
+        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound);
+        $service = new AttendanceService($marks, $users, $discipline);
+
+        return new AttendanceDeps(
+            $config,
+            $users,
+            $rehearsals,
+            $marks,
+            $flows,
+            $service,
+            new AttendanceMessageFactory($texts),
+            new AttendanceConductorNotifier($recipients, $texts, $outbound),
             $texts,
         );
     }
