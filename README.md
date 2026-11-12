@@ -3,9 +3,7 @@
 Telegram-бот для расписания репетиций, отметок посещаемости, оплаты и базы нот/записей хора.
 
 **Стек:** PHP 8.2+, [Nutgram](https://nutgram.dev/) 4.x (Composer), PDO (**SQLite** локально, **MySQL** на сервере).  
-**Статус:** скелет приложения; бизнес-логика по [docs/TZ.md](docs/TZ.md) — в разработке.  
-**Хостинг:** shared [alabot.liveband.kz](https://alabot.liveband.kz) — MySQL, cron, HTTPS; **без SSH** (деплой FTP / Git в панели).  
-**Часовой пояс:** `Asia/Almaty` (UTC+5).  
+**Часовой пояс:** `Asia/Almaty` (UTC+5), задаётся `TIMEZONE` в `.env`.  
 **Username:** [@CHOIR_CLUB_ALA_bot](https://t.me/CHOIR_CLUB_ALA_bot)
 
 ## Документация
@@ -17,6 +15,82 @@ Telegram-бот для расписания репетиций, отметок �
 | [docs/schema.sql](docs/schema.sql) | Эталон DDL (MySQL); применение через `migrations/` |
 | [docs/scenarios.md](docs/scenarios.md) | Сценарии и cron |
 | [texts/ru.json](texts/ru.json) | Тексты бота |
+
+## Функции по ролям
+
+Роли в БД: `member`, `admin` (**помощник**), `conductor` (**дирижёр**), `owner` (**техспец** в интерфейсе и справке «О боте»). Пункт меню **«О боте»** повторяет те же разделы.
+
+### Участник (`member`)
+
+- **Расписание** — ближайшие репетиции.
+- **Не приду** — выбор предстоящей репетиции, затем **обязательная** причина одним сообщением; без причины отметка «предупредил» не ставится.
+- Напоминание **накануне в 12:00** и опрос **«Ты на репетиции?»** в начале репетиции: при отказе можно написать причину или нажать **«Нет причины»** — тогда пропуск **неуважительный**; с причиной — уважительный («предупредил»).
+- **Пропуски:** три неуважительных подряд — предупреждение; на четвёртом бот блокирует доступ до разблокировки дирижёром.
+- **Оплата:** дирижёр подтверждает взнос; 23-го в 12:00 — напоминание за **следующий** месяц, 1-го в 12:00 — за **текущий**; если оплата за этот месяц уже подтверждена, напоминания не приходят. Кнопка **«Я оплатил(а)»**.
+- **Найти песню** / **Мои записи** — ноты, транслит и записи по партии.
+- **Мой профиль** — имя и партия.
+
+### Помощник (`admin`)
+
+- **Админ: расписание** — шаблоны, разовые репетиции, перенос, адрес, отмена; при изменениях рассылка активным участникам.
+- **Админ: материалы** — список в личке; загрузка файлов в **админ-чат** (бот проводит по шагам: песня, тип, для записи — **несколько партий** на один файл, кнопка **«Готово»**).
+
+### Дирижёр (`conductor`)
+
+- Всё, что у помощника, плюс:
+- **Админ: посещаемость** — отметки и ручные правки.
+- **Админ: оплата** — сводка по месяцам, подтверждение; **«Тексты напоминаний»** — правка текстов 23-го и 1-го (плейсхолдер `{month}`), сброс к стандартным.
+- **Админ: история** — посещаемость и оплаты по участнику.
+- **Админ: помощники** / **Админ: участники** — назначение помощников, блокировка и разблокировка.
+
+### Техспец (`owner`)
+
+- **Назначить дирижёра** — из активных участников (прежний дирижёр снова `member`).
+- **Админ-чат** — просмотр и смена чата для материалов и заявок (бот должен быть **администратором** в новом чате).
+- Те же инструменты, что у дирижёра.
+
+Общее: **inline-меню** — **«✖ Закрыть»** (`ui:x`); нажатие **кнопки главного меню** во время пошагового ввода сбрасывает `user_flows` и выполняет действие меню.
+
+## Переменные окружения (`.env.example`)
+
+Скопируйте `.env.example` → `.env`. Ниже — все ключи из примера (включая закомментированные).
+
+| Переменная | Назначение |
+|------------|------------|
+| `BOT_TOKEN` | Токен от [@BotFather](https://t.me/BotFather) |
+| `OWNER_TELEGRAM_ID` | Telegram user id **техспеца** (обязательно); в БД `role=owner`, без регистрации |
+| `CONDUCTOR_TELEGRAM_ID` | *Опционально.* Legacy: при первом действии этот user может стать дирижёром в БД |
+| `ADMIN_CHAT_ID` | *Запасной* id приватной группы для материалов и заявок, если в БД ещё нет `bot_settings.admin_chat_id` |
+| `ADMIN_CHAT_LINK` | *Опционально.* Готовая ссылка `t.me/...` для кнопки **«Открыть админ-чат»**, если id **не** супергруппы (`-100…`). Для супергруппы ссылка строится из id автоматически |
+| `DB_CONNECTION` | `sqlite` или `mysql` |
+| `DB_HOST` | Хост MySQL (для SQLite не используется) |
+| `DB_PORT` | Порт MySQL |
+| `DB_DATABASE` | Путь к файлу SQLite или имя БД MySQL |
+| `TIMEZONE` | Пояс для cron и отображения времени (по умолчанию `Asia/Almaty`) |
+| `WEBHOOK_URL` | HTTPS URL до `public/webhook.php` на хостинге |
+| `WEBHOOK_SECRET` | Секрет заголовка `X-Telegram-Bot-Api-Secret-Token` |
+| `ADMIN_PAGES_KEY` | Ключ для `public/admin/migrate.php`, `public/cron.php`, `public/admin/set-webhook.php` |
+| `PAYMENT_REMINDER_DAY_1` / `PAYMENT_REMINDER_DAY_2` / `PAYMENT_REMINDER_HOUR` | *Подсказка в примере; в коде читаются из `bot_settings`* (`23`, `1`, `12` по умолчанию) |
+| `SCHEDULE_GENERATION_WEEKS` | *Подсказка; в коде — `bot_settings.schedule_generation_weeks` (по умолчанию `4`)* |
+| `REHEARSAL_DEFAULT_DURATION_MINUTES` | *Подсказка; в коде — `bot_settings.rehearsal_default_duration_minutes` (по умолчанию `120`)* |
+| `FAKE_NOW` | *Опционально.* ISO 8601 — подмена «сейчас» для CLI `public/cron.php` и тестов |
+
+**Админ-чат:** основной id хранится в **`bot_settings.admin_chat_id`** (кнопка **«Админ-чат»** у техспеца). `ADMIN_CHAT_ID` в `.env` — fallback до первой привязки. Бот должен быть **админом** в этом чате (загрузка материалов, заявки на вступление с кнопками Принять/Отклонить).
+
+## Cron (фоновые задачи)
+
+Вызов: `public/cron.php` по HTTP или CLI (см. ниже). Внутри — проверка окна в поясе `TIMEZONE`; идемпотентность через `job_deliveries`.
+
+| Задача | Когда | Что делает |
+|--------|-------|------------|
+| `schedule_generate` | Раз в сутки, с **03:00** местного времени | Догенерация репетиций по шаблонам на горизонт `schedule_generation_weeks` |
+| `day_before_reminder` | **12:00** в день **перед** репетицией | «Будешь?» **Да** / **Нет** активным участникам |
+| `checkin_open` | В **начало** репетиции (`starts_at`) | Опрос «Ты на репетиции?» тем, у кого нет отметки «предупредил» |
+| `checkin_close` | В **конец** (`ends_at`) | Нет ответа → неуважительный пропуск; закрытие сессии |
+| `payment_reminder_1` | День `payment_reminder_day_1` (23), час `payment_reminder_hour` (12) | Напоминание об оплате **следующего** месяца; не шлёт, если оплата за этот период уже подтверждена; текст из `bot_settings` или `texts/ru.json` |
+| `payment_reminder_2` | День `payment_reminder_day_2` (1), тот же час | Напоминание за **текущий** месяц или `payment.mismatch`, если участник отметил оплату без подтверждения; при подтверждении — пропуск |
+
+**Дисциплина пропусков:** подряд идущие **неуважительные** (`unexcused`) — на 3-м сообщение-предупреждение, на 4-м авто-блокировка и уведомление дирижёру (участнику — «изгнание»). Уважительное предупреждение или явка сбрасывает счётчик.
 
 ## Структура проекта
 
@@ -34,88 +108,59 @@ Telegram-бот для расписания репетиций, отметок �
 └── storage/                # SQLite по умолчанию (gitignore)
 ```
 
-## Локальная разработка (Windows / macOS)
+## Локальная разработка
 
 ### Требования
 
 - **PHP 8.2+** с расширениями: `pdo`, `pdo_sqlite`, `pdo_mysql`, `mbstring`, `json`, `curl`, `openssl`
 - **Composer** 2.x
-- Тестовый бот от [@BotFather](https://t.me/BotFather) (токен для `.env`)
-
-### Windows
-
-1. Установите [PHP](https://windows.php.net/download/) (Thread Safe) и добавьте в `PATH`, либо используйте [Laragon](https://laragon.org/) / OpenServer.
-2. Установите [Composer](https://getcomposer.org/download/).
-3. В каталоге проекта:
-
-```powershell
-copy .env.example .env
-# заполните BOT_TOKEN, ADMIN_PAGES_KEY, WEBHOOK_SECRET (любые длинные строки для локалки)
-composer install
-php public\admin\migrate.php key=ВАШ_ADMIN_PAGES_KEY
-```
-
-4. Запуск polling (удобно для отладки без HTTPS):
-
-```powershell
-php run.php
-```
-
-5. Проверка cron-заглушки в CLI с подменой времени:
-
-```powershell
-$env:FAKE_NOW="2026-11-22T12:00:00+05:00"
-php public\cron.php
-```
-
-### macOS
+- Тестовый бот от [@BotFather](https://t.me/BotFather)
 
 ```bash
-brew install php composer
-cp .env.example .env
-# отредактируйте .env
+cp .env.example .env   # заполните BOT_TOKEN, OWNER_TELEGRAM_ID, ADMIN_PAGES_KEY, WEBHOOK_SECRET
 composer install
-php public/admin/migrate.php key=YOUR_ADMIN_PAGES_KEY
-php run.php
+php public/admin/migrate.php key=ВАШ_ADMIN_PAGES_KEY
+php run.php            # long polling
+```
+
+Проверка cron с подменой времени:
+
+```bash
 FAKE_NOW=2026-11-22T12:00:00+05:00 php public/cron.php
 ```
 
-Для одноразового вызова `migrate.php` / `cron.php` по HTTP поднимите встроенный сервер (document root = `public/`):
+Одноразовый HTTP: `php -S localhost:8080 -t public` → `http://localhost:8080/admin/migrate.php?key=...`
 
-```bash
-php -S localhost:8080 -t public
-# http://localhost:8080/admin/migrate.php?key=...
-```
+По умолчанию: `DB_CONNECTION=sqlite`, `DB_DATABASE=storage/choir.sqlite`.
 
-### База данных локально
+### Тесты и статический анализ
 
-По умолчанию в `.env.example`: `DB_CONNECTION=sqlite`, `DB_DATABASE=storage/choir.sqlite`.  
-Миграции: `migrations/sqlite/*.sql` (эталон MySQL — `migrations/mysql/` и [docs/schema.sql](docs/schema.sql)).
+`composer test` выполняет по порядку:
 
-### /start
+1. `composer autoload-check` — PSR-4 (`bin/psr4-check.php`)
+2. `composer phpstan` — PHPStan **level 2**, `--memory-limit=1G` (`phpstan.neon`, каталог `src/`)
+3. `phpunit`
 
-После `php run.php` команда `/start` отвечает заглушкой из `texts/ru.json` → `dev.start_placeholder`.
+Правило репозитория: **один класс — один файл** (проверяется autoload-check).
 
-## Деплой на alabot.liveband.kz (без SSH)
+## Деплой (shared hosting, без SSH)
 
-1. **Локально:** `composer install --no-dev --optimize-autoloader` — папку `vendor/` нужно загрузить на хостинг (на сервере Composer может быть недоступен).
-2. Загрузите проект по **FTP** или **Git** в панели хостинга (все файлы, кроме `.env`).
-3. Создайте `.env` на сервере (или загрузите вне Git) с prod-настройками:
-   - `DB_CONNECTION=mysql`, реквизиты MySQL из панели
-   - `BOT_TOKEN`, `OWNER_TELEGRAM_ID`, `ADMIN_CHAT_ID` (опционально `CONDUCTOR_TELEGRAM_ID`)
-   - `WEBHOOK_URL=https://…/public/webhook.php`
-   - `WEBHOOK_SECRET`, `ADMIN_PAGES_KEY`
-4. Настройте **document root** на каталог `public/` **или** URL с путём `/public/webhook.php` — как принято на вашем аккаунте.
-5. Откройте в браузере (с секретным ключом):
+**Сборка локально:** `composer install --no-dev --optimize-autoloader` — загрузите `vendor/` на сервер.
+
+1. Загрузите проект (FTP/Git), `.env` на сервере с prod-значениями (`DB_CONNECTION=mysql`, `BOT_TOKEN`, `WEBHOOK_URL`, …).
+2. Document root на `public/` (или URL с `/public/...`).
+3. После **каждого обновления кода:**
    - `…/admin/migrate.php?key=ADMIN_PAGES_KEY`
-   - `…/admin/set-webhook.php?key=ADMIN_PAGES_KEY`
-6. В панели хостинга добавьте **cron** (каждые 1–5 мин):
+   - Проверьте cron (см. ниже); при смене домена — `…/admin/set-webhook.php?key=…`
+4. Cron **каждые 1–5 минут:**
 
 ```text
 curl -sS "https://ваш-домен/public/cron.php?key=ADMIN_PAGES_KEY"
 ```
 
-7. Удалите webhook перед возвратом к локальному polling: через BotFather или `deleteWebhook` — иначе Telegram не шлёт updates в `run.php`.
+5. Перед локальным `run.php` снимите webhook (BotFather / `deleteWebhook`).
+
+**Хостинг:** [alabot.liveband.kz](https://alabot.liveband.kz) — MySQL, cron, HTTPS.
 
 ## Лицензия
 
