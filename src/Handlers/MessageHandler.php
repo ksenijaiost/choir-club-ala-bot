@@ -90,6 +90,25 @@ final class MessageHandler
             }
 
             if ($status === UserStatus::ACTIVE) {
+                if (in_array($text, MenuKeyboard::allMenuLabels($texts), true)) {
+                    self::clearActiveFlows($telegramId, $schedule, $attendance, $materials);
+                    self::handleActiveMenu(
+                        $bot,
+                        $texts,
+                        $users,
+                        $access,
+                        $schedule,
+                        $attendance,
+                        $payments,
+                        $materials,
+                        $adminHistory,
+                        $user,
+                        $text,
+                    );
+
+                    return;
+                }
+
                 if ($telegramId !== null && AttendanceMemberHandler::handleFlowMessage(
                     $bot,
                     $attendance,
@@ -153,6 +172,23 @@ final class MessageHandler
                 return;
             }
         });
+    }
+
+    private static function clearActiveFlows(
+        ?int $telegramId,
+        ScheduleDeps $schedule,
+        AttendanceDeps $attendance,
+        ?MaterialsDeps $materials,
+    ): void {
+        if ($telegramId === null) {
+            return;
+        }
+
+        $schedule->flows->clear($telegramId);
+        $attendance->flows->clear($telegramId);
+        if ($materials !== null) {
+            $materials->flows->clear($telegramId);
+        }
     }
 
     /**
