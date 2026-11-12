@@ -1,0 +1,44 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# PHP
+/vendor/
+composer.phar
+.phpunit.result.cache
+
+# Node.js
+/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+*.tsbuildinfo
+
+/storage/*
+!storage/.gitkeep
+*.sqlite
+*.sqlite3
+*.db
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs and cache
+/logs/
+*.log
+/cache/
+/tmp/
+
+# Coverage
+/coverage/
+.nyc_output/
+.phpunit.cache/
