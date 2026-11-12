@@ -57,6 +57,7 @@ final class AboutBotTest extends TestCase
 
         $ownerText = AboutBotHandler::sectionText($texts, 'owner');
         self::assertStringContainsString($texts->get('menu.assign_conductor'), $ownerText);
+        self::assertStringContainsString($texts->get('menu.admin_chat'), $ownerText);
     }
 
     private function testConfig(): Config

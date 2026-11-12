@@ -18,6 +18,7 @@ use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\AdminChatResolver;
 use App\Services\UserRolePresenter;
 use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceDiscipline;
@@ -45,11 +46,12 @@ final class HandlerRegistry
         $registrations = new RegistrationRepository($pdo);
         $blockEvents = new BlockEventRepository($pdo);
         $blockService = new MemberBlockService($users, $blockEvents);
-        $access = new AccessControl($config);
+        $settings = new BotSettingsRepository($pdo);
+        $adminChatResolver = new AdminChatResolver($settings, $config);
+        $access = new AccessControl($config, $adminChatResolver);
 
         $templates = new ScheduleTemplateRepository($pdo);
         $rehearsals = new RehearsalRepository($pdo);
-        $settings = new BotSettingsRepository($pdo);
         $flows = new UserFlowRepository($pdo);
         $generator = new ScheduleGenerator($templates, $rehearsals, $settings);
         $presenter = new SchedulePresenter($rehearsals, $texts);
@@ -111,6 +113,8 @@ final class HandlerRegistry
             $rolePresenter,
         );
 
+        $adminChat = new AdminChatDeps($config, $settings, $adminChatResolver, $flows, $texts);
+
         $attendance = new AttendanceDeps(
             $config,
             $users,
@@ -139,12 +143,13 @@ final class HandlerRegistry
             $paymentDeps,
             $materials,
             $adminHistory,
+            $adminChat,
         );
         MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
         StartHandler::register($bot, $texts, $users, $access);
         ConductorAdminHandler::register($bot, $texts, $users, $access);
         HelpersAdminHandler::register($bot, $texts, $users, $access);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService);
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat);
     }
 }

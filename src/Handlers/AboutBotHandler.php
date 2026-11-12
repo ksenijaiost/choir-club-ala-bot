@@ -130,6 +130,7 @@ final class AboutBotHandler
             'btn_admin_helpers' => $texts->get('menu.admin_helpers'),
             'btn_admin_members' => $texts->get('menu.admin_members'),
             'btn_assign_conductor' => $texts->get('menu.assign_conductor'),
+            'btn_admin_chat' => $texts->get('menu.admin_chat'),
         ];
     }
 

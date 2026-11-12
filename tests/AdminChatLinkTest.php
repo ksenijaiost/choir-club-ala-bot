@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Tests;
 
 use App\Config;
+use App\Database\Connection;
+use App\Database\Migrator;
 use App\Handlers\MaterialsAdminHandler;
+use App\Repositories\BotSettingsRepository;
+use App\Services\AdminChatResolver;
 use App\Telegram\AdminChatLink;
 use App\Text\TextRepository;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -15,20 +19,23 @@ final class AdminChatLinkTest extends TestCase
 {
     public function testSupergroupBuildsTelegramPrivateUrl(): void
     {
-        $config = $this->config(adminChatId: '-1001234567890');
-        self::assertSame('https://t.me/c/1234567890', AdminChatLink::resolveUrl($config));
+        $resolver = $this->resolver(adminChatId: '-1001234567890');
+        self::assertSame('https://t.me/c/1234567890', AdminChatLink::resolveUrl($resolver, $this->config()));
     }
 
     public function testRegularGroupWithoutLinkHasNoUrl(): void
     {
-        $config = $this->config(adminChatId: '-12345');
-        self::assertNull(AdminChatLink::resolveUrl($config));
+        $resolver = $this->resolver(adminChatId: '-12345');
+        self::assertNull(AdminChatLink::resolveUrl($resolver, $this->config()));
     }
 
     public function testRegularGroupWithEnvLinkUsesLink(): void
     {
-        $config = $this->config(adminChatId: '-12345', adminChatLink: 'https://t.me/joinchat/AbCdEf');
-        self::assertSame('https://t.me/joinchat/AbCdEf', AdminChatLink::resolveUrl($config));
+        $resolver = $this->resolver(adminChatId: '-12345');
+        self::assertSame(
+            'https://t.me/joinchat/AbCdEf',
+            AdminChatLink::resolveUrl($resolver, $this->config(adminChatLink: 'https://t.me/joinchat/AbCdEf')),
+        );
     }
 
     /**
@@ -49,13 +56,19 @@ final class AdminChatLinkTest extends TestCase
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
 
         $config = match ($expectedUrl) {
-            'https://t.me/c/987654321' => $this->config(adminChatId: '-100987654321'),
-            'https://t.me/mygroup' => $this->config(adminChatId: '-999', adminChatLink: 'https://t.me/mygroup'),
-            default => $this->config(adminChatId: '-999'),
+            'https://t.me/c/987654321' => $this->config(),
+            'https://t.me/mygroup' => $this->config(adminChatLink: 'https://t.me/mygroup'),
+            default => $this->config(),
+        };
+
+        $resolver = match ($expectedUrl) {
+            'https://t.me/c/987654321' => $this->resolver(dbChatId: '-100987654321'),
+            'https://t.me/mygroup' => $this->resolver(adminChatId: '-999'),
+            default => $this->resolver(adminChatId: '-999'),
         };
 
         $json = json_encode(
-            MaterialsAdminHandler::adminChatHintKeyboard($texts, $config),
+            MaterialsAdminHandler::adminChatHintKeyboard($texts, $resolver, $config),
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE,
         );
 
@@ -72,14 +85,25 @@ final class AdminChatLinkTest extends TestCase
         self::assertStringContainsString($texts->get('ui.close'), $json);
     }
 
-    private function config(string $adminChatId, string $adminChatLink = ''): Config
+    private function resolver(string $adminChatId = '', string $dbChatId = ''): AdminChatResolver
+    {
+        $pdo = Connection::make($this->config($adminChatId));
+        (new Migrator($pdo, 'sqlite'))->migrate();
+        $settings = new BotSettingsRepository($pdo);
+        if ($dbChatId !== '') {
+            $settings->set(AdminChatResolver::SETTING_KEY, $dbChatId);
+        }
+
+        return new AdminChatResolver($settings, $this->config($adminChatId));
+    }
+
+    private function config(string $adminChatId = '', string $adminChatLink = ''): Config
     {
         return new Config(
             botToken: 'test-token',
             ownerTelegramId: '1',
             conductorTelegramId: '',
             adminChatId: $adminChatId,
-            adminChatLink: $adminChatLink,
             dbConnection: 'sqlite',
             dbHost: '',
             dbPort: '',
@@ -91,6 +115,7 @@ final class AdminChatLinkTest extends TestCase
             adminPagesKey: 'admin-key',
             webhookUrl: '',
             fakeNow: null,
+            adminChatLink: $adminChatLink,
         );
     }
 }

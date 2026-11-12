@@ -11,6 +11,7 @@ use App\Domain\VoicePart;
 use App\Repositories\RegistrationRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\AdminChatResolver;
 use App\Services\MemberBlockService;
 use App\Services\UserIdentitySync;
 use App\Telegram\InlineMenuHelper;
@@ -35,8 +36,9 @@ final class CallbackQueryHandler
         PaymentDeps $payments,
         MaterialsDeps $materials,
         AdminHistoryContext $adminHistory,
+        AdminChatDeps $adminChat,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -60,6 +62,22 @@ final class CallbackQueryHandler
 
             if (str_starts_with($data, 'ab:')) {
                 AboutBotHandler::handleCallback($bot, $texts, $access, $users, $data, $actorTelegramId);
+
+                return;
+            }
+
+            if (str_starts_with($data, 'ach:')) {
+                $actorRow = $users->findByTelegramId($actorTelegramId);
+                if ($actorRow !== null && AdminChatOwnerHandler::handleCallback(
+                    $bot,
+                    $access,
+                    $adminChat,
+                    $actorRow,
+                    $data,
+                    $actorTelegramId,
+                )) {
+                    return;
+                }
 
                 return;
             }
@@ -184,7 +202,15 @@ final class CallbackQueryHandler
             }
 
             if (str_starts_with($data, 'rp:')) {
-                self::handleRegistrationPart($bot, $texts, $config, $users, $registrations, $data, $actorTelegramId);
+                self::handleRegistrationPart(
+                    $bot,
+                    $texts,
+                    $adminChat->resolver,
+                    $users,
+                    $registrations,
+                    $data,
+                    $actorTelegramId,
+                );
 
                 return;
             }
@@ -200,7 +226,7 @@ final class CallbackQueryHandler
     private static function handleRegistrationPart(
         Nutgram $bot,
         TextRepository $texts,
-        Config $config,
+        AdminChatResolver $adminChatResolver,
         UserRepository $users,
         RegistrationRepository $registrations,
         string $data,
@@ -238,8 +264,8 @@ final class CallbackQueryHandler
         $bot->answerCallbackQuery();
         $bot->sendMessage($texts->get('registration.pending_user'));
 
-        $adminChatId = trim($config->adminChatId);
-        if ($adminChatId === '') {
+        $adminChatId = $adminChatResolver->resolvedIdAsInt();
+        if ($adminChatId === null) {
             return;
         }
 
@@ -260,7 +286,7 @@ final class CallbackQueryHandler
                 'name' => (string) $user['display_name'],
                 'part' => $partLabel,
             ]),
-            chat_id: (int) $adminChatId,
+            chat_id: $adminChatId,
             reply_markup: $keyboard,
         );
 

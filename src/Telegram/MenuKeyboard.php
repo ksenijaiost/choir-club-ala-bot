@@ -58,6 +58,7 @@ final class MenuKeyboard
         if ($role === UserRole::OWNER) {
             $rows[] = [
                 $texts->get('menu.assign_conductor'),
+                $texts->get('menu.admin_chat'),
             ];
         }
 
@@ -111,6 +112,7 @@ final class MenuKeyboard
             $texts->get('menu.admin_members'),
             $texts->get('menu.admin_materials'),
             $texts->get('menu.assign_conductor'),
+            $texts->get('menu.admin_chat'),
         ];
     }
 }

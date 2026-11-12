@@ -26,8 +26,9 @@ final class MessageHandler
         PaymentDeps $payments,
         ?MaterialsDeps $materials = null,
         ?AdminHistoryContext $adminHistory = null,
+        ?AdminChatDeps $adminChat = null,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -102,10 +103,20 @@ final class MessageHandler
                         $payments,
                         $materials,
                         $adminHistory,
+                        $adminChat,
                         $user,
                         $text,
                     );
 
+                    return;
+                }
+
+                if ($adminChat !== null && $telegramId !== null && AdminChatOwnerHandler::handleFlowMessage(
+                    $bot,
+                    $adminChat,
+                    $telegramId,
+                    $text,
+                )) {
                     return;
                 }
 
@@ -165,6 +176,7 @@ final class MessageHandler
                     $payments,
                     $materials,
                     $adminHistory,
+                    $adminChat,
                     $user,
                     $text,
                 );
@@ -236,6 +248,7 @@ final class MessageHandler
         PaymentDeps $payments,
         ?MaterialsDeps $materials,
         ?AdminHistoryContext $adminHistory,
+        ?AdminChatDeps $adminChat,
         array $user,
         string $text,
     ): void {
@@ -298,8 +311,14 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $texts->get('menu.admin_materials') && $materials !== null) {
-            MaterialsAdminHandler::openHome($bot, $texts, $access, $materials, $user);
+        if ($text === $texts->get('menu.admin_materials') && $materials !== null && $adminChat !== null) {
+            MaterialsAdminHandler::openHome($bot, $texts, $access, $materials, $adminChat->resolver, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.admin_chat') && $adminChat !== null) {
+            AdminChatOwnerHandler::openHome($bot, $texts, $access, $adminChat, $user);
 
             return;
         }

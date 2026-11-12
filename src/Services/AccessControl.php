@@ -10,8 +10,10 @@ use App\Domain\UserStatus;
 
 final class AccessControl
 {
-    public function __construct(private readonly Config $config)
-    {
+    public function __construct(
+        private readonly Config $config,
+        private readonly ?AdminChatResolver $adminChatResolver = null,
+    ) {
     }
 
     public function isOwnerTelegramId(int $telegramId): bool
@@ -115,6 +117,10 @@ final class AccessControl
 
     public function isAdminChatId(int|string $chatId): bool
     {
+        if ($this->adminChatResolver !== null) {
+            return $this->adminChatResolver->isAdminChat($chatId);
+        }
+
         $configured = trim($this->config->adminChatId);
         if ($configured === '') {
             return false;

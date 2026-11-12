@@ -9,7 +9,10 @@ use App\Database\Connection;
 use App\Database\Migrator;
 use App\Domain\UserRole;
 use App\Domain\UserStatus;
+use App\Handlers\AdminChatDeps;
 use App\Handlers\AdminHistoryContext;
+use App\Repositories\BotSettingsRepository;
+use App\Services\AdminChatResolver;
 use App\Handlers\AttendanceDeps;
 use App\Handlers\MaterialsDeps;
 use App\Handlers\MessageHandler;
@@ -17,7 +20,6 @@ use App\Handlers\PaymentDeps;
 use App\Handlers\ScheduleDeps;
 use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BlockEventRepository;
-use App\Repositories\BotSettingsRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\MaterialRepository;
 use App\Repositories\PaymentRecordRepository;
@@ -82,6 +84,7 @@ final class MenuFlowInterruptTest extends TestCase
             $deps['payments'],
             $deps['materials'],
             $deps['adminHistory'],
+            $deps['adminChat'],
         );
 
         $notFound = $texts->get('songs.not_found');
@@ -129,6 +132,7 @@ final class MenuFlowInterruptTest extends TestCase
             $deps['payments'],
             $deps['materials'],
             $deps['adminHistory'],
+            $deps['adminChat'],
         );
 
         $scheduleHint = $texts->get('schedule.list_header');
@@ -265,13 +269,17 @@ final class MenuFlowInterruptTest extends TestCase
             new UserRolePresenter($texts),
         );
 
+        $settings = new BotSettingsRepository($pdo);
+        $resolver = new AdminChatResolver($settings, $config);
+
         return [
-            'access' => new AccessControl($config),
+            'access' => new AccessControl($config, $resolver),
             'schedule' => $schedule,
             'attendance' => $attendance,
             'payments' => $payments,
             'materials' => $materials,
             'adminHistory' => $adminHistory,
+            'adminChat' => new AdminChatDeps($config, $settings, $resolver, $flows, $texts),
         ];
     }
 

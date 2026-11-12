@@ -83,6 +83,7 @@ final class RoleMenuKeyboardTest extends TestCase
                     $texts->get('menu.admin_helpers'),
                     $texts->get('menu.admin_members'),
                     $texts->get('menu.assign_conductor'),
+                    $texts->get('menu.admin_chat'),
                 ],
             ],
         ];

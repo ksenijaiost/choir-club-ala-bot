@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Services\AccessControl;
+use App\Services\AdminChatResolver;
 use App\Telegram\AdminChatLink;
 use App\Telegram\InlineMenuHelper;
 use App\Text\TextRepository;
@@ -22,6 +23,7 @@ final class MaterialsAdminHandler
         TextRepository $texts,
         AccessControl $access,
         MaterialsDeps $deps,
+        AdminChatResolver $adminChatResolver,
         array $user,
     ): void {
         if (!$access->canUploadMaterials($user)) {
@@ -32,16 +34,17 @@ final class MaterialsAdminHandler
 
         $bot->sendMessage(
             $texts->get('materials.admin_chat_hint'),
-            reply_markup: self::adminChatHintKeyboard($texts, $deps->config),
+            reply_markup: self::adminChatHintKeyboard($texts, $adminChatResolver, $deps->config),
         );
         MaterialsCallbackHandler::openManagementHome($bot, $deps);
     }
 
     public static function adminChatHintKeyboard(
         TextRepository $texts,
+        AdminChatResolver $adminChatResolver,
         \App\Config $config,
     ): InlineKeyboardMarkup {
-        $url = AdminChatLink::resolveUrl($config);
+        $url = AdminChatLink::resolveUrl($adminChatResolver, $config);
         if ($url === null) {
             return InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $texts);
         }

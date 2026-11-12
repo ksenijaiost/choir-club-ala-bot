@@ -46,7 +46,8 @@ final class MenuButtonAccess
             return $access->canManageHelpers($user);
         }
 
-        if ($label === $texts->get('menu.assign_conductor')) {
+        if ($label === $texts->get('menu.assign_conductor')
+            || $label === $texts->get('menu.admin_chat')) {
             return $access->isOwner($user);
         }
 

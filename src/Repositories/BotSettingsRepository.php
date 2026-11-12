@@ -32,4 +32,21 @@ final class BotSettingsRepository
 
         return (int) $raw;
     }
+
+    public function set(string $key, string $value): void
+    {
+        $driver = $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $this->pdo->prepare(
+                'INSERT OR REPLACE INTO bot_settings (setting_key, setting_value) VALUES (?, ?)',
+            );
+        } else {
+            $stmt = $this->pdo->prepare(
+                'INSERT INTO bot_settings (setting_key, setting_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)',
+            );
+        }
+
+        $stmt->execute([$key, $value]);
+    }
 }

@@ -15,7 +15,9 @@ use App\Repositories\MaterialRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\BotSettingsRepository;
 use App\Services\AccessControl;
+use App\Services\AdminChatResolver;
 use App\Services\MaterialsService;
 use App\Services\SongDeliveryService;
 use App\Text\TextRepository;
@@ -82,7 +84,8 @@ final class MaterialsOwnerUploadTest extends TestCase
         $bot = Nutgram::fake();
         $bot->setCommonUser($this->makeTelegramUser(self::OWNER_TG));
 
-        MaterialsAdminHandler::openHome($bot, $texts, $access, $deps, $owner);
+        $resolver = new AdminChatResolver(new BotSettingsRepository($pdo), $config);
+        MaterialsAdminHandler::openHome($bot, $texts, $access, $deps, $resolver, $owner);
 
         $bot->assertReplyText($texts->get('materials.admin_chat_hint'));
     }

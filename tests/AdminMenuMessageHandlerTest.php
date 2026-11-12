@@ -9,7 +9,10 @@ use App\Database\Connection;
 use App\Database\Migrator;
 use App\Domain\UserRole;
 use App\Domain\UserStatus;
+use App\Handlers\AdminChatDeps;
 use App\Handlers\AdminHistoryContext;
+use App\Repositories\BotSettingsRepository;
+use App\Services\AdminChatResolver;
 use App\Handlers\AttendanceDeps;
 use App\Handlers\MaterialsDeps;
 use App\Handlers\MessageHandler;
@@ -17,7 +20,6 @@ use App\Handlers\PaymentDeps;
 use App\Handlers\ScheduleDeps;
 use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\BlockEventRepository;
-use App\Repositories\BotSettingsRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\MaterialRepository;
 use App\Repositories\PaymentRecordRepository;
@@ -92,13 +94,16 @@ final class AdminMenuMessageHandlerTest extends TestCase
         $payments = $this->paymentDeps($config, $pdo, $users, $texts);
         $materials = $this->materialsDeps($config, $pdo, $texts, $users);
         $adminHistory = $this->adminHistoryContext($config, $pdo, $users, $texts);
-        $access = new AccessControl($config);
+        $settings = new BotSettingsRepository($pdo);
+        $resolver = new AdminChatResolver($settings, $config);
+        $access = new AccessControl($config, $resolver);
+        $adminChat = new AdminChatDeps($config, $settings, $resolver, $schedule->flows, $texts);
 
         $bot = Nutgram::fake();
         $bot->setCommonUser($this->makeUser());
         $bot->setCommonChat($this->makeChat(self::OWNER_TG, ChatType::PRIVATE));
 
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat);
 
         $soon = $texts->get('common.soon');
 
