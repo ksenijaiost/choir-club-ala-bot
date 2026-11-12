@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Clock;
+use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
 use App\Services\ScheduleTime;
 use SergiX44\Nutgram\Nutgram;
@@ -64,27 +65,54 @@ final class AttendanceMemberHandler
 
         $reason = trim($text);
         if ($reason === '') {
-            $bot->sendMessage($deps->texts->get('absence.ask_reason_optional'));
+            $bot->sendMessage(
+                $source === AttendanceSource::ABSENCE_BUTTON
+                    ? $deps->texts->get('absence.ask_reason_required')
+                    : $deps->texts->get('absence.ask_reason_optional'),
+            );
 
             return true;
         }
 
+        self::completeAbsenceWithReason($bot, $deps, $telegramId, $user, $rehearsal, $source, $rehearsalId, $reason);
+
+        return true;
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $rehearsal
+     */
+    public static function completeAbsenceWithReason(
+        Nutgram $bot,
+        AttendanceDeps $deps,
+        int $telegramId,
+        array $user,
+        array $rehearsal,
+        string $source,
+        int $rehearsalId,
+        string $reason,
+    ): void {
         $tz = new \DateTimeZone($deps->config->timezone);
-        $deps->attendance->appendReason($rehearsalId, (int) $user['id'], $reason);
+        $userId = (int) $user['id'];
+        $existing = $deps->marks->find($rehearsalId, $userId);
+        if ($existing !== null && ($existing['mark'] ?? '') !== AttendanceMark::UNEXCUSED) {
+            $deps->marks->appendReason($rehearsalId, $userId, $reason);
+        } else {
+            $deps->attendance->recordWarned($user, $rehearsalId, $source, $reason);
+        }
 
         if ($source === AttendanceSource::DAY_BEFORE) {
             $deps->conductor->forwardDayBeforeReason($user, $rehearsal, $reason, $tz);
-        } else {
+        } elseif ($source === AttendanceSource::ABSENCE_BUTTON) {
             $deps->conductor->notifyPlannedAbsence($user, $rehearsal, $reason, $tz);
         }
 
         $deps->flows->clear($telegramId);
         $bot->sendMessage($deps->texts->get('absence.confirmed'));
-
-        return true;
     }
 
-    public static function finishReasonSkip(
+    public static function finishReasonWithoutReason(
         Nutgram $bot,
         AttendanceDeps $deps,
         int $telegramId,
@@ -99,16 +127,11 @@ final class AttendanceMemberHandler
             return;
         }
 
-        $tz = new \DateTimeZone($deps->config->timezone);
-        $deps->attendance->appendReason($rehearsalId, (int) $user['id'], '—');
-
-        if ($source === AttendanceSource::DAY_BEFORE) {
-            $deps->conductor->forwardDayBeforeReason($user, $rehearsal, '—', $tz);
-        } else {
-            $deps->conductor->notifyPlannedAbsence($user, $rehearsal, '—', $tz);
-            $bot->sendMessage($deps->texts->get('absence.confirmed'));
-        }
-
+        $deps->attendance->recordUnexcused($user, $rehearsalId, $source);
         $deps->flows->clear($telegramId);
+
+        if ($source === AttendanceSource::CHECKIN) {
+            $bot->sendMessage($deps->texts->get('checkin.thanks_no'));
+        }
     }
 }

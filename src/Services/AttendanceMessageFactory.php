@@ -45,10 +45,17 @@ final class AttendanceMessageFactory
         ]);
     }
 
-    public function reasonPromptKeyboard(): InlineKeyboardMarkup
+    public function reasonOptionalKeyboard(): InlineKeyboardMarkup
     {
         return InlineKeyboardMarkup::make()->addRow(
             InlineKeyboardButton::make($this->texts->get('buttons.skip_reason'), callback_data: 'att:sk'),
         );
+    }
+
+    public function pollReasonPromptText(): string
+    {
+        return $this->texts->get('reminder.will_not_attend')
+            . "\n\n"
+            . $this->texts->get('absence.unexcused_hint_html');
     }
 }

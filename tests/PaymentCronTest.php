@@ -35,8 +35,11 @@ final class PaymentCronTest extends TestCase
         $users->create(7001, 'Плательщик', 'tenor', UserRole::MEMBER, UserStatus::ACTIVE);
 
         $outbound = new RecordingTelegramOutbound();
+        $payments = new PaymentRecordRepository($pdo);
+
         $job = new PaymentReminderFirstJob(
             $users,
+            $payments,
             new BotSettingsRepository($pdo),
             new JobDeliveryRepository($pdo),
             $texts,
@@ -51,6 +54,40 @@ final class PaymentCronTest extends TestCase
         $second = $job->runIfDue($config);
         self::assertSame(0, $second['sent']);
         self::assertCount(1, $outbound->messages);
+
+        putenv('FAKE_NOW');
+    }
+
+    public function testFirstReminderSkipsWhenConfirmed(): void
+    {
+        putenv('FAKE_NOW=2026-04-23T12:10:00+05:00');
+
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $config = $this->testConfig();
+        $pdo = Connection::make($config);
+        (new Migrator($pdo, 'sqlite'))->migrate();
+
+        $users = new UserRepository($pdo);
+        $uid = $users->create(7003, 'Оплачен', 'alto_1', UserRole::MEMBER, UserStatus::ACTIVE);
+
+        $payments = new PaymentRecordRepository($pdo);
+        $payments->confirmByConductor($uid, 2026, 5, 1);
+
+        $outbound = new RecordingTelegramOutbound();
+        $job = new PaymentReminderFirstJob(
+            $users,
+            $payments,
+            new BotSettingsRepository($pdo),
+            new JobDeliveryRepository($pdo),
+            $texts,
+            new PaymentTexts($texts),
+            $outbound,
+        );
+
+        $result = $job->runIfDue($config);
+        self::assertSame(0, $result['sent']);
+        self::assertSame(1, $result['skipped_confirmed']);
+        self::assertCount(0, $outbound->messages);
 
         putenv('FAKE_NOW');
     }

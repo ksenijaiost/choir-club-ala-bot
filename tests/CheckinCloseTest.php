@@ -111,49 +111,6 @@ final class CheckinCloseTest extends TestCase
         putenv('FAKE_NOW');
     }
 
-    public function testSkipReasonUsesNotGivenInConductorNotification(): void
-    {
-        putenv('FAKE_NOW=2026-03-10T12:05:00+05:00');
-
-        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
-        $config = $this->testConfig('9002');
-        $pdo = Connection::make($config);
-        (new Migrator($pdo, 'sqlite'))->migrate();
-
-        $users = new UserRepository($pdo);
-        $users->create(self::MEMBER_TG, 'Участник', 'tenor', UserRole::MEMBER, UserStatus::ACTIVE);
-
-        $pdo->prepare(
-            'INSERT INTO rehearsals (template_id, starts_at, ends_at, address, status) VALUES (NULL, ?, ?, ?, ?)'
-        )->execute(['2026-03-11 19:30:00', '2026-03-11 21:30:00', 'зал', 'scheduled']);
-        $rehearsalId = 1;
-
-        $outbound = new RecordingTelegramOutbound();
-        $deps = $this->attendanceDeps($config, $pdo, $texts, $users, $outbound);
-        $bot = \SergiX44\Nutgram\Nutgram::fake();
-        $member = $users->findByTelegramId(self::MEMBER_TG);
-        self::assertNotNull($member);
-        $deps->attendance->recordWarned($member, $rehearsalId, \App\Domain\AttendanceSource::ABSENCE_BUTTON, null);
-        $deps->flows->set(self::MEMBER_TG, 'absence_reason', [
-            'rehearsal_id' => $rehearsalId,
-            'source' => \App\Domain\AttendanceSource::ABSENCE_BUTTON,
-        ]);
-
-        AttendanceMemberHandler::finishReasonSkip(
-            $bot,
-            $deps,
-            self::MEMBER_TG,
-            \App\Domain\AttendanceSource::ABSENCE_BUTTON,
-            $rehearsalId,
-        );
-
-        self::assertCount(1, $outbound->messages);
-        self::assertStringContainsString('не указана', $outbound->messages[0]['text']);
-        self::assertStringNotContainsString('—', $outbound->messages[0]['text']);
-
-        putenv('FAKE_NOW');
-    }
-
     private function testConfig(string $conductorTelegramId = ''): Config
     {
         return new Config(

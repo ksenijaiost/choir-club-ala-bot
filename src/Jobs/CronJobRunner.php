@@ -58,7 +58,7 @@ final class CronJobRunner
             'day_before_reminder' => ['sent' => 0, 'skipped_hour' => true],
             'checkin_open' => ['sent' => 0],
             'checkin_close' => ['closed' => 0, 'marks' => 0],
-            'payment_reminder_1' => ['sent' => 0, 'skipped' => true],
+            'payment_reminder_1' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
             'payment_reminder_2' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
         ];
 
@@ -116,6 +116,7 @@ final class CronJobRunner
 
         $result['payment_reminder_1'] = (new PaymentReminderFirstJob(
             $users,
+            $paymentRecords,
             $settings,
             $deliveries,
             $texts,

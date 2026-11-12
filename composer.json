@@ -24,7 +24,7 @@
     },
     "scripts": {
         "autoload-check": "php bin/psr4-check.php",
-        "phpstan": "phpstan analyse -c phpstan.neon",
+        "phpstan": "phpstan analyse -c phpstan.neon --memory-limit=1G",
         "test": [
             "@autoload-check",
             "@phpstan",

@@ -8,6 +8,7 @@ use App\Clock;
 use App\Config;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\JobDeliveryRepository;
+use App\Repositories\PaymentRecordRepository;
 use App\Repositories\UserRepository;
 use App\Services\PaymentPeriod;
 use App\Services\PaymentTexts;
@@ -20,6 +21,7 @@ final class PaymentReminderFirstJob
 {
     public function __construct(
         private readonly UserRepository $users,
+        private readonly PaymentRecordRepository $payments,
         private readonly BotSettingsRepository $settings,
         private readonly JobDeliveryRepository $deliveries,
         private readonly TextRepository $texts,
@@ -29,7 +31,7 @@ final class PaymentReminderFirstJob
     }
 
     /**
-     * @return array{sent: int, skipped: bool}
+     * @return array{sent: int, skipped_confirmed: int, not_due?: bool}
      */
     public function runIfDue(Config $config): array
     {
@@ -41,7 +43,7 @@ final class PaymentReminderFirstJob
         $hour = $this->settings->getInt('payment_reminder_hour', 12);
 
         if ((int) $local->format('j') !== $day || (int) $local->format('G') !== $hour) {
-            return ['sent' => 0, 'skipped' => true];
+            return ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true];
         }
 
         $period = PaymentPeriod::targetForFirstReminder($local);
@@ -57,9 +59,20 @@ final class PaymentReminderFirstJob
         );
 
         $sent = 0;
+        $skippedConfirmed = 0;
+
         foreach ($this->users->listActivePayers() as $user) {
             $userId = (int) $user['id'];
             $jobKey = 'payment_r1:' . $periodKey . ':' . $userId;
+
+            $row = $this->payments->find($userId, $period['year'], $period['month']);
+            if ($this->payments->isConductorConfirmed($row)) {
+                $this->deliveries->tryClaim($jobKey, 'payment_reminder_1', $userId);
+                $skippedConfirmed++;
+
+                continue;
+            }
+
             if (!$this->deliveries->tryClaim($jobKey, 'payment_reminder_1', $userId)) {
                 continue;
             }
@@ -68,6 +81,6 @@ final class PaymentReminderFirstJob
             $sent++;
         }
 
-        return ['sent' => $sent, 'skipped' => false];
+        return ['sent' => $sent, 'skipped_confirmed' => $skippedConfirmed];
     }
 }

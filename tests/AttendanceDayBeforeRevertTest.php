@@ -65,9 +65,7 @@ final class AttendanceDayBeforeRevertTest extends TestCase
 
         AttendanceCallbackHandler::handle($bot, $deps, 'att:db:' . $rehearsalId . ':n', self::MEMBER_TG);
 
-        $mark = $deps->marks->find($rehearsalId, $memberId);
-        self::assertNotNull($mark);
-        self::assertSame(AttendanceMark::WARNED, $mark['mark']);
+        self::assertNull($deps->marks->find($rehearsalId, $memberId));
         self::assertNotNull($deps->flows->get(self::MEMBER_TG));
 
         AttendanceCallbackHandler::handle($bot, $deps, 'att:db:' . $rehearsalId . ':y', self::MEMBER_TG);
@@ -105,22 +103,17 @@ final class AttendanceDayBeforeRevertTest extends TestCase
         $bot = Nutgram::fake();
 
         AttendanceCallbackHandler::handle($bot, $deps, 'att:db:' . $rehearsalId . ':n', self::MEMBER_TG);
-        AttendanceMemberHandler::finishReasonSkip(
-            $bot,
-            $deps,
-            self::MEMBER_TG,
-            \App\Domain\AttendanceSource::DAY_BEFORE,
-            $rehearsalId,
-        );
+        AttendanceCallbackHandler::handle($bot, $deps, 'att:sk', self::MEMBER_TG);
 
-        self::assertSame('—', $deps->marks->find($rehearsalId, $memberId)['reason_text'] ?? null);
+        $afterSkip = $deps->marks->find($rehearsalId, $memberId);
+        self::assertNotNull($afterSkip);
+        self::assertSame(AttendanceMark::UNEXCUSED, $afterSkip['mark']);
         $outbound->messages = [];
 
         AttendanceCallbackHandler::handle($bot, $deps, 'att:db:' . $rehearsalId . ':y', self::MEMBER_TG);
 
         self::assertNull($deps->marks->find($rehearsalId, $memberId));
-        self::assertCount(1, $outbound->messages);
-        self::assertStringContainsString('передумал', strtolower($outbound->messages[0]['text']));
+        self::assertCount(0, $outbound->messages);
 
         putenv('FAKE_NOW');
     }

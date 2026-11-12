@@ -11,6 +11,7 @@ use App\Domain\UserStatus;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 
 final class AttendanceCallbackHandler
 {
@@ -78,13 +79,17 @@ final class AttendanceCallbackHandler
         $userId = (int) $user['id'];
         $existing = $deps->marks->find($rehearsalId, $userId);
         if ($yes) {
-            $hadWarned = $existing !== null && ($existing['mark'] ?? '') === AttendanceMark::WARNED;
-
-            if ($hadWarned) {
-                $notifiedConductor = trim((string) ($existing['reason_text'] ?? '')) !== '';
-                $deps->attendance->clearPlannedAbsence($user, $rehearsalId);
-                if ($notifiedConductor) {
-                    $deps->conductor->notifyChangedMind($user, $rehearsal, $tz);
+            if ($existing !== null) {
+                $mark = (string) ($existing['mark'] ?? '');
+                if ($mark === AttendanceMark::WARNED) {
+                    $notifiedConductor = trim((string) ($existing['reason_text'] ?? '')) !== '';
+                    $deps->attendance->clearPlannedAbsence($user, $rehearsalId);
+                    if ($notifiedConductor) {
+                        $deps->conductor->notifyChangedMind($user, $rehearsal, $tz);
+                    }
+                } elseif ($mark === AttendanceMark::UNEXCUSED
+                    && ($existing['source'] ?? '') === AttendanceSource::DAY_BEFORE) {
+                    $deps->attendance->clearPlannedAbsence($user, $rehearsalId);
                 }
             }
 
@@ -101,19 +106,24 @@ final class AttendanceCallbackHandler
             return;
         }
 
+        if ($existing !== null) {
+            $bot->answerCallbackQuery(text: $deps->texts->get('absence.already_marked'), show_alert: true);
+
+            return;
+        }
+
         $bot->answerCallbackQuery();
         CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_no'));
 
-        $deps->attendance->recordWarned($user, $rehearsalId, AttendanceSource::DAY_BEFORE, null);
         $deps->flows->set($telegramId, 'absence_reason', [
             'rehearsal_id' => $rehearsalId,
             'source' => AttendanceSource::DAY_BEFORE,
-            'conductor_notified' => false,
         ]);
 
         $bot->sendMessage(
-            $deps->texts->get('reminder.will_not_attend'),
-            reply_markup: $deps->messages->reasonPromptKeyboard(),
+            $deps->messages->pollReasonPromptText(),
+            parse_mode: ParseMode::HTML,
+            reply_markup: $deps->messages->reasonOptionalKeyboard(),
         );
     }
 
@@ -180,8 +190,18 @@ final class AttendanceCallbackHandler
             return;
         }
 
-        $deps->attendance->recordUnexcused($user, $rehearsalId, AttendanceSource::CHECKIN);
         CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_no'));
+
+        $deps->flows->set($telegramId, 'absence_reason', [
+            'rehearsal_id' => $rehearsalId,
+            'source' => AttendanceSource::CHECKIN,
+        ]);
+
+        $bot->sendMessage(
+            $deps->messages->pollReasonPromptText(),
+            parse_mode: ParseMode::HTML,
+            reply_markup: $deps->messages->reasonOptionalKeyboard(),
+        );
     }
 
     private static function handleWontComePick(
@@ -230,20 +250,17 @@ final class AttendanceCallbackHandler
         $bot->answerCallbackQuery();
         CallbackUi::clearKeyboard($bot);
 
-        $deps->attendance->recordWarned($user, $rehearsalId, AttendanceSource::ABSENCE_BUTTON, null);
         $deps->flows->set($telegramId, 'absence_reason', [
             'rehearsal_id' => $rehearsalId,
             'source' => AttendanceSource::ABSENCE_BUTTON,
-            'conductor_notified' => false,
         ]);
 
         $startsLabel = ScheduleTime::formatLocalDate($starts, $tz) . ' '
             . ScheduleTime::formatRehearsalTimeRange($rehearsal, $tz);
         $bot->sendMessage(
             $deps->texts->get('absence.rehearsal_picked', ['rehearsal' => $startsLabel])
-            . "\n\n"
-            . $deps->texts->get('absence.ask_reason_optional'),
-            reply_markup: $deps->messages->reasonPromptKeyboard(),
+                . "\n\n"
+                . $deps->texts->get('absence.ask_reason_required'),
         );
     }
 
@@ -261,9 +278,16 @@ final class AttendanceCallbackHandler
         $rehearsalId = (int) ($ctx['rehearsal_id'] ?? 0);
         $source = (string) ($ctx['source'] ?? AttendanceSource::ABSENCE_BUTTON);
 
+        if ($source === AttendanceSource::ABSENCE_BUTTON) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+
+            return true;
+        }
+
         $bot->answerCallbackQuery();
-        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_skip'));
-        AttendanceMemberHandler::finishReasonSkip($bot, $deps, $telegramId, $source, $rehearsalId);
+        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_no_reason'));
+        AttendanceMemberHandler::finishReasonWithoutReason($bot, $deps, $telegramId, $source, $rehearsalId);
 
         return true;
     }
