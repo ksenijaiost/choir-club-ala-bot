@@ -31,6 +31,7 @@ final class MenuKeyboard
 
         $rows[] = [
             $texts->get('menu.my_profile'),
+            $texts->get('menu.about_bot'),
         ];
 
         if (in_array($role, [UserRole::ADMIN, UserRole::CONDUCTOR, UserRole::OWNER], true)) {
@@ -38,15 +39,15 @@ final class MenuKeyboard
                 $texts->get('menu.admin_schedule'),
                 $texts->get('menu.admin_materials'),
             ];
-            $rows[] = [
-                $texts->get('menu.admin_attendance'),
-            ];
         }
 
         if ($role === UserRole::CONDUCTOR || $role === UserRole::OWNER) {
             $rows[] = [
-                $texts->get('menu.admin_payment'),
+                $texts->get('menu.admin_attendance'),
                 $texts->get('menu.admin_history'),
+            ];
+            $rows[] = [
+                $texts->get('menu.admin_payment'),
             ];
             $rows[] = [
                 $texts->get('menu.admin_helpers'),
@@ -73,6 +74,24 @@ final class MenuKeyboard
     }
 
     /**
+     * @param array<string, mixed> $user
+     *
+     * @return list<string>
+     */
+    public static function buttonLabelsForUser(TextRepository $texts, array $user): array
+    {
+        $markup = self::forUser($texts, $user);
+        $labels = [];
+        foreach ($markup->keyboard ?? [] as $row) {
+            foreach ($row as $button) {
+                $labels[] = (string) $button->text;
+            }
+        }
+
+        return $labels;
+    }
+
+    /**
      * @return list<string>
      */
     public static function allMenuLabels(TextRepository $texts): array
@@ -83,6 +102,7 @@ final class MenuKeyboard
             $texts->get('menu.find_song'),
             $texts->get('menu.my_recordings'),
             $texts->get('menu.my_profile'),
+            $texts->get('menu.about_bot'),
             $texts->get('menu.admin_schedule'),
             $texts->get('menu.admin_attendance'),
             $texts->get('menu.admin_payment'),

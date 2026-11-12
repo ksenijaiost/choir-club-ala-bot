@@ -322,6 +322,12 @@ final class MessageHandler
             return;
         }
 
+        if ($text === $texts->get('menu.about_bot')) {
+            AboutBotHandler::openHome($bot, $texts, $access, $user);
+
+            return;
+        }
+
         if ($text === $texts->get('menu.admin_history') && $adminHistory !== null) {
             AdminHistoryHandler::openHome($bot, $access, $user, $adminHistory);
 

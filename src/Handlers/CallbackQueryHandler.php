@@ -58,6 +58,12 @@ final class CallbackQueryHandler
                 return;
             }
 
+            if (str_starts_with($data, 'ab:')) {
+                AboutBotHandler::handleCallback($bot, $texts, $access, $users, $data, $actorTelegramId);
+
+                return;
+            }
+
             if (str_starts_with($data, 'snd:')) {
                 if (SongsCallbackHandler::handle($bot, $materials, $materials->delivery, $data)) {
                     return;
