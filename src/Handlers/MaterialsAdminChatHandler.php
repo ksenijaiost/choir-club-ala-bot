@@ -18,7 +18,7 @@ final class MaterialsAdminChatHandler
         AccessControl $access,
         MaterialsDeps $deps,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $access, $deps): void {
+        $bot->onMessage(function (Nutgram $bot) use ($access, $deps): void {
             $chat = $bot->chat();
             if ($chat === null || !$access->isAdminChatId($chat->id)) {
                 return;

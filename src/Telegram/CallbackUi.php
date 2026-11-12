@@ -15,6 +15,28 @@ final class CallbackUi
         return $bot->callbackQuery()?->message;
     }
 
+    public static function editCurrentMessage(
+        Nutgram $bot,
+        string $text,
+        ?InlineKeyboardMarkup $replyMarkup = null,
+    ): void {
+        $message = self::callbackMessage($bot);
+        if ($message === null) {
+            return;
+        }
+
+        try {
+            $bot->editMessageText(
+                text: $text,
+                chat_id: $message->chat->id,
+                message_id: $message->message_id,
+                reply_markup: $replyMarkup,
+            );
+        } catch (\Throwable) {
+            self::clearKeyboard($bot, $message);
+        }
+    }
+
     public static function finalizeWithAnswer(Nutgram $bot, string $answerLine): void
     {
         $message = self::callbackMessage($bot);

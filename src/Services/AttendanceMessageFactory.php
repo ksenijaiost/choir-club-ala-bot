@@ -15,9 +15,6 @@ final class AttendanceMessageFactory
     ) {
     }
 
-    /**
-     * @param array<string, mixed> $rehearsal
-     */
     public function dayBeforeKeyboard(int $rehearsalId): InlineKeyboardMarkup
     {
         return InlineKeyboardMarkup::make()->addRow(
@@ -26,9 +23,6 @@ final class AttendanceMessageFactory
         );
     }
 
-    /**
-     * @param array<string, mixed> $rehearsal
-     */
     public function checkinKeyboard(int $rehearsalId): InlineKeyboardMarkup
     {
         return InlineKeyboardMarkup::make()->addRow(
