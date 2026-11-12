@@ -22,6 +22,7 @@ final class Config
         public readonly string $adminPagesKey,
         public readonly string $webhookUrl,
         public readonly ?string $fakeNow,
+        public readonly string $adminChatLink = '',
     ) {
     }
 
@@ -43,6 +44,7 @@ final class Config
             adminPagesKey: self::envString('ADMIN_PAGES_KEY'),
             webhookUrl: self::envString('WEBHOOK_URL'),
             fakeNow: self::envOptional('FAKE_NOW'),
+            adminChatLink: self::envString('ADMIN_CHAT_LINK'),
         );
     }
 
