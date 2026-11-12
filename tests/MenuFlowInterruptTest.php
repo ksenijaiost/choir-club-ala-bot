@@ -235,13 +235,18 @@ final class MenuFlowInterruptTest extends TestCase
             new CheckInSessionRepository($pdo),
         );
 
+        $settings = new BotSettingsRepository($pdo);
+        $paymentTexts = new PaymentTexts($texts);
         $payments = new PaymentDeps(
             $config,
             $users,
             new PaymentRecordRepository($pdo),
-            new PaymentTexts($texts),
+            $paymentTexts,
             $recipients,
             $texts,
+            $settings,
+            $flows,
+            new \App\Services\PaymentReminderTextService($settings, $texts, $paymentTexts),
         );
 
         $songRepo = new SongRepository($pdo);

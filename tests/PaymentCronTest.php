@@ -15,6 +15,7 @@ use App\Repositories\BotSettingsRepository;
 use App\Repositories\JobDeliveryRepository;
 use App\Repositories\PaymentRecordRepository;
 use App\Repositories\UserRepository;
+use App\Services\PaymentReminderTextService;
 use App\Services\PaymentTexts;
 use App\Tests\Support\RecordingTelegramOutbound;
 use App\Text\TextRepository;
@@ -36,14 +37,17 @@ final class PaymentCronTest extends TestCase
 
         $outbound = new RecordingTelegramOutbound();
         $payments = new PaymentRecordRepository($pdo);
+        $settings = new BotSettingsRepository($pdo);
+        $paymentTexts = new PaymentTexts($texts);
+        $reminderTexts = new PaymentReminderTextService($settings, $texts, $paymentTexts);
 
         $job = new PaymentReminderFirstJob(
             $users,
             $payments,
-            new BotSettingsRepository($pdo),
+            $settings,
             new JobDeliveryRepository($pdo),
             $texts,
-            new PaymentTexts($texts),
+            $reminderTexts,
             $outbound,
         );
 
@@ -74,13 +78,16 @@ final class PaymentCronTest extends TestCase
         $payments->confirmByConductor($uid, 2026, 5, 1);
 
         $outbound = new RecordingTelegramOutbound();
+        $settings = new BotSettingsRepository($pdo);
+        $paymentTexts = new PaymentTexts($texts);
+        $reminderTexts = new PaymentReminderTextService($settings, $texts, $paymentTexts);
         $job = new PaymentReminderFirstJob(
             $users,
             $payments,
-            new BotSettingsRepository($pdo),
+            $settings,
             new JobDeliveryRepository($pdo),
             $texts,
-            new PaymentTexts($texts),
+            $reminderTexts,
             $outbound,
         );
 
@@ -108,13 +115,17 @@ final class PaymentCronTest extends TestCase
         $payments->confirmByConductor($uid, 2026, 5, 1);
 
         $outbound = new RecordingTelegramOutbound();
+        $settings = new BotSettingsRepository($pdo);
+        $paymentTexts = new PaymentTexts($texts);
+        $reminderTexts = new PaymentReminderTextService($settings, $texts, $paymentTexts);
         $job = new PaymentReminderSecondJob(
             $users,
             $payments,
-            new BotSettingsRepository($pdo),
+            $settings,
             new JobDeliveryRepository($pdo),
             $texts,
-            new PaymentTexts($texts),
+            $paymentTexts,
+            $reminderTexts,
             $outbound,
         );
 

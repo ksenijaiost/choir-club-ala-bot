@@ -126,6 +126,7 @@ final class AboutBotHandler
             'btn_admin_materials' => $texts->get('menu.admin_materials'),
             'btn_admin_attendance' => $texts->get('menu.admin_attendance'),
             'btn_admin_payment' => $texts->get('menu.admin_payment'),
+            'btn_payment_reminder_texts' => $texts->get('payment.reminder_texts_button'),
             'btn_admin_history' => $texts->get('menu.admin_history'),
             'btn_admin_helpers' => $texts->get('menu.admin_helpers'),
             'btn_admin_members' => $texts->get('menu.admin_members'),

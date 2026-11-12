@@ -198,13 +198,20 @@ final class AdminMenuMessageHandlerTest extends TestCase
     ): PaymentDeps {
         $recipients = new NotificationRecipientResolver($config, $users);
 
+        $settings = new \App\Repositories\BotSettingsRepository($pdo);
+        $flows = new \App\Repositories\UserFlowRepository($pdo);
+        $paymentTexts = new PaymentTexts($texts);
+
         return new PaymentDeps(
             $config,
             $users,
             new PaymentRecordRepository($pdo),
-            new PaymentTexts($texts),
+            $paymentTexts,
             $recipients,
             $texts,
+            $settings,
+            $flows,
+            new \App\Services\PaymentReminderTextService($settings, $texts, $paymentTexts),
         );
     }
 

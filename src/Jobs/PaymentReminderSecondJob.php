@@ -11,6 +11,7 @@ use App\Repositories\JobDeliveryRepository;
 use App\Repositories\PaymentRecordRepository;
 use App\Repositories\UserRepository;
 use App\Services\PaymentPeriod;
+use App\Services\PaymentReminderTextService;
 use App\Services\PaymentTexts;
 use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
@@ -24,6 +25,7 @@ final class PaymentReminderSecondJob
         private readonly JobDeliveryRepository $deliveries,
         private readonly TextRepository $texts,
         private readonly PaymentTexts $paymentTexts,
+        private readonly PaymentReminderTextService $reminderTexts,
         private readonly TelegramOutbound $outbound,
     ) {
     }
@@ -79,7 +81,7 @@ final class PaymentReminderSecondJob
             } else {
                 $this->outbound->sendMessage(
                     (int) $user['telegram_id'],
-                    $this->texts->get('payment.reminder_second', $placeholders),
+                    $this->reminderTexts->formatReminder(2, $period['year'], $period['month']),
                 );
             }
 

@@ -30,6 +30,7 @@ use App\Services\MaterialsService;
 use App\Services\SongDeliveryService;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Services\PaymentReminderTextService;
 use App\Services\PaymentTexts;
 use App\Services\ScheduleBroadcastService;
 use App\Services\ScheduleGenerator;
@@ -79,13 +80,17 @@ final class HandlerRegistry
         $conductorNotifier = new AttendanceConductorNotifier($recipients, $texts, $outbound);
 
         $payments = new PaymentRecordRepository($pdo);
+        $paymentTexts = new PaymentTexts($texts);
         $paymentDeps = new PaymentDeps(
             $config,
             $users,
             $payments,
-            new PaymentTexts($texts),
+            $paymentTexts,
             $recipients,
             $texts,
+            $settings,
+            $flows,
+            new PaymentReminderTextService($settings, $texts, $paymentTexts),
         );
 
         $songRepo = new SongRepository($pdo);

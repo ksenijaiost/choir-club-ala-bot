@@ -49,4 +49,10 @@ final class BotSettingsRepository
 
         $stmt->execute([$key, $value]);
     }
+
+    public function delete(string $key): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM bot_settings WHERE setting_key = ?');
+        $stmt->execute([$key]);
+    }
 }

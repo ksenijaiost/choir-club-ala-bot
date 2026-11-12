@@ -92,7 +92,7 @@ final class MessageHandler
 
             if ($status === UserStatus::ACTIVE) {
                 if (in_array($text, MenuKeyboard::allMenuLabels($texts), true)) {
-                    self::clearActiveFlows($telegramId, $schedule, $attendance, $materials);
+                    self::clearActiveFlows($telegramId, $schedule, $attendance, $materials, $payments);
                     self::handleActiveMenu(
                         $bot,
                         $texts,
@@ -114,6 +114,15 @@ final class MessageHandler
                 if ($adminChat !== null && $telegramId !== null && AdminChatOwnerHandler::handleFlowMessage(
                     $bot,
                     $adminChat,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
+                if ($payments !== null && $telegramId !== null && PaymentReminderTextAdminHandler::handleFlowMessage(
+                    $bot,
+                    $payments,
                     $telegramId,
                     $text,
                 )) {
@@ -191,6 +200,7 @@ final class MessageHandler
         ScheduleDeps $schedule,
         AttendanceDeps $attendance,
         ?MaterialsDeps $materials,
+        ?PaymentDeps $payments = null,
     ): void {
         if ($telegramId === null) {
             return;
@@ -200,6 +210,9 @@ final class MessageHandler
         $attendance->flows->clear($telegramId);
         if ($materials !== null) {
             $materials->flows->clear($telegramId);
+        }
+        if ($payments !== null) {
+            $payments->flows->clear($telegramId);
         }
     }
 

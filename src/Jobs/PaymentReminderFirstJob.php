@@ -11,7 +11,7 @@ use App\Repositories\JobDeliveryRepository;
 use App\Repositories\PaymentRecordRepository;
 use App\Repositories\UserRepository;
 use App\Services\PaymentPeriod;
-use App\Services\PaymentTexts;
+use App\Services\PaymentReminderTextService;
 use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -25,7 +25,7 @@ final class PaymentReminderFirstJob
         private readonly BotSettingsRepository $settings,
         private readonly JobDeliveryRepository $deliveries,
         private readonly TextRepository $texts,
-        private readonly PaymentTexts $paymentTexts,
+        private readonly PaymentReminderTextService $reminderTexts,
         private readonly TelegramOutbound $outbound,
     ) {
     }
@@ -48,8 +48,7 @@ final class PaymentReminderFirstJob
 
         $period = PaymentPeriod::targetForFirstReminder($local);
         $periodKey = PaymentPeriod::periodKey($period['year'], $period['month']);
-        $placeholders = $this->paymentTexts->monthYearPlaceholders($period['year'], $period['month']);
-        $message = $this->texts->get('payment.reminder_first', $placeholders);
+        $message = $this->reminderTexts->formatReminder(1, $period['year'], $period['month']);
 
         $keyboard = InlineKeyboardMarkup::make()->addRow(
             InlineKeyboardButton::make(

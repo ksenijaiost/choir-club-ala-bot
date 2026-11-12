@@ -21,6 +21,7 @@ use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Services\PaymentReminderTextService;
 use App\Services\PaymentTexts;
 use App\Repositories\BlockEventRepository;
 use App\Services\ScheduleGenerator;
@@ -113,6 +114,7 @@ final class CronJobRunner
         $settings = new BotSettingsRepository($pdo);
         $paymentRecords = new PaymentRecordRepository($pdo);
         $paymentTexts = new PaymentTexts($texts);
+        $reminderTexts = new PaymentReminderTextService($settings, $texts, $paymentTexts);
 
         $result['payment_reminder_1'] = (new PaymentReminderFirstJob(
             $users,
@@ -120,7 +122,7 @@ final class CronJobRunner
             $settings,
             $deliveries,
             $texts,
-            $paymentTexts,
+            $reminderTexts,
             $outbound,
         ))->runIfDue($config);
 
@@ -131,6 +133,7 @@ final class CronJobRunner
             $deliveries,
             $texts,
             $paymentTexts,
+            $reminderTexts,
             $outbound,
         ))->runIfDue($config);
 

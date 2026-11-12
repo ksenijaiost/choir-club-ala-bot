@@ -28,7 +28,12 @@ final class PaymentAdminHandler
         $tz = new \DateTimeZone($deps->config->timezone);
         $local = Clock::now($deps->config)->setTimezone($tz);
 
-        $keyboard = InlineKeyboardMarkup::make();
+        $keyboard = InlineKeyboardMarkup::make()->addRow(
+            InlineKeyboardButton::make(
+                $deps->texts->get('payment.reminder_texts_button'),
+                callback_data: PaymentReminderTextAdminHandler::CB_HOME,
+            ),
+        );
         for ($i = 0; $i < 3; $i++) {
             $cursor = $local->modify('-' . $i . ' months');
             $year = (int) $cursor->format('Y');
@@ -51,6 +56,19 @@ final class PaymentAdminHandler
         array $actor,
         string $data,
     ): bool {
+        if (str_starts_with($data, 'pay:rt:')) {
+            $actorTelegramId = (int) ($actor['telegram_id'] ?? 0);
+
+            return PaymentReminderTextAdminHandler::handleCallback(
+                $bot,
+                $deps,
+                $access,
+                $actor,
+                $data,
+                $actorTelegramId,
+            );
+        }
+
         if ($data === 'pay:adm:home') {
             if (!$access->hasConductorPrivileges($actor)) {
                 $bot->answerCallbackQuery(text: $deps->texts->get('admin.only_conductor_or_owner'), show_alert: true);
@@ -60,6 +78,7 @@ final class PaymentAdminHandler
 
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
+            $deps->flows->clear((int) ($actor['telegram_id'] ?? 0));
             self::openHome($bot, $deps, $access, $actor);
 
             return true;
