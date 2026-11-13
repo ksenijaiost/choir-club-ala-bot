@@ -13,10 +13,12 @@ WHERE weekday = 5;
 
 INSERT INTO schedule_templates (weekday, start_time, duration_minutes, address, is_active, sort_order)
 SELECT 3, '19:30:00', 120, 'комьюнити-центр', 1, 1
+FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM schedule_templates WHERE weekday = 3);
 
 INSERT INTO schedule_templates (weekday, start_time, duration_minutes, address, is_active, sort_order)
 SELECT 6, '16:00:00', 120, 'комьюнити-центр', 1, 2
+FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM schedule_templates WHERE weekday = 6);
 
 DELETE FROM rehearsals

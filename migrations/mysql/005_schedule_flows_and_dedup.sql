@@ -12,8 +12,10 @@ CREATE UNIQUE INDEX uk_rehearsals_template_slot
 -- Шаблон по умолчанию (2 репетиции), если таблица пуста
 INSERT INTO schedule_templates (weekday, start_time, duration_minutes, address, is_active, sort_order)
 SELECT 3, '19:00:00', 120, 'Адрес уточни в «Админ: расписание» → шаблоны', 1, 1
+FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM schedule_templates LIMIT 1);
 
 INSERT INTO schedule_templates (weekday, start_time, duration_minutes, address, is_active, sort_order)
 SELECT 5, '19:00:00', 120, 'Адрес уточни в «Админ: расписание» → шаблоны', 1, 2
+FROM DUAL
 WHERE (SELECT COUNT(*) FROM schedule_templates) = 1;
