@@ -66,18 +66,43 @@ final class MaterialsUploadTest extends TestCase
         $materials = new MaterialRepository($pdo);
         $service = new MaterialsService($materials, $songs, $texts);
 
-        $service->saveUpload($uploader, $songId, MaterialType::NOTES, null, 'f1', 'u1', null, true);
-        $service->saveUpload($uploader, $songId, MaterialType::NOTES, null, 'f2', 'u2', null, true);
+        $service->saveUpload($uploader, $songId, MaterialType::NOTES, null, 'f1', 'u1', null);
+        $service->saveUpload($uploader, $songId, MaterialType::NOTES, null, 'f2', 'u2', null, false, 'replace_all');
 
-        $current = $materials->findCurrentSingleton($songId, MaterialType::NOTES);
-        self::assertNotNull($current);
-        self::assertSame('u2', $current['telegram_file_unique_id']);
+        $current = $materials->listCurrentNotes($songId);
+        self::assertCount(1, $current);
+        self::assertSame('u2', $current[0]['telegram_file_unique_id']);
 
         $stmt = $pdo->prepare(
             'SELECT COUNT(*) FROM materials WHERE song_id = ? AND type = ? AND is_current = 0'
         );
         $stmt->execute([$songId, MaterialType::NOTES]);
         self::assertSame(1, (int) $stmt->fetchColumn());
+    }
+
+    public function testNotesAddKeepsPrevious(): void
+    {
+        $pdo = Connection::make($this->testConfig());
+        (new Migrator($pdo, 'sqlite'))->migrate();
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+
+        $users = new UserRepository($pdo);
+        $users->create(8005, 'Админ', 'tenor', UserRole::ADMIN, UserStatus::ACTIVE);
+        $uploader = $users->findByTelegramId(8005);
+        self::assertNotNull($uploader);
+
+        $songs = new SongRepository($pdo);
+        $songId = $songs->create('Две ноты');
+
+        $materials = new MaterialRepository($pdo);
+        $service = new MaterialsService($materials, $songs, $texts);
+
+        $service->saveUpload($uploader, $songId, MaterialType::NOTES, null, 'f1', 'u1', null);
+        $service->saveUpload($uploader, $songId, MaterialType::NOTES, null, 'f2', 'u2', null, false, 'add');
+
+        $current = $materials->listCurrentNotes($songId);
+        self::assertCount(2, $current);
+        self::assertSame(['u1', 'u2'], array_column($current, 'telegram_file_unique_id'));
     }
 
     public function testTextTranslitSavedWithTextContentColumn(): void

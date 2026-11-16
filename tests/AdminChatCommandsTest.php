@@ -76,6 +76,29 @@ final class AdminChatCommandsTest extends TestCase
         self::assertStringContainsString('Гимн', $body);
     }
 
+    public function testSongsListShowsMultipleNotesCount(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $pdo = Connection::make($this->testConfig());
+        (new Migrator($pdo, 'sqlite'))->migrate();
+
+        $users = new UserRepository($pdo);
+        $uploaderId = $users->create(self::ADMIN_TG, 'Админ', 'tenor', UserRole::ADMIN, UserStatus::ACTIVE);
+
+        $songs = new SongRepository($pdo);
+        $materials = new MaterialRepository($pdo);
+        $songId = $songs->create('Две страницы');
+
+        $materials->insert($songId, MaterialType::NOTES, null, 'f1', 'u1', $uploaderId, null, true);
+        $materials->insert($songId, MaterialType::NOTES, null, 'f2', 'u2', $uploaderId, null, true);
+
+        $presenter = new AdminChatSongListPresenter($songs, $materials, $texts);
+        $body = implode("\n", $presenter->buildMessageChunks());
+
+        self::assertStringContainsString('Две страницы', $body);
+        self::assertStringContainsString('ноты 2 шт.', $body);
+    }
+
     public function testSongsEmptyList(): void
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');

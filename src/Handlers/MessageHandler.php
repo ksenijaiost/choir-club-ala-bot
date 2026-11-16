@@ -149,6 +149,15 @@ final class MessageHandler
                     return;
                 }
 
+                if ($materials !== null && $telegramId !== null && MaterialsFlowHandler::handleFlowMessage(
+                    $bot,
+                    $materials,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
                 if ($materials !== null && $telegramId !== null && SongMemberHandler::handleFlowMessage(
                     $bot,
                     $materials,

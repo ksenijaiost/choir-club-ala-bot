@@ -29,6 +29,10 @@ final class MaterialsService
 
     public function needsReplaceConfirm(int $songId, string $type): bool
     {
+        if ($type === MaterialType::NOTES) {
+            return $this->materials->countCurrentNotes($songId) > 0;
+        }
+
         if (!MaterialType::isSingleton($type)) {
             return false;
         }
@@ -39,6 +43,7 @@ final class MaterialsService
     /**
      * @param array<string, mixed> $uploader
      * @param list<string>|null $voiceParts
+     * @param 'add'|'replace_all'|null $notesUploadMode
      */
     public function saveUpload(
         array $uploader,
@@ -49,6 +54,7 @@ final class MaterialsService
         string $fileUniqueId,
         ?int $adminChatMessageId,
         bool $replaceConfirmed = false,
+        ?string $notesUploadMode = null,
     ): array {
         $song = $this->songs->findById($songId);
         if ($song === null) {
@@ -58,7 +64,29 @@ final class MaterialsService
         $existing = null;
         $savedVoiceParts = [];
 
-        if (MaterialType::isSingleton($type)) {
+        if ($type === MaterialType::NOTES) {
+            $notesCount = $this->materials->countCurrentNotes($songId);
+            if ($notesCount > 0) {
+                if ($notesUploadMode === null) {
+                    throw new \InvalidArgumentException('notes_choice_required');
+                }
+                if ($notesUploadMode === 'replace_all') {
+                    $existing = $this->materials->listCurrentNotes($songId)[0] ?? [];
+                    $this->materials->archiveAllCurrentByType($songId, MaterialType::NOTES);
+                }
+            }
+
+            $materialId = $this->materials->insert(
+                $songId,
+                $type,
+                null,
+                $fileId,
+                $fileUniqueId,
+                (int) $uploader['id'],
+                $adminChatMessageId,
+                true,
+            );
+        } elseif (MaterialType::isSingleton($type)) {
             $existing = $this->materials->findCurrentSingleton($songId, $type);
             if ($existing !== null) {
                 if (!$replaceConfirmed) {
@@ -176,6 +204,30 @@ final class MaterialsService
             $fileUniqueId,
             (int) $uploader['id'],
             $adminChatMessageId,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $uploader
+     * @param array<string, mixed> $targetMaterial
+     */
+    public function replaceNotesFile(
+        array $uploader,
+        array $targetMaterial,
+        string $fileId,
+        string $fileUniqueId,
+        ?int $adminChatMessageId,
+    ): void {
+        $this->materials->archiveById((int) $targetMaterial['id']);
+        $this->materials->insert(
+            (int) $targetMaterial['song_id'],
+            MaterialType::NOTES,
+            null,
+            $fileId,
+            $fileUniqueId,
+            (int) $uploader['id'],
+            $adminChatMessageId,
+            true,
         );
     }
 

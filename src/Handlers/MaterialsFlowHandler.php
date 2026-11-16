@@ -163,12 +163,17 @@ final class MaterialsFlowHandler
 
     public static function sendReplaceConfirm(Nutgram $bot, MaterialsDeps $deps, int $songId, string $type): void
     {
+        if ($type === MaterialType::NOTES) {
+            self::sendNotesUploadChoice($bot, $deps, $songId);
+
+            return;
+        }
+
         $song = $deps->songs->findById($songId);
         if ($song === null) {
             return;
         }
 
-        $key = $type === MaterialType::NOTES ? 'materials.replace_confirm_notes' : 'materials.replace_confirm_translit';
         $keyboard = InlineKeyboardMarkup::make()
             ->addRow(
                 InlineKeyboardButton::make(
@@ -184,12 +189,116 @@ final class MaterialsFlowHandler
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:tp');
 
         $bot->sendMessage(
-            $deps->texts->get($key, ['title' => (string) $song['title']]),
+            $deps->texts->get('materials.replace_confirm_translit', ['title' => (string) $song['title']]),
             reply_markup: $keyboard,
         );
     }
 
+    public static function sendNotesUploadChoice(Nutgram $bot, MaterialsDeps $deps, int $songId, ?int $chatId = null): void
+    {
+        $song = $deps->songs->findById($songId);
+        if ($song === null) {
+            return;
+        }
+
+        $keyboard = InlineKeyboardMarkup::make()
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.notes_add'),
+                    callback_data: 'mat:up:nt:add',
+                ),
+                InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.notes_replace_all'),
+                    callback_data: 'mat:up:nt:all',
+                ),
+            );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:tp');
+
+        $text = $deps->texts->get('materials.notes_upload_choice', ['title' => (string) $song['title']]);
+        if ($chatId !== null) {
+            $bot->sendMessage(chat_id: $chatId, text: $text, reply_markup: $keyboard);
+        } else {
+            $bot->sendMessage($text, reply_markup: $keyboard);
+        }
+    }
+
     public static function handleAdminChatText(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        string $text,
+    ): bool {
+        return self::handleFlowMessage($bot, $deps, $telegramId, $text);
+    }
+
+    public static function handleFlowMessage(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        string $text,
+    ): bool {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null) {
+            return false;
+        }
+
+        $flow = (string) ($state['flow'] ?? '');
+        if ($flow === 'material_rename') {
+            return self::handleRenameTitle($bot, $deps, $telegramId, $text, $state['context'] ?? []);
+        }
+
+        if ($flow === 'material_upload' && ($state['context']['step'] ?? '') === 'new_song_title') {
+            return self::handleNewSongTitle($bot, $deps, $telegramId, $text);
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    private static function handleRenameTitle(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        string $text,
+        array $ctx,
+    ): bool {
+        $songId = (int) ($ctx['song_id'] ?? 0);
+        $song = $deps->songs->findById($songId);
+        if ($song === null) {
+            $deps->flows->clear($telegramId);
+            $bot->sendMessage($deps->texts->get('errors.generic'));
+
+            return true;
+        }
+
+        $newTitle = trim($text);
+        if (mb_strlen($newTitle) < 2 || mb_strlen($newTitle) > 255) {
+            $bot->sendMessage($deps->texts->get('materials.invalid_song_title'));
+
+            return true;
+        }
+
+        $oldTitle = (string) $song['title'];
+        $result = $deps->songs->rename($songId, $newTitle);
+        if ($result === 'duplicate') {
+            $bot->sendMessage($deps->texts->get('materials.rename_duplicate'));
+
+            return true;
+        }
+
+        $deps->flows->clear($telegramId);
+        $bot->sendMessage($deps->texts->get('materials.rename_success', [
+            'old' => $oldTitle,
+            'new' => trim($newTitle),
+        ]));
+
+        return true;
+    }
+
+    private static function handleNewSongTitle(
         Nutgram $bot,
         MaterialsDeps $deps,
         int $telegramId,
@@ -201,9 +310,6 @@ final class MaterialsFlowHandler
         }
 
         $ctx = $state['context'];
-        if (($ctx['step'] ?? '') !== 'new_song_title') {
-            return false;
-        }
 
         if (mb_strlen($text) < 2 || mb_strlen($text) > 255) {
             $bot->sendMessage($deps->texts->get('materials.invalid_song_title'));
@@ -278,6 +384,7 @@ final class MaterialsFlowHandler
                     $replaceConfirmed,
                 );
             } else {
+                $notesMode = isset($ctx['notes_mode']) ? (string) $ctx['notes_mode'] : null;
                 $result = $deps->service->saveUpload(
                     $user,
                     $songId,
@@ -287,6 +394,7 @@ final class MaterialsFlowHandler
                     (string) ($ctx['file_unique_id'] ?? ''),
                     isset($ctx['admin_chat_message_id']) ? (int) $ctx['admin_chat_message_id'] : null,
                     $replaceConfirmed,
+                    $notesMode,
                 );
             }
         } catch (\InvalidArgumentException $e) {
@@ -294,6 +402,20 @@ final class MaterialsFlowHandler
                 $ctx['step'] = 'replace_confirm';
                 $deps->flows->set($telegramId, 'material_upload', $ctx);
                 self::sendReplaceConfirm($bot, $deps, $songId, $type);
+
+                return;
+            }
+
+            if ($e->getMessage() === 'notes_choice_required') {
+                $ctx['step'] = 'notes_choice';
+                $deps->flows->set($telegramId, 'material_upload', $ctx);
+                $adminChatId = (int) ($ctx['admin_chat_id'] ?? 0);
+                self::sendNotesUploadChoice(
+                    $bot,
+                    $deps,
+                    $songId,
+                    $adminChatId !== 0 ? $adminChatId : null,
+                );
 
                 return;
             }

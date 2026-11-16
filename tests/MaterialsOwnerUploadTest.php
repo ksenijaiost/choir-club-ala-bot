@@ -59,10 +59,10 @@ final class MaterialsOwnerUploadTest extends TestCase
         $bot = Nutgram::fake();
         MaterialsFlowHandler::completeUpload($bot, $deps, $owner);
 
-        $material = $deps->materials->findCurrentSingleton($songId, MaterialType::NOTES);
-        self::assertNotNull($material);
-        self::assertSame('owner-notes-uniq-1', $material['telegram_file_unique_id']);
-        self::assertSame((int) $owner['id'], (int) $material['uploaded_by_user_id']);
+        $notes = $deps->materials->listCurrentNotes($songId);
+        self::assertCount(1, $notes);
+        self::assertSame('owner-notes-uniq-1', $notes[0]['telegram_file_unique_id']);
+        self::assertSame((int) $owner['id'], (int) $notes[0]['uploaded_by_user_id']);
         self::assertNull($deps->flows->get(self::OWNER_TG));
     }
 

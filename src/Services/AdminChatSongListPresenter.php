@@ -33,16 +33,14 @@ final class AdminChatSongListPresenter
 
         foreach ($rows as $row) {
             $songId = (int) $row['id'];
-            $hasNotes = ((int) ($row['has_notes'] ?? 0)) > 0;
+            $notesCount = (int) ($row['notes_count'] ?? 0);
             $hasTranslit = ((int) ($row['has_translit'] ?? 0)) > 0;
             $recording = $recordings[$songId] ?? ['count' => 0, 'parts' => []];
             $recordingText = $this->formatRecordings($recording['count'], $recording['parts']);
 
             $lines[] = $this->texts->get('admin_chat.songs_line', [
                 'title' => (string) $row['title'],
-                'notes' => $hasNotes
-                    ? $this->texts->get('admin_chat.mark_yes')
-                    : $this->texts->get('admin_chat.mark_no'),
+                'notes' => $this->formatNotesCount($notesCount),
                 'translit' => $hasTranslit
                     ? $this->texts->get('admin_chat.mark_yes')
                     : $this->texts->get('admin_chat.mark_no'),
@@ -53,6 +51,19 @@ final class AdminChatSongListPresenter
         $body = implode("\n", $lines);
 
         return \App\Telegram\TelegramMessageChunker::splitByLines($body);
+    }
+
+    private function formatNotesCount(int $count): string
+    {
+        if ($count <= 0) {
+            return $this->texts->get('admin_chat.mark_no');
+        }
+
+        if ($count === 1) {
+            return $this->texts->get('admin_chat.mark_yes');
+        }
+
+        return $this->texts->get('admin_chat.notes_many', ['count' => (string) $count]);
     }
 
     /**

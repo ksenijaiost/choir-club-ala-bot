@@ -121,6 +121,37 @@ final class MaterialRepository
         $stmt->execute([$songId, $type]);
     }
 
+    public function archiveAllCurrentByType(int $songId, string $type): void
+    {
+        $this->archiveSingleton($songId, $type);
+    }
+
+  /**
+   * @return list<array<string, mixed>>
+   */
+    public function listCurrentNotes(int $songId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM materials
+             WHERE song_id = ? AND type = ? AND is_current = 1
+             ORDER BY uploaded_at ASC, id ASC'
+        );
+        $stmt->execute([$songId, MaterialType::NOTES]);
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    public function countCurrentNotes(int $songId): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM materials
+             WHERE song_id = ? AND type = ? AND is_current = 1'
+        );
+        $stmt->execute([$songId, MaterialType::NOTES]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     public function archiveById(int $id): void
     {
         $stmt = $this->pdo->prepare(
