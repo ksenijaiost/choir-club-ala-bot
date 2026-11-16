@@ -80,6 +80,30 @@ final class MaterialsUploadTest extends TestCase
         self::assertSame(1, (int) $stmt->fetchColumn());
     }
 
+    public function testTextTranslitSavedWithTextContentColumn(): void
+    {
+        $pdo = Connection::make($this->testConfig());
+        (new Migrator($pdo, 'sqlite'))->migrate();
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+
+        $users = new UserRepository($pdo);
+        $users->create(8004, 'Админ', 'tenor', UserRole::ADMIN, UserStatus::ACTIVE);
+        $uploader = $users->findByTelegramId(8004);
+        self::assertNotNull($uploader);
+
+        $songs = new SongRepository($pdo);
+        $songId = $songs->create('Текстовая');
+
+        $materials = new MaterialRepository($pdo);
+        $service = new MaterialsService($materials, $songs, $texts);
+        $service->saveTextUpload($uploader, $songId, MaterialType::TRANSLIT, "Одна\nДве", null, true);
+
+        $row = $materials->findCurrentSingleton($songId, MaterialType::TRANSLIT);
+        self::assertNotNull($row);
+        self::assertSame("Одна\nДве", $row['text_content']);
+        self::assertNull($row['telegram_file_id']);
+    }
+
     public function testRecordingAddsWithoutReplacing(): void
     {
         $pdo = Connection::make($this->testConfig());

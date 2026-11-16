@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Domain\MaterialType;
 use App\Repositories\MaterialRepository;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\TelegramMessageChunker;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 
@@ -60,7 +61,32 @@ final class SongDeliveryService
             return;
         }
 
+        $textContent = (string) ($row['text_content'] ?? '');
+        if ($type === MaterialType::TRANSLIT && $textContent !== '') {
+            $this->sendTextChunks($bot, $textContent);
+
+            return;
+        }
+
         $this->sendMaterialFile($bot, $row);
+    }
+
+    public function sendTextChunks(Nutgram $bot, string $text, ?int $chatId = null): void
+    {
+        $chunks = TelegramMessageChunker::splitByLines($text);
+        if ($chunks === []) {
+            $bot->sendMessage($this->texts->get('songs.no_material'), chat_id: $chatId);
+
+            return;
+        }
+
+        foreach ($chunks as $chunk) {
+            if ($chatId !== null) {
+                $bot->sendMessage($chunk, chat_id: $chatId);
+            } else {
+                $bot->sendMessage($chunk);
+            }
+        }
     }
 
     /**

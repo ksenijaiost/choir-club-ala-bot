@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Handlers;
 
+use App\Domain\MaterialType;
 use App\Services\AccessControl;
+use App\Services\TranslitUploadCommand;
 use App\Services\UserIdentitySync;
 use App\Telegram\TelegramFileExtractor;
 use App\Text\TextRepository;
@@ -18,7 +20,7 @@ final class MaterialsAdminChatHandler
         AccessControl $access,
         MaterialsDeps $deps,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($access, $deps): void {
+        $bot->onMessage(function (Nutgram $bot) use ($access, $deps, $texts): void {
             $chat = $bot->chat();
             if ($chat === null || !$access->isAdminChatId($chat->id)) {
                 return;
@@ -37,12 +39,27 @@ final class MaterialsAdminChatHandler
             );
 
             $user = $deps->users->findByTelegramId($telegramId);
-            if ($user === null || !$access->canUploadMaterials($user)) {
+            if ($user === null) {
                 return;
             }
 
             $message = $bot->message();
             if ($message === null) {
+                return;
+            }
+
+            $rawText = $message->text ?? $message->caption;
+            if ($rawText !== null && TranslitUploadCommand::isInvoked($rawText)) {
+                if (!$access->canUploadMaterials($user)) {
+                    return;
+                }
+
+                self::onTranslitCommand($bot, $deps, $user, $message, (int) $chat->id, (int) $message->message_id);
+
+                return;
+            }
+
+            if (!$access->canUploadMaterials($user)) {
                 return;
             }
 
@@ -53,11 +70,44 @@ final class MaterialsAdminChatHandler
                 return;
             }
 
-            $text = trim($message->text ?? '');
+            $text = trim($rawText ?? '');
             if ($text !== '' && !str_starts_with($text, '/')) {
                 MaterialsFlowHandler::handleAdminChatText($bot, $deps, $telegramId, $text);
             }
         });
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    private static function onTranslitCommand(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        array $user,
+        \SergiX44\Nutgram\Telegram\Types\Message\Message $message,
+        int $chatId,
+        int $messageId,
+    ): void {
+        $text = TranslitUploadCommand::extractText($message);
+        if ($text === null) {
+            $bot->sendMessage(
+                chat_id: $chatId,
+                text: $deps->texts->get('materials.translit_upload_hint'),
+            );
+
+            return;
+        }
+
+        $deps->flows->set((int) $user['telegram_id'], 'material_upload', [
+            'source' => 'text_translit',
+            'text_content' => $text,
+            'type' => MaterialType::TRANSLIT,
+            'step' => 'song',
+            'admin_chat_id' => $chatId,
+            'admin_chat_message_id' => $messageId,
+        ]);
+
+        MaterialsFlowHandler::sendSongPicker($bot, $deps, page: 0, chatId: $chatId);
     }
 
     /**
@@ -108,7 +158,7 @@ final class MaterialsAdminChatHandler
                 $bot->sendMessage($deps->service->uploadSuccessText(
                     $song,
                     (string) $target['type'],
-                    (string) ($target['voice_part'] ?? ''),
+                    [],
                 ));
             }
 
@@ -116,10 +166,12 @@ final class MaterialsAdminChatHandler
         }
 
         $deps->flows->set((int) $user['telegram_id'], 'material_upload', [
+            'source' => 'file',
             'file_id' => $file['file_id'],
             'file_unique_id' => $file['file_unique_id'],
             'admin_chat_id' => $chatId,
             'admin_chat_message_id' => $messageId,
+            'step' => 'song',
         ]);
 
         MaterialsFlowHandler::sendSongPicker($bot, $deps, page: 0, chatId: $chatId);

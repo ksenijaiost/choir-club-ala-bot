@@ -133,19 +133,20 @@ final class MaterialRepository
         int $songId,
         string $type,
         ?string $voicePart,
-        string $fileId,
-        string $fileUniqueId,
+        ?string $fileId,
+        ?string $fileUniqueId,
         int $uploadedByUserId,
         ?int $adminChatMessageId,
         bool $isCurrent = true,
+        ?string $textContent = null,
     ): int {
         $storedPart = MaterialType::isSingleton($type) ? null : null;
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO materials (
-                song_id, type, voice_part, telegram_file_id, telegram_file_unique_id,
+                song_id, type, voice_part, telegram_file_id, telegram_file_unique_id, text_content,
                 is_current, uploaded_by_user_id, admin_chat_message_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $songId,
@@ -153,6 +154,7 @@ final class MaterialRepository
             $storedPart,
             $fileId,
             $fileUniqueId,
+            $textContent,
             $isCurrent ? 1 : 0,
             $uploadedByUserId,
             $adminChatMessageId,

@@ -104,6 +104,60 @@ final class MaterialsService
 
     /**
      * @param array<string, mixed> $uploader
+     */
+    public function saveTextUpload(
+        array $uploader,
+        int $songId,
+        string $type,
+        string $textContent,
+        ?int $adminChatMessageId,
+        bool $replaceConfirmed = false,
+    ): array {
+        if ($type !== MaterialType::TRANSLIT) {
+            throw new \InvalidArgumentException('text_upload_type');
+        }
+
+        $textContent = str_replace(["\r\n", "\r"], "\n", $textContent);
+        if (trim($textContent) === '') {
+            throw new \InvalidArgumentException('text_content_empty');
+        }
+
+        $song = $this->songs->findById($songId);
+        if ($song === null) {
+            throw new \InvalidArgumentException('Song not found');
+        }
+
+        $existing = $this->materials->findCurrentSingleton($songId, $type);
+        if ($existing !== null) {
+            if (!$replaceConfirmed) {
+                throw new \InvalidArgumentException('replace_confirm_required');
+            }
+            $this->materials->archiveSingleton($songId, $type);
+        }
+
+        $materialId = $this->materials->insert(
+            $songId,
+            $type,
+            null,
+            null,
+            null,
+            (int) $uploader['id'],
+            $adminChatMessageId,
+            true,
+            $textContent,
+        );
+
+        return [
+            'material_id' => $materialId,
+            'song' => $song,
+            'type' => $type,
+            'voice_parts' => [],
+            'archived_previous' => $existing,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $uploader
      * @param array<string, mixed> $targetMaterial
      */
     public function replaceRecordingFile(
