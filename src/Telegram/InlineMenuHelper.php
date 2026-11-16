@@ -192,7 +192,7 @@ final class InlineMenuHelper
         int $telegramId,
     ): void {
         $flows->clear($telegramId);
-        $bot->answerCallbackQuery();
+        SafeTelegram::answerCallbackQuery($bot);
 
         $message = CallbackUi::callbackMessage($bot);
         if ($message === null) {

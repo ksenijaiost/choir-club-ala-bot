@@ -228,7 +228,7 @@ final class TranslitTextUploadTest extends TestCase
             $texts->get('materials.text_notes_saved_append_end', ['song' => 'Песня'])
                 . "\n"
                 . $texts->get('materials.archived_notice'),
-            index: 2,
+            index: 1,
         );
     }
 
@@ -266,7 +266,7 @@ final class TranslitTextUploadTest extends TestCase
             $texts->get('materials.text_notes_saved_replace', ['song' => 'Песня'])
                 . "\n"
                 . $texts->get('materials.archived_notice'),
-            index: 2,
+            index: 1,
         );
     }
 

@@ -50,18 +50,10 @@ final class InteractiveMenuService
     public function removeMessage(Nutgram $bot, int $chatId, int $messageId): void
     {
         try {
-            $bot->deleteMessage(chat_id: $chatId, message_id: $messageId);
+            SafeTelegram::call(static fn (): mixed => $bot->deleteMessage(chat_id: $chatId, message_id: $messageId));
         } catch (\Throwable $e) {
             error_log(self::LOG_PREFIX . ' delete failed chat=' . $chatId . ' message=' . $messageId . ': ' . $e->getMessage());
-            try {
-                $bot->editMessageReplyMarkup(
-                    chat_id: $chatId,
-                    message_id: $messageId,
-                    reply_markup: InlineKeyboardMarkup::make(),
-                );
-            } catch (\Throwable $clearError) {
-                error_log(self::LOG_PREFIX . ' clear keyboard failed chat=' . $chatId . ' message=' . $messageId . ': ' . $clearError->getMessage());
-            }
+            SafeTelegram::editMessageReplyMarkup($bot, $chatId, $messageId, InlineKeyboardMarkup::make());
         }
     }
 }
