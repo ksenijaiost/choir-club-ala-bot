@@ -13,13 +13,16 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AdminChatResolver;
 use App\Services\MemberBlockService;
+use App\Services\RegistrationAdminMessageBuilder;
 use App\Services\UserIdentitySync;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuKeyboard;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
-use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
+use SergiX44\Nutgram\Telegram\Types\Message\Message;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 
 final class CallbackQueryHandler
 {
@@ -205,6 +208,7 @@ final class CallbackQueryHandler
                 self::handleRegistrationPart(
                     $bot,
                     $texts,
+                    $config,
                     $adminChat->resolver,
                     $users,
                     $registrations,
@@ -226,6 +230,7 @@ final class CallbackQueryHandler
     private static function handleRegistrationPart(
         Nutgram $bot,
         TextRepository $texts,
+        Config $config,
         AdminChatResolver $adminChatResolver,
         UserRepository $users,
         RegistrationRepository $registrations,
@@ -254,6 +259,13 @@ final class CallbackQueryHandler
             $bot->answerCallbackQuery(text: $texts->get('registration.welcome'), show_alert: true);
 
             return;
+        }
+
+        $from = $bot->callbackQuery()?->from;
+        if ($from !== null) {
+            $username = $from->username;
+            $users->updateTelegramUsername((int) $user['id'], $username !== null ? (string) $username : null);
+            $user = $users->findById((int) $user['id']) ?? $user;
         }
 
         $users->updateVoicePart((int) $user['id'], $part);
@@ -285,13 +297,13 @@ final class CallbackQueryHandler
             ),
         );
 
+        $builder = new RegistrationAdminMessageBuilder($texts, $config);
+
         $message = $bot->sendMessage(
-            text: $texts->get('registration.admin_new_request', [
-                'name' => (string) $user['display_name'],
-                'part' => $partLabel,
-            ]),
+            text: $builder->buildNewRequest($user, $partLabel, $from),
             chat_id: $adminChatId,
             reply_markup: $keyboard,
+            parse_mode: ParseMode::HTML,
         );
 
         if ($message !== null) {
@@ -339,14 +351,32 @@ final class CallbackQueryHandler
         $action = $matches[1];
         $requestId = (int) $matches[2];
 
+        $builder = new RegistrationAdminMessageBuilder($texts, $config);
         $request = $registrations->findById($requestId);
-        if ($request === null || ($request['status'] ?? '') !== 'pending') {
-            $bot->answerCallbackQuery(text: $texts->get('registration.request_already_handled'), show_alert: true);
+
+        if ($request === null) {
+            $bot->answerCallbackQuery(text: $texts->get('errors.generic'), show_alert: true);
 
             return;
         }
 
         $applicant = $users->findById((int) $request['user_id']);
+        $partLabel = $applicant !== null ? self::applicantPartLabel($texts, $applicant) : '—';
+        $callbackMessage = $bot->callbackQuery()?->message;
+        $adminChatId = (int) ($bot->chatId() ?? 0);
+
+        if (($request['status'] ?? '') !== 'pending') {
+            $bot->answerCallbackQuery(text: $texts->get('registration.request_already_handled'), show_alert: true);
+            if ($applicant !== null) {
+                $resolvedHtml = ($request['status'] ?? '') === 'accepted'
+                    ? $builder->buildResolvedAccepted($applicant, $partLabel, null)
+                    : $builder->buildResolvedRejected($applicant, $partLabel, null);
+                self::finalizeRegistrationAdminMessage($bot, $callbackMessage, $resolvedHtml, $adminChatId);
+            }
+
+            return;
+        }
+
         if ($applicant === null) {
             $bot->answerCallbackQuery(text: $texts->get('errors.generic'), show_alert: true);
 
@@ -368,7 +398,7 @@ final class CallbackQueryHandler
                 reply_markup: MenuKeyboard::forUser($texts, $applicant),
             );
 
-            $resultText = $texts->get('registration.admin_chat_result_accepted', ['name' => $name]);
+            $resolvedHtml = $builder->buildResolvedAccepted($applicant, $partLabel, $moderator);
         } else {
             $registrations->resolve($requestId, 'rejected');
             $users->updateStatus((int) $applicant['id'], UserStatus::REJECTED);
@@ -379,16 +409,48 @@ final class CallbackQueryHandler
                 chat_id: $telegramId,
             );
 
-            $resultText = $texts->get('registration.admin_chat_result_rejected', ['name' => $name]);
+            $resolvedHtml = $builder->buildResolvedRejected($applicant, $partLabel, $moderator);
         }
 
-        $callbackMessage = $bot->callbackQuery()?->message;
-        if ($callbackMessage !== null) {
-            $bot->editMessageText(
-                text: $resultText . "\n\n" . ($callbackMessage->text ?? ''),
-                chat_id: $callbackMessage->chat->id,
-                message_id: $callbackMessage->message_id,
-            );
+        self::finalizeRegistrationAdminMessage($bot, $callbackMessage, $resolvedHtml, $adminChatId);
+    }
+
+    /**
+     * @param array<string, mixed> $applicant
+     */
+    private static function applicantPartLabel(TextRepository $texts, array $applicant): string
+    {
+        $part = (string) ($applicant['voice_part'] ?? '');
+        if ($part !== '' && VoicePart::isValid($part)) {
+            return $texts->get('parts.' . $part);
+        }
+
+        return '—';
+    }
+
+    private static function finalizeRegistrationAdminMessage(
+        Nutgram $bot,
+        ?Message $message,
+        string $html,
+        int $fallbackChatId,
+    ): void {
+        if ($message !== null) {
+            try {
+                $bot->editMessageText(
+                    text: $html,
+                    chat_id: $message->chat->id,
+                    message_id: $message->message_id,
+                    parse_mode: ParseMode::HTML,
+                    reply_markup: InlineKeyboardMarkup::make(),
+                );
+
+                return;
+            } catch (\Throwable) {
+            }
+        }
+
+        if ($fallbackChatId !== 0) {
+            $bot->sendMessage(text: $html, chat_id: $fallbackChatId, parse_mode: ParseMode::HTML);
         }
     }
 }
