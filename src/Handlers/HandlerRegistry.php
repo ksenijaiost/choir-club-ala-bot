@@ -151,6 +151,7 @@ final class HandlerRegistry
             $adminChat,
         );
         MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
+        AdminChatCommandHandler::register($bot, $texts, $access, $users, $songRepo, $materialRepo);
         StartHandler::register($bot, $texts, $users, $access);
         ConductorAdminHandler::register($bot, $texts, $users, $access);
         HelpersAdminHandler::register($bot, $texts, $users, $access);

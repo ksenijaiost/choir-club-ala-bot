@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Bootstrap;
 use App\Http\AdminGate;
+use App\Repositories\BotSettingsRepository;
+use App\Services\AdminChatBotCommands;
+use App\Services\AdminChatResolver;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
@@ -34,6 +37,20 @@ $ok = $bot->setWebhook(
 
 if ($ok) {
     echo "Webhook set to {$config->webhookUrl}\n";
+
+    $texts = Bootstrap::texts();
+    $settings = new BotSettingsRepository(Bootstrap::pdo());
+    $resolver = new AdminChatResolver($settings, $config);
+    $adminChatId = $resolver->resolvedIdAsInt();
+    if ($adminChatId !== null) {
+        try {
+            AdminChatBotCommands::registerForAdminChat($bot, $texts, $adminChatId);
+            echo "Admin chat commands registered for chat {$adminChatId}.\n";
+        } catch (\Throwable $e) {
+            echo 'Admin chat commands registration failed: ' . $e->getMessage() . "\n";
+        }
+    }
+
     $info = $bot->getWebhookInfo();
     if ($info !== null) {
         echo 'Pending updates: ' . ($info->pending_update_count ?? 0) . "\n";

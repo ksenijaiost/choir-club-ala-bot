@@ -71,12 +71,6 @@ final class MaterialsFlowHandler
                     callback_data: 'mat:up:tp:' . MaterialType::NOTES,
                 ),
                 InlineKeyboardButton::make(
-                    $deps->texts->get('material_types.translit'),
-                    callback_data: 'mat:up:tp:' . MaterialType::TRANSLIT,
-                ),
-            )
-            ->addRow(
-                InlineKeyboardButton::make(
                     $deps->texts->get('material_types.recording'),
                     callback_data: 'mat:up:tp:' . MaterialType::RECORDING,
                 ),
@@ -219,12 +213,35 @@ final class MaterialsFlowHandler
 
         $songId = $deps->songs->create($text);
         $ctx['song_id'] = $songId;
-        $ctx['step'] = 'type';
         unset($ctx['awaiting_title']);
+
+        if (($ctx['source'] ?? '') === 'text_translit') {
+            $ctx['type'] = MaterialType::TRANSLIT;
+            $ctx['step'] = 'save';
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
+            $user = $deps->users->findByTelegramId($telegramId);
+            if ($user !== null) {
+                self::completeUpload($bot, $deps, $user);
+            }
+
+            return true;
+        }
+
+        $ctx['step'] = 'type';
         $deps->flows->set($telegramId, 'material_upload', $ctx);
         self::sendTypePicker($bot, $deps);
 
         return true;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    public static function isTextTranslitUpload(array $context): bool
+    {
+        return ($context['source'] ?? '') === 'text_translit'
+            && isset($context['text_content'])
+            && trim((string) $context['text_content']) !== '';
     }
 
     /**
@@ -251,16 +268,27 @@ final class MaterialsFlowHandler
         }
 
         try {
-            $result = $deps->service->saveUpload(
-                $user,
-                $songId,
-                $type,
-                $voiceParts,
-                (string) $ctx['file_id'],
-                (string) $ctx['file_unique_id'],
-                isset($ctx['admin_chat_message_id']) ? (int) $ctx['admin_chat_message_id'] : null,
-                $replaceConfirmed,
-            );
+            if (self::isTextTranslitUpload($ctx)) {
+                $result = $deps->service->saveTextUpload(
+                    $user,
+                    $songId,
+                    MaterialType::TRANSLIT,
+                    (string) $ctx['text_content'],
+                    isset($ctx['admin_chat_message_id']) ? (int) $ctx['admin_chat_message_id'] : null,
+                    $replaceConfirmed,
+                );
+            } else {
+                $result = $deps->service->saveUpload(
+                    $user,
+                    $songId,
+                    $type,
+                    $voiceParts,
+                    (string) ($ctx['file_id'] ?? ''),
+                    (string) ($ctx['file_unique_id'] ?? ''),
+                    isset($ctx['admin_chat_message_id']) ? (int) $ctx['admin_chat_message_id'] : null,
+                    $replaceConfirmed,
+                );
+            }
         } catch (\InvalidArgumentException $e) {
             if ($e->getMessage() === 'replace_confirm_required') {
                 $ctx['step'] = 'replace_confirm';
@@ -281,7 +309,9 @@ final class MaterialsFlowHandler
         $chatId = (int) ($ctx['admin_chat_id'] ?? 0);
         $partList = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
         $lines = [
-            $deps->service->uploadSuccessText($result['song'], $type, $partList),
+            self::isTextTranslitUpload($ctx)
+                ? $deps->texts->get('materials.translit_saved', ['song' => (string) ($result['song']['title'] ?? '')])
+                : $deps->service->uploadSuccessText($result['song'], $type, $partList),
         ];
         if ($result['archived_previous'] !== null) {
             $lines[] = $deps->texts->get('materials.archived_notice');

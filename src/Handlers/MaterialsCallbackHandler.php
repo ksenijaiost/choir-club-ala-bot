@@ -74,6 +74,16 @@ final class MaterialsCallbackHandler
             }
 
             $ctx['song_id'] = (int) $m[1];
+
+            if (MaterialsFlowHandler::isTextTranslitUpload($ctx)) {
+                $ctx['type'] = MaterialType::TRANSLIT;
+                $ctx['step'] = 'save';
+                $deps->flows->set((int) $actor['telegram_id'], 'material_upload', $ctx);
+                MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+
+                return true;
+            }
+
             $ctx['step'] = 'type';
             $deps->flows->set((int) $actor['telegram_id'], 'material_upload', $ctx);
             MaterialsFlowHandler::sendTypePicker($bot, $deps);
@@ -84,6 +94,12 @@ final class MaterialsCallbackHandler
         if (preg_match('/^mat:up:tp:(notes|translit|recording)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
+
+            if ($m[1] === MaterialType::TRANSLIT) {
+                $bot->sendMessage($deps->texts->get('materials.translit_upload_hint'));
+
+                return true;
+            }
 
             $type = $m[1];
             $state = $deps->flows->get((int) $actor['telegram_id']);

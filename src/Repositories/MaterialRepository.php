@@ -133,19 +133,20 @@ final class MaterialRepository
         int $songId,
         string $type,
         ?string $voicePart,
-        string $fileId,
-        string $fileUniqueId,
+        ?string $fileId,
+        ?string $fileUniqueId,
         int $uploadedByUserId,
         ?int $adminChatMessageId,
         bool $isCurrent = true,
+        ?string $textContent = null,
     ): int {
         $storedPart = MaterialType::isSingleton($type) ? null : null;
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO materials (
-                song_id, type, voice_part, telegram_file_id, telegram_file_unique_id,
+                song_id, type, voice_part, telegram_file_id, telegram_file_unique_id, text_content,
                 is_current, uploaded_by_user_id, admin_chat_message_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $songId,
@@ -153,6 +154,7 @@ final class MaterialRepository
             $storedPart,
             $fileId,
             $fileUniqueId,
+            $textContent,
             $isCurrent ? 1 : 0,
             $uploadedByUserId,
             $adminChatMessageId,
@@ -313,6 +315,39 @@ final class MaterialRepository
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
+    /**
+     * @return array<int, array{count: int, parts: list<string>}>
+     */
+    public function listCurrentRecordingSummariesBySong(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT m.song_id,
+                COUNT(DISTINCT m.id) AS recording_count,
+                GROUP_CONCAT(DISTINCT mvp.voice_part) AS parts
+             FROM materials m
+             INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
+             WHERE m.type = ? AND m.is_current = 1
+             GROUP BY m.song_id'
+        );
+        $stmt->execute([MaterialType::RECORDING]);
+
+        $map = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            $songId = (int) $row['song_id'];
+            $rawParts = (string) ($row['parts'] ?? '');
+            $parts = $rawParts === ''
+                ? []
+                : array_values(array_unique(explode(',', $rawParts)));
+            sort($parts);
+            $map[$songId] = [
+                'count' => (int) $row['recording_count'],
+                'parts' => $parts,
+            ];
+        }
+
+        return $map;
+    }
+
     private function attachVoiceParts(array $rows): array
     {
         foreach ($rows as $i => $row) {
