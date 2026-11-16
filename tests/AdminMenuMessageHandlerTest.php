@@ -275,7 +275,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
             $songRepo,
             $materialRepo,
             $service,
-            new SongDeliveryService($materialRepo, $texts, $service),
+            new SongDeliveryService($materialRepo, $songRepo, $texts, $service),
             $texts,
                     new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );

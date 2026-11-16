@@ -109,9 +109,16 @@ final class TranslitTextUploadTest extends TestCase
 
         self::assertSame('Заметки (транслит и пр.)', $texts->get('buttons.translit'));
 
+        $admin = $this->seedAdmin($deps);
+        $deps->users->create(self::MEMBER_TG, 'Участник', 'soprano_1', UserRole::MEMBER, UserStatus::ACTIVE);
+
         $bot = Nutgram::fake();
-        $deps->delivery->sendSongCard($bot, $song);
-        $bot->assertReplyText($texts->get('songs.card_header', ['title' => 'Тест']));
+        $deps->service->saveTextUpload($admin, $song['id'], MaterialType::TRANSLIT, 'Заметка', null);
+        $member = $deps->users->findByTelegramId(self::MEMBER_TG);
+        self::assertNotNull($member);
+        $deps->delivery->sendSongCard($bot, $song, $member);
+        $header = $texts->get('songs.card_header', ['title' => 'Тест']);
+        $bot->assertReplyText($header);
     }
 
     public function testAppendEndMergesExistingText(): void
@@ -387,7 +394,7 @@ final class TranslitTextUploadTest extends TestCase
             $songRepo,
             $materialRepo,
             $materialsService,
-            new SongDeliveryService($materialRepo, $texts, $materialsService),
+            new SongDeliveryService($materialRepo, $songRepo, $texts, $materialsService),
             $texts,
                     new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
