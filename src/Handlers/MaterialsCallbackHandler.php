@@ -267,8 +267,13 @@ final class MaterialsCallbackHandler
 
     private static function sendManagementSongPicker(Nutgram $bot, MaterialsDeps $deps, int $page): void
     {
+        $page = \App\Support\SqlPagination::clampPage($page);
         $total = $deps->songs->countAll();
-        $songs = $deps->songs->listAlphabetical($page * InlineMenuHelper::PAGE_SIZE, InlineMenuHelper::PAGE_SIZE);
+        $pageSize = InlineMenuHelper::PAGE_SIZE;
+        $songs = $deps->songs->listAlphabetical(
+            \App\Support\SqlPagination::offsetForPage($page, $pageSize),
+            $pageSize,
+        );
 
         $keyboard = \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make();
         foreach ($songs as $song) {

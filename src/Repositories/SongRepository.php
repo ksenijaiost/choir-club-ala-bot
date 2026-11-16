@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Support\SqlPagination;
+
 final class SongRepository
 {
     public function __construct(private readonly \PDO $pdo)
@@ -42,7 +44,7 @@ final class SongRepository
      */
     public function listRecent(int $limit = 25): array
     {
-        return $this->listAlphabetical(0, $limit);
+        return $this->listAlphabetical(0, SqlPagination::clampLimit($limit));
     }
 
     public function countAll(): int
@@ -57,6 +59,8 @@ final class SongRepository
      */
     public function listAlphabetical(int $offset, int $limit): array
     {
+        $limit = SqlPagination::clampLimit($limit);
+        $offset = SqlPagination::clampOffset($offset);
         $stmt = $this->pdo->prepare(
             'SELECT * FROM songs ORDER BY title_normalized ASC LIMIT ? OFFSET ?'
         );
@@ -72,6 +76,7 @@ final class SongRepository
      */
     public function searchByTitleFragment(string $query, int $limit = 10): array
     {
+        $limit = SqlPagination::clampLimit($limit);
         $norm = '%' . self::normalizeTitle($query) . '%';
         $stmt = $this->pdo->prepare(
             'SELECT * FROM songs WHERE title_normalized LIKE ? ORDER BY title_normalized ASC LIMIT ?'
@@ -98,6 +103,8 @@ final class SongRepository
      */
     public function listWithCurrentMaterials(int $offset, int $limit): array
     {
+        $limit = SqlPagination::clampLimit($limit);
+        $offset = SqlPagination::clampOffset($offset);
         $stmt = $this->pdo->prepare(
             'SELECT DISTINCT s.* FROM songs s
              INNER JOIN materials m ON m.song_id = s.id AND m.is_current = 1

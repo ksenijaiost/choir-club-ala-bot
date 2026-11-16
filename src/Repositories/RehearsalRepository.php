@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Support\SqlPagination;
+
 final class RehearsalRepository
 {
     public function __construct(private readonly \PDO $pdo)
@@ -52,6 +54,7 @@ final class RehearsalRepository
      */
     public function listFrom(string $fromLocal, int $limit = 20): array
     {
+        $limit = SqlPagination::clampLimit($limit);
         $stmt = $this->pdo->prepare(
             'SELECT * FROM rehearsals WHERE starts_at >= ? ORDER BY starts_at ASC LIMIT ?'
         );
@@ -75,6 +78,8 @@ final class RehearsalRepository
      */
     public function listFromNearest(string $fromLocal, string $pivotLocal, int $offset, int $limit): array
     {
+        $limit = SqlPagination::clampLimit($limit);
+        $offset = SqlPagination::clampOffset($offset);
         $isSqlite = $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite';
         $order = $isSqlite
             ? 'ABS(strftime(\'%s\', starts_at) - strftime(\'%s\', ?)) ASC, starts_at ASC'
@@ -144,6 +149,7 @@ final class RehearsalRepository
      */
     public function listUpcomingScheduled(string $fromLocal, int $limit = 10): array
     {
+        $limit = SqlPagination::clampLimit($limit);
         $stmt = $this->pdo->prepare(
             'SELECT * FROM rehearsals WHERE status = ? AND starts_at > ? ORDER BY starts_at ASC LIMIT ?'
         );

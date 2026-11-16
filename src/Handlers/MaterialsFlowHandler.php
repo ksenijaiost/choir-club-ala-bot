@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Domain\MaterialType;
 use App\Domain\VoicePart;
+use App\Support\SqlPagination;
 use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -16,8 +17,12 @@ final class MaterialsFlowHandler
 {
     public static function sendSongPicker(Nutgram $bot, MaterialsDeps $deps, int $page = 0, ?int $chatId = null): void
     {
+        $page = SqlPagination::clampPage($page);
         $total = $deps->songs->countAll();
-        $songs = $deps->songs->listAlphabetical($page * InlineMenuHelper::PAGE_SIZE, InlineMenuHelper::PAGE_SIZE);
+        $songs = $deps->songs->listAlphabetical(
+            SqlPagination::offsetForPage($page, InlineMenuHelper::PAGE_SIZE),
+            InlineMenuHelper::PAGE_SIZE,
+        );
         $keyboard = InlineKeyboardMarkup::make()
             ->addRow(
                 InlineKeyboardButton::make(
