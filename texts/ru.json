@@ -47,7 +47,7 @@
     "cmd_translit": "translit",
     "cmd_songs": "songs",
     "cmd_members": "members",
-    "cmd_desc_translit": "/translit — заметки к песне текстом (транслит и пр.)",
+    "cmd_desc_translit": "Заметки к песне текстом (транслит и пр.)",
     "cmd_desc_songs": "Список песен и материалов",
     "cmd_desc_members": "Участники по партиям",
     "songs_header": "Песни и материалы:",
