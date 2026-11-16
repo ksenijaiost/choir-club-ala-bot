@@ -53,13 +53,16 @@ final class MaterialsFlowHandler
             $text .= "\n\n" . $deps->texts->get('materials.pick_song_empty');
         }
 
-        if ($chatId !== null) {
-            $bot->sendMessage(chat_id: $chatId, text: $text, reply_markup: $keyboard);
-
-            return;
-        }
-
-        $bot->sendMessage($text, reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        $targetChatId = $chatId ?? $bot->chatId() ?? $ownerTelegramId;
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $text,
+            $keyboard,
+            $targetChatId,
+        );
     }
 
     public static function sendTypePicker(Nutgram $bot, MaterialsDeps $deps): void
@@ -78,7 +81,15 @@ final class MaterialsFlowHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:sn');
 
-        $bot->sendMessage($deps->texts->get('materials.ask_type'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $deps->texts->get('materials.ask_type'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     /**
@@ -124,9 +135,14 @@ final class MaterialsFlowHandler
 
     public static function sendRecordingPartPicker(Nutgram $bot, MaterialsDeps $deps, int $telegramId): void
     {
-        $message = $bot->sendMessage(
+        $keyboard = self::buildRecordingPartKeyboard($deps, []);
+        $message = InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $telegramId,
             $deps->texts->get('materials.ask_part_multi'),
-            reply_markup: self::buildRecordingPartKeyboard($deps, []),
+            $keyboard,
+            $bot->chatId() ?? $telegramId,
         );
 
         if ($message instanceof Message) {
@@ -183,9 +199,14 @@ final class MaterialsFlowHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:tp');
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
             $deps->texts->get($key, ['title' => (string) $song['title']]),
-            reply_markup: $keyboard,
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
         );
     }
 

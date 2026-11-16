@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -97,7 +99,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
         $settings = new BotSettingsRepository($pdo);
         $resolver = new AdminChatResolver($settings, $config);
         $access = new AccessControl($config, $resolver);
-        $adminChat = new AdminChatDeps($config, $settings, $resolver, $schedule->flows, $texts);
+        $adminChat = new AdminChatDeps($config, $settings, $resolver, $schedule->flows, $texts, new InteractiveMenuService(new UserOpenMenuRepository($pdo)));
 
         $bot = Nutgram::fake();
         $bot->setCommonUser($this->makeUser());
@@ -139,6 +141,11 @@ final class AdminMenuMessageHandlerTest extends TestCase
         $chat->type = $type;
 
         return $chat;
+    }
+
+    private function interactiveMenus(\PDO $pdo): InteractiveMenuService
+    {
+        return new InteractiveMenuService(new UserOpenMenuRepository($pdo));
     }
 
     private function testConfig(): Config
@@ -187,6 +194,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
             $broadcast,
             $users,
             $texts,
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 
@@ -212,6 +220,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
             $settings,
             $flows,
             new \App\Services\PaymentReminderTextService($settings, $texts, $paymentTexts),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 
@@ -244,6 +253,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
             new AttendanceHistoryPresenter($texts),
             $texts,
             new CheckInSessionRepository($pdo),
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 
@@ -267,6 +277,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
             $service,
             new SongDeliveryService($materialRepo, $texts, $service),
             $texts,
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 
@@ -288,6 +299,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
             new AttendanceHistoryPresenter($texts),
             new PaymentTexts($texts),
             new UserRolePresenter($texts),
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 }

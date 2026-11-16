@@ -19,6 +19,8 @@ final class CallbackUi
         Nutgram $bot,
         string $text,
         ?InlineKeyboardMarkup $replyMarkup = null,
+        ?InteractiveMenuService $menus = null,
+        ?int $ownerTelegramId = null,
     ): void {
         $message = self::callbackMessage($bot);
         if ($message === null) {
@@ -32,6 +34,15 @@ final class CallbackUi
                 message_id: $message->message_id,
                 reply_markup: $replyMarkup,
             );
+            if ($menus !== null && $ownerTelegramId !== null) {
+                InlineMenuHelper::trackEditedMenu(
+                    $menus,
+                    $ownerTelegramId,
+                    (int) $message->chat->id,
+                    (int) $message->message_id,
+                    $replyMarkup,
+                );
+            }
         } catch (\Throwable) {
             self::clearKeyboard($bot, $message);
         }

@@ -87,9 +87,13 @@ final class PaymentReminderTextAdminHandler
                 $deps->texts,
                 self::CB_BACK,
             );
-            $bot->sendMessage(
+            InlineMenuHelper::sendInteractiveMenu(
+                $bot,
+                $deps->interactiveMenus,
+                $actorTelegramId,
                 $deps->texts->get('payment.reminder_edit_prompt', ['which' => $label]),
-                reply_markup: $keyboard,
+                $keyboard,
+                $bot->chatId() ?? $actorTelegramId,
             );
 
             return true;
@@ -206,6 +210,14 @@ final class PaymentReminderTextAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'pay:adm:home');
 
-        $bot->sendMessage($body, reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $body,
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 }

@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS user_open_menus (
+    telegram_id BIGINT NOT NULL,
+    chat_id BIGINT NOT NULL,
+    message_id INT NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (telegram_id, chat_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

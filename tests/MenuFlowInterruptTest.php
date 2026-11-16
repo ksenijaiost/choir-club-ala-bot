@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -210,6 +212,7 @@ final class MenuFlowInterruptTest extends TestCase
             $broadcast,
             $users,
             $texts,
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
         $marks = new AttendanceMarkRepository($pdo);
@@ -233,6 +236,7 @@ final class MenuFlowInterruptTest extends TestCase
             new AttendanceHistoryPresenter($texts),
             $texts,
             new CheckInSessionRepository($pdo),
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
         $settings = new BotSettingsRepository($pdo);
@@ -247,6 +251,7 @@ final class MenuFlowInterruptTest extends TestCase
             $settings,
             $flows,
             new \App\Services\PaymentReminderTextService($settings, $texts, $paymentTexts),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
         $songRepo = new SongRepository($pdo);
@@ -261,6 +266,7 @@ final class MenuFlowInterruptTest extends TestCase
             $materialsService,
             new SongDeliveryService($materialRepo, $texts, $materialsService),
             $texts,
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
         $adminHistory = new AdminHistoryContext(
@@ -272,6 +278,7 @@ final class MenuFlowInterruptTest extends TestCase
             new AttendanceHistoryPresenter($texts),
             new PaymentTexts($texts),
             new UserRolePresenter($texts),
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
         $settings = new BotSettingsRepository($pdo);
@@ -284,7 +291,7 @@ final class MenuFlowInterruptTest extends TestCase
             'payments' => $payments,
             'materials' => $materials,
             'adminHistory' => $adminHistory,
-            'adminChat' => new AdminChatDeps($config, $settings, $resolver, $flows, $texts),
+            'adminChat' => new AdminChatDeps($config, $settings, $resolver, $flows, $texts, new InteractiveMenuService(new UserOpenMenuRepository($pdo))),
         ];
     }
 
@@ -307,5 +314,9 @@ final class MenuFlowInterruptTest extends TestCase
             webhookUrl: '',
             fakeNow: null,
         );
+    }
+    private function interactiveMenus(\PDO $pdo): InteractiveMenuService
+    {
+        return new InteractiveMenuService(new UserOpenMenuRepository($pdo));
     }
 }

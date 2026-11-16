@@ -11,6 +11,7 @@ use App\Repositories\UserRepository;
 use App\Services\VoicePartRules;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\InteractiveMenuService;
 use App\Telegram\MenuKeyboard;
 use App\Telegram\PartKeyboard;
 use App\Text\TextRepository;
@@ -23,8 +24,13 @@ final class ProfileHandler
     /**
      * @param array<string, mixed> $user
      */
-    public static function openProfile(Nutgram $bot, TextRepository $texts, UserRepository $users, array $user): void
-    {
+    public static function openProfile(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserRepository $users,
+        array $user,
+        InteractiveMenuService $interactiveMenus,
+    ): void {
         $fresh = $users->findById((int) $user['id']) ?? $user;
         $isConductor = VoicePartRules::isConductor($fresh);
 
@@ -58,22 +64,37 @@ final class ProfileHandler
             ]);
         }
 
-        $bot->sendMessage($body, reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($fresh['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            $body,
+            $keyboard,
+        );
     }
 
     /**
      * @param array<string, mixed> $user
      */
-    public static function promptOwnerPartIfNeeded(Nutgram $bot, TextRepository $texts, array $user): bool
-    {
-        return self::promptMissingVoicePartIfNeeded($bot, $texts, $user);
+    public static function promptOwnerPartIfNeeded(
+        Nutgram $bot,
+        TextRepository $texts,
+        array $user,
+        InteractiveMenuService $interactiveMenus,
+    ): bool {
+        return self::promptMissingVoicePartIfNeeded($bot, $texts, $user, $interactiveMenus);
     }
 
     /**
      * @param array<string, mixed> $user
      */
-    public static function promptMissingVoicePartIfNeeded(Nutgram $bot, TextRepository $texts, array $user): bool
-    {
+    public static function promptMissingVoicePartIfNeeded(
+        Nutgram $bot,
+        TextRepository $texts,
+        array $user,
+        InteractiveMenuService $interactiveMenus,
+    ): bool {
         if (!VoicePartRules::requiresAssignedVoicePart($user)) {
             return false;
         }
@@ -86,9 +107,14 @@ final class ProfileHandler
             ? $texts->get('profile.owner_ask_part')
             : $texts->get('profile.ask_part_required');
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        $keyboard = PartKeyboard::profile($texts, $user);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
             $prompt,
-            reply_markup: PartKeyboard::profile($texts, $user),
+            $keyboard,
         );
 
         return true;
@@ -97,17 +123,26 @@ final class ProfileHandler
     /**
      * @param array<string, mixed> $user
      */
-    public static function sendPartPicker(Nutgram $bot, TextRepository $texts, array $user): void
-    {
+    public static function sendPartPicker(
+        Nutgram $bot,
+        TextRepository $texts,
+        array $user,
+        InteractiveMenuService $interactiveMenus,
+    ): void {
         if (VoicePartRules::isConductor($user)) {
             $bot->sendMessage($texts->get('profile.conductor_no_part'));
 
             return;
         }
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        $keyboard = PartKeyboard::profile($texts, $user);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
             $texts->get('profile.pick_part'),
-            reply_markup: PartKeyboard::profile($texts, $user),
+            $keyboard,
         );
     }
 
@@ -116,10 +151,17 @@ final class ProfileHandler
         TextRepository $texts,
         UserFlowRepository $flows,
         int $telegramId,
+        InteractiveMenuService $interactiveMenus,
     ): void {
         $flows->set($telegramId, 'profile_rename', []);
         $keyboard = InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $texts);
-        $bot->sendMessage($texts->get('profile.ask_name'), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $telegramId,
+            $texts->get('profile.ask_name'),
+            $keyboard,
+        );
     }
 
     public static function handleFlowMessage(
@@ -129,6 +171,7 @@ final class ProfileHandler
         UserFlowRepository $flows,
         int $telegramId,
         string $text,
+        InteractiveMenuService $interactiveMenus,
     ): bool {
         $state = $flows->get($telegramId);
         if ($state === null || ($state['flow'] ?? '') !== 'profile_rename') {
@@ -154,7 +197,7 @@ final class ProfileHandler
         $flows->clear($telegramId);
         $fresh = $users->findById((int) $user['id']) ?? $user;
         $bot->sendMessage($texts->get('profile.name_saved'));
-        self::openProfile($bot, $texts, $users, $fresh);
+        self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus);
 
         return true;
     }
@@ -164,6 +207,7 @@ final class ProfileHandler
         TextRepository $texts,
         UserRepository $users,
         UserFlowRepository $flows,
+        InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
     ): bool {
@@ -187,7 +231,7 @@ final class ProfileHandler
         if ($data === 'prf:nm') {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::beginRenameFlow($bot, $texts, $flows, $actorTelegramId);
+            self::beginRenameFlow($bot, $texts, $flows, $actorTelegramId, $interactiveMenus);
 
             return true;
         }
@@ -195,7 +239,7 @@ final class ProfileHandler
         if ($data === 'prf:ch') {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendPartPicker($bot, $texts, $user);
+            self::sendPartPicker($bot, $texts, $user, $interactiveMenus);
 
             return true;
         }

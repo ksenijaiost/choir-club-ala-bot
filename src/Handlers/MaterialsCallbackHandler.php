@@ -312,7 +312,15 @@ final class MaterialsCallbackHandler
             'mat:mg:pg:',
         );
 
-        $bot->sendMessage($deps->texts->get('materials.manage_pick_song'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $deps->texts->get('materials.manage_pick_song'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     private static function sendRecordingPartPicker(Nutgram $bot, MaterialsDeps $deps, int $songId): void
@@ -337,9 +345,14 @@ final class MaterialsCallbackHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:mg:pg:0');
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
             $deps->texts->get('materials.manage_pick_part', ['title' => (string) $song['title']]),
-            reply_markup: $keyboard,
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
         );
     }
 
@@ -395,6 +408,14 @@ final class MaterialsCallbackHandler
             'mat:mg:sn:' . $songId,
         );
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 }

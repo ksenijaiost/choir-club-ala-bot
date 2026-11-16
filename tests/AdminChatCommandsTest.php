@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
+
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -287,6 +290,7 @@ final class AdminChatCommandsTest extends TestCase
             $users,
             $access,
             new MemberBlockService($users, new BlockEventRepository($pdo)),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 

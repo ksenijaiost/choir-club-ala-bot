@@ -18,6 +18,7 @@ use App\Services\SchedulePresenter;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -30,10 +31,11 @@ final class ScheduleAdminHandler
      */
     public static function openAdminHome(
         Nutgram $bot,
-        TextRepository $texts,
+        ScheduleDeps $schedule,
         AccessControl $access,
         array $user,
     ): void {
+        $texts = $schedule->texts;
         if (!$access->hasAdminStaffMenu($user)) {
             $bot->sendMessage($texts->get('admin.only_conductor_or_owner'));
 
@@ -51,7 +53,15 @@ final class ScheduleAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
-        $bot->sendMessage($texts->get('schedule.admin_menu'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $schedule->interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('schedule.admin_menu'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     public static function handleCallback(
@@ -67,6 +77,7 @@ final class ScheduleAdminHandler
         SchedulePresenter $presenter,
         BotSettingsRepository $settings,
         UserRepository $users,
+        InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
     ): bool {
@@ -96,7 +107,7 @@ final class ScheduleAdminHandler
 
         if ($data === 'sch:adm:list') {
             $bot->answerCallbackQuery();
-            self::sendRehearsalAdminList($bot, $texts, $rehearsals, $now, $tz, 0);
+            self::sendRehearsalAdminList($bot, $texts, $rehearsals, $interactiveMenus, $actorTelegramId, $now, $tz, 0);
 
             return true;
         }
@@ -104,14 +115,14 @@ final class ScheduleAdminHandler
         if (preg_match('/^sch:adm:l:pg:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendRehearsalAdminList($bot, $texts, $rehearsals, $now, $tz, (int) $m[1]);
+            self::sendRehearsalAdminList($bot, $texts, $rehearsals, $interactiveMenus, $actorTelegramId, $now, $tz, (int) $m[1]);
 
             return true;
         }
 
         if ($data === 'sch:adm:tpl') {
             $bot->answerCallbackQuery();
-            self::sendTemplateList($bot, $texts, $templates, $tz);
+            self::sendTemplateList($bot, $texts, $templates, $interactiveMenus, $actorTelegramId, $tz);
 
             return true;
         }
@@ -130,7 +141,7 @@ final class ScheduleAdminHandler
             $id = (int) $m[1];
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendRehearsalActions($bot, $texts, $rehearsals, $id);
+            self::sendRehearsalActions($bot, $texts, $rehearsals, $interactiveMenus, $actorTelegramId, $id);
 
             return true;
         }
@@ -207,7 +218,7 @@ final class ScheduleAdminHandler
         if (preg_match('/^sch:adm:tpl:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendTemplateActions($bot, $texts, $templates, (int) $m[1]);
+            self::sendTemplateActions($bot, $texts, $templates, $interactiveMenus, $actorTelegramId, (int) $m[1]);
 
             return true;
         }
@@ -485,6 +496,8 @@ final class ScheduleAdminHandler
         Nutgram $bot,
         TextRepository $texts,
         RehearsalRepository $rehearsals,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
         \DateTimeImmutable $now,
         \DateTimeZone $tz,
         int $page,
@@ -528,13 +541,22 @@ final class ScheduleAdminHandler
             'sch:adm:list',
         );
 
-        $bot->sendMessage($texts->get('schedule.admin_list_prompt'), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('schedule.admin_list_prompt'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     private static function sendRehearsalActions(
         Nutgram $bot,
         TextRepository $texts,
         RehearsalRepository $rehearsals,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
         int $id,
     ): void {
         $row = $rehearsals->findById($id);
@@ -555,9 +577,13 @@ final class ScheduleAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'sch:adm:list');
 
-        $bot->sendMessage(
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
             $texts->get('schedule.admin_rehearsal_card', ['id' => (string) $id]),
-            reply_markup: $keyboard,
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
         );
     }
 
@@ -565,6 +591,8 @@ final class ScheduleAdminHandler
         Nutgram $bot,
         TextRepository $texts,
         ScheduleTemplateRepository $templates,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
         \DateTimeZone $tz,
     ): void {
         $all = $templates->listAll();
@@ -603,13 +631,22 @@ final class ScheduleAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'sch:adm:tpl');
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     private static function sendTemplateActions(
         Nutgram $bot,
         TextRepository $texts,
         ScheduleTemplateRepository $templates,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
         int $id,
     ): void {
         $tpl = $templates->findById($id);
@@ -631,6 +668,13 @@ final class ScheduleAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'sch:adm:tpl');
 
-        $bot->sendMessage($texts->get('schedule.template_edit_menu', ['id' => (string) $id]), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('schedule.template_edit_menu', ['id' => (string) $id]),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 }

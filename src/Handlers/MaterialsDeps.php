@@ -11,6 +11,7 @@ use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\MaterialsService;
 use App\Services\SongDeliveryService;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 
 final class MaterialsDeps
@@ -24,6 +25,7 @@ final class MaterialsDeps
         public readonly MaterialsService $service,
         public readonly SongDeliveryService $delivery,
         public readonly TextRepository $texts,
+        public readonly InteractiveMenuService $interactiveMenus,
     ) {
     }
 }
