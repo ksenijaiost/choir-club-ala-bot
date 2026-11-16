@@ -189,9 +189,81 @@ final class MaterialsFlowHandler
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:tp');
 
         $bot->sendMessage(
-            $deps->texts->get('materials.replace_confirm_translit', ['title' => (string) $song['title']]),
+            $deps->texts->get('materials.replace_confirm_text_notes_file', ['title' => (string) $song['title']]),
             reply_markup: $keyboard,
         );
+    }
+
+    public static function sendTextNotesUploadChoice(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $songId,
+        ?int $chatId = null,
+    ): void {
+        $song = $deps->songs->findById($songId);
+        if ($song === null) {
+            return;
+        }
+
+        $keyboard = InlineKeyboardMarkup::make()
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.text_notes_append_end'),
+                    callback_data: 'mat:up:tr:end',
+                ),
+            )
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.text_notes_append_start'),
+                    callback_data: 'mat:up:tr:begin',
+                ),
+                InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.text_notes_replace'),
+                    callback_data: 'mat:up:tr:repl',
+                ),
+            );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:sn');
+
+        $text = $deps->texts->get('materials.text_notes_upload_choice', ['title' => (string) $song['title']]);
+        if ($chatId !== null) {
+            $bot->sendMessage(chat_id: $chatId, text: $text, reply_markup: $keyboard);
+        } else {
+            $bot->sendMessage($text, reply_markup: $keyboard);
+        }
+    }
+
+    public static function sendTextNotesFileOnlyChoice(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $songId,
+        ?int $chatId = null,
+    ): void {
+        $song = $deps->songs->findById($songId);
+        if ($song === null) {
+            return;
+        }
+
+        $keyboard = InlineKeyboardMarkup::make()
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.text_notes_replace'),
+                    callback_data: 'mat:up:tr:repl',
+                ),
+                InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.replace_no'),
+                    callback_data: 'mat:up:rp:n',
+                ),
+            );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:sn');
+
+        $text = $deps->texts->get('materials.text_notes_file_only', ['title' => (string) $song['title']]);
+        if ($chatId !== null) {
+            $bot->sendMessage(chat_id: $chatId, text: $text, reply_markup: $keyboard);
+        } else {
+            $bot->sendMessage($text, reply_markup: $keyboard);
+        }
     }
 
     public static function sendNotesUploadChoice(Nutgram $bot, MaterialsDeps $deps, int $songId, ?int $chatId = null): void
@@ -375,6 +447,10 @@ final class MaterialsFlowHandler
 
         try {
             if (self::isTextTranslitUpload($ctx)) {
+                $textNotesMode = isset($ctx['text_notes_mode']) ? (string) $ctx['text_notes_mode'] : null;
+                if ($textNotesMode === null && $replaceConfirmed) {
+                    $textNotesMode = 'replace';
+                }
                 $result = $deps->service->saveTextUpload(
                     $user,
                     $songId,
@@ -382,6 +458,7 @@ final class MaterialsFlowHandler
                     (string) $ctx['text_content'],
                     isset($ctx['admin_chat_message_id']) ? (int) $ctx['admin_chat_message_id'] : null,
                     $replaceConfirmed,
+                    $textNotesMode,
                 );
             } else {
                 $notesMode = isset($ctx['notes_mode']) ? (string) $ctx['notes_mode'] : null;
@@ -420,6 +497,34 @@ final class MaterialsFlowHandler
                 return;
             }
 
+            if ($e->getMessage() === 'text_notes_choice_required') {
+                $ctx['step'] = 'text_notes_choice';
+                $deps->flows->set($telegramId, 'material_upload', $ctx);
+                $adminChatId = (int) ($ctx['admin_chat_id'] ?? 0);
+                self::sendTextNotesUploadChoice(
+                    $bot,
+                    $deps,
+                    $songId,
+                    $adminChatId !== 0 ? $adminChatId : null,
+                );
+
+                return;
+            }
+
+            if ($e->getMessage() === 'text_notes_file_only') {
+                $ctx['step'] = 'text_notes_file_only';
+                $deps->flows->set($telegramId, 'material_upload', $ctx);
+                $adminChatId = (int) ($ctx['admin_chat_id'] ?? 0);
+                self::sendTextNotesFileOnlyChoice(
+                    $bot,
+                    $deps,
+                    $songId,
+                    $adminChatId !== 0 ? $adminChatId : null,
+                );
+
+                return;
+            }
+
             $bot->sendMessage($deps->texts->get('errors.generic'));
             $deps->flows->clear($telegramId);
 
@@ -432,7 +537,7 @@ final class MaterialsFlowHandler
         $partList = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
         $lines = [
             self::isTextTranslitUpload($ctx)
-                ? $deps->texts->get('materials.translit_saved', ['song' => (string) ($result['song']['title'] ?? '')])
+                ? $deps->service->textNotesSavedMessage($result)
                 : $deps->service->uploadSuccessText($result['song'], $type, $partList),
         ];
         if ($result['archived_previous'] !== null) {

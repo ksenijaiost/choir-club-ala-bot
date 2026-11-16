@@ -121,7 +121,7 @@ final class MaterialsUploadTest extends TestCase
 
         $materials = new MaterialRepository($pdo);
         $service = new MaterialsService($materials, $songs, $texts);
-        $service->saveTextUpload($uploader, $songId, MaterialType::TRANSLIT, "Одна\nДве", null, true);
+        $service->saveTextUpload($uploader, $songId, MaterialType::TRANSLIT, "Одна\nДве", null, false, 'replace');
 
         $row = $materials->findCurrentSingleton($songId, MaterialType::TRANSLIT);
         self::assertNotNull($row);

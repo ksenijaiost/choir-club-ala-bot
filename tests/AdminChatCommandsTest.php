@@ -66,12 +66,12 @@ final class AdminChatCommandsTest extends TestCase
 
         self::assertStringContainsString('Аве Мария', $body);
         self::assertStringContainsString('ноты ✅', $body);
-        self::assertStringContainsString('транслит ✅', $body);
+        self::assertStringContainsString('заметки ✅', $body);
         self::assertStringContainsString('записи: 2 шт.', $body);
         self::assertStringContainsString('Сопрано 1', $body);
         self::assertStringContainsString('Бас', $body);
         self::assertStringContainsString('Благослови', $body);
-        self::assertStringContainsString('транслит ❌', $body);
+        self::assertStringContainsString('заметки ❌', $body);
         self::assertStringContainsString('записей нет', $body);
         self::assertStringContainsString('Гимн', $body);
     }

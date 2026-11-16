@@ -207,6 +207,30 @@ final class MaterialsCallbackHandler
             return true;
         }
 
+        if (preg_match('/^mat:up:tr:(end|begin|repl)$/', $data, $m) === 1) {
+            $telegramId = (int) $actor['telegram_id'];
+            $state = $deps->flows->get($telegramId);
+            if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $ctx = $state['context'];
+            $ctx['text_notes_mode'] = match ($m[1]) {
+                'end' => 'append_end',
+                'begin' => 'append_start',
+                default => 'replace',
+            };
+            $ctx['step'] = 'save';
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
+            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+
+            return true;
+        }
+
         if ($data === 'mat:up:nt:add' || $data === 'mat:up:nt:all') {
             $telegramId = (int) $actor['telegram_id'];
             $state = $deps->flows->get($telegramId);

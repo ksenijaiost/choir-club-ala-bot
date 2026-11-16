@@ -93,9 +93,72 @@ final class TranslitTextUploadTest extends TestCase
         self::assertSame("У-у-у\nНа небе", $current['text_content']);
         self::assertNull($current['telegram_file_id']);
         $bot->assertReplyText(
-            $texts->get('materials.translit_saved', ['song' => 'Новая песня']),
+            $texts->get('materials.text_notes_saved_new', ['song' => 'Новая песня']),
             index: 1,
         );
+    }
+
+    public function testMemberSongCardUsesTextNotesButtonLabel(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $deps = $this->materialsDeps($texts);
+        $song = $deps->songs->findById($deps->songs->create('Тест'));
+        self::assertNotNull($song);
+
+        self::assertSame('Заметки (транслит и пр.)', $texts->get('buttons.translit'));
+
+        $bot = Nutgram::fake();
+        $deps->delivery->sendSongCard($bot, $song);
+        $bot->assertReplyText($texts->get('songs.card_header', ['title' => 'Тест']));
+    }
+
+    public function testAppendEndMergesExistingText(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $deps = $this->materialsDeps($texts);
+        $admin = $this->seedAdmin($deps);
+        $songId = $deps->songs->create('Склейка');
+
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Старый', null);
+        $deps->service->saveTextUpload(
+            $admin,
+            $songId,
+            MaterialType::TRANSLIT,
+            'Новый',
+            null,
+            false,
+            'append_end',
+        );
+
+        $expected = 'Старый' . MaterialsService::TEXT_NOTES_SEPARATOR . 'Новый';
+        $current = $deps->materials->findCurrentSingleton($songId, MaterialType::TRANSLIT);
+        self::assertSame($expected, $current['text_content'] ?? null);
+
+        $bot = Nutgram::fake();
+        $deps->delivery->sendSingletonFile($bot, $songId, MaterialType::TRANSLIT);
+        $bot->assertReplyText($expected);
+    }
+
+    public function testAppendStartMergesExistingText(): void
+    {
+        $deps = $this->materialsDeps(TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json'));
+        $admin = $this->seedAdmin($deps);
+        $songId = $deps->songs->create('Начало');
+
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Старый', null);
+        $deps->service->saveTextUpload(
+            $admin,
+            $songId,
+            MaterialType::TRANSLIT,
+            'Новый',
+            null,
+            false,
+            'append_start',
+        );
+
+        $expected = 'Новый' . MaterialsService::TEXT_NOTES_SEPARATOR . 'Старый';
+        $current = $deps->materials->findCurrentSingleton($songId, MaterialType::TRANSLIT);
+        self::assertSame($expected, $current['text_content']);
     }
 
     public function testReplaceExistingTranslitArchivesPrevious(): void
@@ -105,8 +168,8 @@ final class TranslitTextUploadTest extends TestCase
         $admin = $this->seedAdmin($deps);
         $songId = $deps->songs->create('Песня');
 
-        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Старый', null, true);
-        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Новый', null, true);
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Старый', null);
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Новый', null, false, 'replace');
 
         $current = $deps->materials->findCurrentSingleton($songId, MaterialType::TRANSLIT);
         self::assertSame('Новый', $current['text_content'] ?? null);
@@ -126,7 +189,7 @@ final class TranslitTextUploadTest extends TestCase
         $admin = $this->seedAdmin($deps);
         $songId = $deps->songs->create('Песня');
 
-        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Версия 1', null, true);
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Версия 1', null);
 
         $deps->flows->set(self::ADMIN_TG, 'material_upload', [
             'source' => 'text_translit',
@@ -140,17 +203,96 @@ final class TranslitTextUploadTest extends TestCase
         $bot->setCommonUser($this->telegramUser(self::ADMIN_TG));
         MaterialsFlowHandler::completeUpload($bot, $deps, $admin);
 
-        $bot->assertReplyText($texts->get('materials.replace_confirm_translit', ['title' => 'Песня']));
+        $bot->assertReplyText($texts->get('materials.text_notes_upload_choice', ['title' => 'Песня']));
 
         MaterialsCallbackHandler::handle(
             $bot,
             $deps,
             new AccessControl($this->testConfig()),
             $admin,
-            'mat:up:rp:y',
+            'mat:up:tr:end',
+        );
+
+        $expected = 'Версия 1' . MaterialsService::TEXT_NOTES_SEPARATOR . 'Версия 2';
+        self::assertSame($expected, $deps->materials->findCurrentSingleton($songId, MaterialType::TRANSLIT)['text_content'] ?? null);
+        $bot->assertReplyText(
+            $texts->get('materials.text_notes_saved_append_end', ['song' => 'Песня'])
+                . "\n"
+                . $texts->get('materials.archived_notice'),
+            index: 2,
+        );
+    }
+
+    public function testUploadChoiceReplaceMode(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $deps = $this->materialsDeps($texts);
+        $admin = $this->seedAdmin($deps);
+        $songId = $deps->songs->create('Песня');
+
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, 'Версия 1', null);
+
+        $deps->flows->set(self::ADMIN_TG, 'material_upload', [
+            'source' => 'text_translit',
+            'text_content' => 'Версия 2',
+            'type' => MaterialType::TRANSLIT,
+            'song_id' => $songId,
+            'admin_chat_id' => self::ADMIN_CHAT_ID,
+        ]);
+
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->telegramUser(self::ADMIN_TG));
+        MaterialsFlowHandler::completeUpload($bot, $deps, $admin);
+
+        MaterialsCallbackHandler::handle(
+            $bot,
+            $deps,
+            new AccessControl($this->testConfig()),
+            $admin,
+            'mat:up:tr:repl',
         );
 
         self::assertSame('Версия 2', $deps->materials->findCurrentSingleton($songId, MaterialType::TRANSLIT)['text_content'] ?? null);
+        $bot->assertReplyText(
+            $texts->get('materials.text_notes_saved_replace', ['song' => 'Песня'])
+                . "\n"
+                . $texts->get('materials.archived_notice'),
+            index: 2,
+        );
+    }
+
+    public function testLegacyFileNotesAllowReplaceOnlyInFlow(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $deps = $this->materialsDeps($texts);
+        $admin = $this->seedAdmin($deps);
+        $songId = $deps->songs->create('Файл');
+
+        $deps->materials->insert(
+            $songId,
+            MaterialType::TRANSLIT,
+            null,
+            'doc-file',
+            'uniq-file-notes',
+            (int) $admin['id'],
+            null,
+            true,
+            null,
+        );
+
+        $deps->flows->set(self::ADMIN_TG, 'material_upload', [
+            'source' => 'text_translit',
+            'text_content' => 'Текстом',
+            'type' => MaterialType::TRANSLIT,
+            'song_id' => $songId,
+            'admin_chat_id' => self::ADMIN_CHAT_ID,
+        ]);
+
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->telegramUser(self::ADMIN_TG));
+        MaterialsFlowHandler::completeUpload($bot, $deps, $admin);
+
+        $bot->assertReplyText($texts->get('materials.text_notes_file_only', ['title' => 'Файл']));
     }
 
     public function testDeliverySendsTextAndSplitsLongContent(): void
@@ -161,7 +303,7 @@ final class TranslitTextUploadTest extends TestCase
         $songId = $deps->songs->create('Длинная');
 
         $short = "А\nБ";
-        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, $short, null, true);
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, $short, null, false, 'replace');
 
         $bot = Nutgram::fake();
         $deps->delivery->sendSingletonFile($bot, $songId, MaterialType::TRANSLIT);
@@ -169,7 +311,7 @@ final class TranslitTextUploadTest extends TestCase
 
         $longLine = str_repeat('я', 3000);
         $long = $longLine . "\n" . $longLine;
-        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, $long, null, true);
+        $deps->service->saveTextUpload($admin, $songId, MaterialType::TRANSLIT, $long, null, false, 'replace');
 
         $chunks = TelegramMessageChunker::splitByLines($long);
         self::assertGreaterThan(1, count($chunks));
