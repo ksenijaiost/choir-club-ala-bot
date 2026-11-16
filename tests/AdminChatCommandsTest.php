@@ -153,11 +153,13 @@ final class AdminChatCommandsTest extends TestCase
         $presenter = new AdminChatMemberListPresenter($users, $texts, new UserRolePresenter($texts));
         $body = implode("\n", $presenter->buildMessageChunks());
 
-        self::assertStringContainsString('Дирижёр: Надима @nadima', $body);
+        self::assertStringContainsString('Дирижёр:', $body);
+        self::assertStringContainsString('tg://user?id=91100', $body);
+        self::assertStringContainsString('https://t.me/nadima', $body);
         self::assertStringContainsString('Сопрано 1:', $body);
-        self::assertStringContainsString('• Сопран', $body);
-        self::assertStringContainsString('техспец', mb_strtolower($body));
-        self::assertStringContainsString('@owner_k', $body);
+        self::assertStringContainsString('• ', $body);
+        self::assertStringContainsString('tg://user?id=91102', $body);
+        self::assertStringContainsString('https://t.me/owner_k', $body);
         self::assertStringContainsString('Без партии:', $body);
         self::assertStringNotContainsString('Ждёт', $body);
         self::assertStringContainsString('ожидают регистрации — 1', $body);

@@ -8,6 +8,7 @@ use App\Domain\UserRole;
 use App\Domain\UserStatus;
 use App\Domain\VoicePart;
 use App\Repositories\UserRepository;
+use App\Telegram\TelegramHtml;
 use App\Text\TextRepository;
 
 final class AdminChatMemberListPresenter
@@ -121,12 +122,9 @@ final class AdminChatMemberListPresenter
      */
     private function formatConductorLine(array $user): string
     {
-        $username = trim((string) ($user['telegram_username'] ?? ''));
-        $usernameSuffix = $username !== '' ? ' @' . $username : '';
-
         return $this->texts->get('admin_chat.members_conductor', [
-            'name' => (string) ($user['display_name'] ?? ''),
-            'username' => $usernameSuffix,
+            'name' => TelegramHtml::memberNameLink($user),
+            'username' => TelegramHtml::memberUsernameSuffix($user),
         ]);
     }
 
@@ -135,20 +133,17 @@ final class AdminChatMemberListPresenter
      */
     private function formatPersonLine(array $user): string
     {
-        $name = (string) ($user['display_name'] ?? '');
-        $username = trim((string) ($user['telegram_username'] ?? ''));
-        $usernameSuffix = $username !== '' ? ' @' . $username : '';
         $role = (string) ($user['role'] ?? UserRole::MEMBER);
         $roleSuffix = '';
         if ($role !== UserRole::MEMBER) {
-            $roleSuffix = $this->texts->get('admin_chat.members_role_suffix', [
+            $roleSuffix = TelegramHtml::escape($this->texts->get('admin_chat.members_role_suffix', [
                 'role' => $this->roles->singingRoleBadge($user),
-            ]);
+            ]));
         }
 
         return $this->texts->get('admin_chat.members_line', [
-            'name' => $name,
-            'username' => $usernameSuffix,
+            'name' => TelegramHtml::memberNameLink($user),
+            'username' => TelegramHtml::memberUsernameSuffix($user),
             'role' => $roleSuffix,
         ]);
     }
