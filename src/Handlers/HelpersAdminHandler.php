@@ -9,6 +9,7 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -16,9 +17,14 @@ use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class HelpersAdminHandler
 {
-    public static function register(Nutgram $bot, TextRepository $texts, UserRepository $users, AccessControl $access): void
-    {
-        $bot->onCommand('helpers', function (Nutgram $bot) use ($texts, $users, $access): void {
+    public static function register(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserRepository $users,
+        AccessControl $access,
+        InteractiveMenuService $interactiveMenus,
+    ): void {
+        $bot->onCommand('helpers', function (Nutgram $bot) use ($texts, $users, $access, $interactiveMenus): void {
             $telegramId = $bot->userId();
             if ($telegramId === null) {
                 return;
@@ -29,7 +35,7 @@ final class HelpersAdminHandler
                 return;
             }
 
-            self::openHelpersUi($bot, $texts, $users, $access, $user);
+            self::openHelpersUi($bot, $texts, $users, $access, $user, $interactiveMenus);
         });
     }
 
@@ -42,6 +48,7 @@ final class HelpersAdminHandler
         UserRepository $users,
         AccessControl $access,
         array $user,
+        InteractiveMenuService $interactiveMenus,
     ): void {
         if (!$access->canManageHelpers($user)) {
             $bot->sendMessage($texts->get('admin.only_conductor_or_owner'));
@@ -49,13 +56,17 @@ final class HelpersAdminHandler
             return;
         }
 
-        self::sendHelpersList($bot, $texts, $users);
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        self::sendHelpersList($bot, $texts, $users, $interactiveMenus, $ownerTelegramId);
     }
 
     public static function sendHelpersList(
         Nutgram $bot,
         TextRepository $texts,
         UserRepository $users,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
+        ?int $chatId = null,
     ): void {
         $helpers = $users->listActiveByRole(UserRole::ADMIN);
         $lines = [$texts->get('admin.helpers_list')];
@@ -93,11 +104,25 @@ final class HelpersAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
-        $bot->sendMessage(text: implode("\n", $lines), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $chatId ?? $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
-    public static function sendMemberPicker(Nutgram $bot, TextRepository $texts, UserRepository $users, int $page = 0): void
-    {
+    public static function sendMemberPicker(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserRepository $users,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
+        int $page = 0,
+        ?int $chatId = null,
+    ): void {
         $all = $users->listActiveMembers();
         $total = count($all);
         if ($total === 0) {
@@ -125,9 +150,13 @@ final class HelpersAdminHandler
             'hp:home',
         );
 
-        $bot->sendMessage(
-            text: $texts->get('admin.pick_member_for_helper'),
-            reply_markup: $keyboard,
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('admin.pick_member_for_helper'),
+            $keyboard,
+            $chatId ?? $bot->chatId() ?? $ownerTelegramId,
         );
     }
 
@@ -136,6 +165,7 @@ final class HelpersAdminHandler
         TextRepository $texts,
         UserRepository $users,
         AccessControl $access,
+        InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
     ): bool {
@@ -153,14 +183,14 @@ final class HelpersAdminHandler
         if ($data === 'hp:home') {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendHelpersList($bot, $texts, $users);
+            self::sendHelpersList($bot, $texts, $users, $interactiveMenus, $actorTelegramId);
 
             return true;
         }
 
         if ($data === 'hp:pick') {
             $bot->answerCallbackQuery();
-            self::sendMemberPicker($bot, $texts, $users, 0);
+            self::sendMemberPicker($bot, $texts, $users, $interactiveMenus, $actorTelegramId, 0);
 
             return true;
         }
@@ -168,7 +198,7 @@ final class HelpersAdminHandler
         if (preg_match('/^hp:pg:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendMemberPicker($bot, $texts, $users, (int) $m[1]);
+            self::sendMemberPicker($bot, $texts, $users, $interactiveMenus, $actorTelegramId, (int) $m[1]);
 
             return true;
         }
@@ -185,7 +215,7 @@ final class HelpersAdminHandler
             $users->updateRole($targetId, UserRole::ADMIN);
             $bot->answerCallbackQuery();
             $bot->sendMessage($texts->get('admin.helper_appointed', ['name' => (string) $target['display_name']]));
-            self::sendHelpersList($bot, $texts, $users);
+            self::sendHelpersList($bot, $texts, $users, $interactiveMenus, $actorTelegramId);
 
             return true;
         }
@@ -202,7 +232,7 @@ final class HelpersAdminHandler
             $users->updateRole($targetId, UserRole::MEMBER);
             $bot->answerCallbackQuery();
             $bot->sendMessage($texts->get('admin.helper_removed', ['name' => (string) $target['display_name']]));
-            self::sendHelpersList($bot, $texts, $users);
+            self::sendHelpersList($bot, $texts, $users, $interactiveMenus, $actorTelegramId);
 
             return true;
         }

@@ -32,9 +32,13 @@ final class MaterialsAdminHandler
             return;
         }
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
             $texts->get('materials.admin_chat_hint'),
-            reply_markup: self::adminChatHintKeyboard($texts, $adminChatResolver, $deps->config),
+            self::adminChatHintKeyboard($texts, $adminChatResolver, $deps->config),
         );
         MaterialsCallbackHandler::openManagementHome($bot, $deps);
     }

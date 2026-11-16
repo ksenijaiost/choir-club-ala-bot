@@ -55,12 +55,16 @@ final class SongMemberHandler
             'snd:cat:pg:',
         );
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
             $deps->texts->get('songs.catalog_header', [
                 'page' => (string) ($page + 1),
                 'pages' => (string) InlineMenuHelper::totalPages($total),
             ]),
-            reply_markup: $keyboard,
+            $keyboard,
         );
     }
 
@@ -96,7 +100,14 @@ final class SongMemberHandler
             'snd:sr:pg:',
         );
 
-        $bot->sendMessage($deps->texts->get('songs.pick_from_list'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $deps->texts->get('songs.pick_from_list'),
+            $keyboard,
+        );
     }
 
     public static function sendMyRecordingsPage(
@@ -151,7 +162,8 @@ final class SongMemberHandler
             ? $deps->texts->get($headerKey)
             : $deps->texts->get($headerKey, ['part' => $partLabel]);
 
-        $bot->sendMessage($header, reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu($bot, $deps->interactiveMenus, $ownerTelegramId, $header, $keyboard);
     }
 
     public static function handleFlowMessage(

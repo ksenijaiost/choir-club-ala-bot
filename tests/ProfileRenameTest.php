@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
+
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -39,6 +42,7 @@ final class ProfileRenameTest extends TestCase
             $flows,
             self::MEMBER_TG,
             '  Новое имя  ',
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
         $user = $users->findByTelegramId(self::MEMBER_TG);

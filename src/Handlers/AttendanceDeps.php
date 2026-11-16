@@ -15,6 +15,7 @@ use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 
 final class AttendanceDeps
@@ -32,6 +33,7 @@ final class AttendanceDeps
         public readonly AttendanceHistoryPresenter $history,
         public readonly TextRepository $texts,
         public readonly CheckInSessionRepository $checkInSessions,
+        public readonly InteractiveMenuService $interactiveMenus,
     ) {
     }
 }

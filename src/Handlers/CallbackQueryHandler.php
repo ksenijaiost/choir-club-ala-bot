@@ -16,6 +16,7 @@ use App\Services\MemberBlockService;
 use App\Services\RegistrationAdminMessageBuilder;
 use App\Services\UserIdentitySync;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\InteractiveMenuService;
 use App\Telegram\MenuKeyboard;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -40,8 +41,9 @@ final class CallbackQueryHandler
         MaterialsDeps $materials,
         AdminHistoryContext $adminHistory,
         AdminChatDeps $adminChat,
+        InteractiveMenuService $interactiveMenus,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $interactiveMenus): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -58,13 +60,13 @@ final class CallbackQueryHandler
             }
 
             if ($data === InlineMenuHelper::CLOSE_CALLBACK) {
-                InlineMenuHelper::handleClose($bot, $schedule->flows, $texts, $actorTelegramId);
+                InlineMenuHelper::handleClose($bot, $schedule->flows, $interactiveMenus, $actorTelegramId);
 
                 return;
             }
 
             if (str_starts_with($data, 'ab:')) {
-                AboutBotHandler::handleCallback($bot, $texts, $access, $users, $data, $actorTelegramId);
+                AboutBotHandler::handleCallback($bot, $texts, $access, $users, $interactiveMenus, $data, $actorTelegramId);
 
                 return;
             }
@@ -153,6 +155,7 @@ final class CallbackQueryHandler
                     $schedule->presenter,
                     $schedule->settings,
                     $users,
+                    $schedule->interactiveMenus,
                     $data,
                     $actorTelegramId,
                 );
@@ -170,13 +173,13 @@ final class CallbackQueryHandler
             }
 
             if (str_starts_with($data, 'prf:')) {
-                ProfileHandler::handleCallback($bot, $texts, $users, $schedule->flows, $data, $actorTelegramId);
+                ProfileHandler::handleCallback($bot, $texts, $users, $schedule->flows, $schedule->interactiveMenus, $data, $actorTelegramId);
 
                 return;
             }
 
             if (str_starts_with($data, 'bl:')) {
-                MembersAdminHandler::handleCallback($bot, $texts, $users, $access, $blocks, $data, $actorTelegramId);
+                MembersAdminHandler::handleCallback($bot, $texts, $users, $access, $blocks, $interactiveMenus, $data, $actorTelegramId);
 
                 return;
             }
@@ -193,13 +196,13 @@ final class CallbackQueryHandler
             }
 
             if (str_starts_with($data, 'oc:')) {
-                ConductorAdminHandler::handleCallback($bot, $texts, $users, $access, $data, $actorTelegramId);
+                ConductorAdminHandler::handleCallback($bot, $texts, $users, $access, $interactiveMenus, $data, $actorTelegramId);
 
                 return;
             }
 
             if (str_starts_with($data, 'hp:')) {
-                HelpersAdminHandler::handleCallback($bot, $texts, $users, $access, $data, $actorTelegramId);
+                HelpersAdminHandler::handleCallback($bot, $texts, $users, $access, $interactiveMenus, $data, $actorTelegramId);
 
                 return;
             }

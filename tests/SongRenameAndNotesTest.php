@@ -17,6 +17,8 @@ use App\Handlers\SongsCallbackHandler;
 use App\Repositories\MaterialRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\UserFlowRepository;
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\MaterialsService;
@@ -295,6 +297,7 @@ final class SongRenameAndNotesTest extends TestCase
             $service,
             new SongDeliveryService($materialRepo, $texts, $service),
             $texts,
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 

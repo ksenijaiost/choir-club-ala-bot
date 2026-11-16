@@ -49,7 +49,15 @@ final class AdminChatOwnerHandler
             ]);
         }
 
-        $bot->sendMessage($body, reply_markup: self::homeKeyboard($texts, $deps));
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $body,
+            self::homeKeyboard($texts, $deps),
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     public static function beginChangeFlow(Nutgram $bot, TextRepository $texts, AdminChatDeps $deps, int $telegramId): void
@@ -61,7 +69,13 @@ final class AdminChatOwnerHandler
             ),
             $texts,
         );
-        $bot->sendMessage($texts->get('admin_chat.ask_id'), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $telegramId,
+            $texts->get('admin_chat.ask_id'),
+            $keyboard,
+        );
     }
 
     public static function handleFlowMessage(
@@ -95,12 +109,15 @@ final class AdminChatOwnerHandler
         $title = (string) ($result['title'] ?? '');
 
         $keyboard = self::successKeyboard($deps);
-        $bot->sendMessage(
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $telegramId,
             $deps->texts->get('admin_chat.changed', [
                 'id' => (string) $chatId,
                 'title' => $title,
             ]),
-            reply_markup: $keyboard,
+            $keyboard,
         );
 
         $bot->sendMessage(

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -109,6 +111,7 @@ final class MaterialsOwnerUploadTest extends TestCase
             new MaterialsService($materialRepo, $songRepo, $texts),
             new SongDeliveryService($materialRepo, $texts, new MaterialsService($materialRepo, $songRepo, $texts)),
             $texts,
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 

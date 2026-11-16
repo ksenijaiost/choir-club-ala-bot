@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
+
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -119,7 +122,7 @@ final class ConductorVoicePartTest extends TestCase
         $actor = $users->findByTelegramId($tid);
         self::assertNotNull($actor);
 
-        ProfileHandler::handleCallback($bot, $texts, $users, $flows, 'prf:pt:tenor', $tid);
+        ProfileHandler::handleCallback($bot, $texts, $users, $flows, new InteractiveMenuService(new UserOpenMenuRepository($pdo)), 'prf:pt:tenor', $tid);
         $bot->assertCalled('answerCallbackQuery', 1);
         self::assertNull($users->findByTelegramId($tid)['voice_part']);
     }

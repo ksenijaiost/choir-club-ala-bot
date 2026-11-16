@@ -15,6 +15,7 @@ use App\Services\MemberBlockService;
 use App\Services\UserRolePresenter;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\InteractiveMenuService;
 use App\Telegram\MenuKeyboard;
 use App\Telegram\TelegramHtml;
 use App\Text\TextRepository;
@@ -31,8 +32,9 @@ final class MembersAdminHandler
         UserRepository $users,
         AccessControl $access,
         MemberBlockService $blocks,
+        InteractiveMenuService $interactiveMenus,
     ): void {
-        $bot->onCommand('members', function (Nutgram $bot) use ($texts, $users, $access): void {
+        $bot->onCommand('members', function (Nutgram $bot) use ($texts, $users, $access, $interactiveMenus): void {
             $chatId = $bot->chatId();
             if ($chatId !== null && $access->isAdminChatId($chatId)) {
                 $user = AdminChatCommandHandler::resolveActor($bot, $access, $users);
@@ -56,7 +58,7 @@ final class MembersAdminHandler
                 return;
             }
 
-            self::openFilterUi($bot, $texts, $access, $user);
+            self::openFilterUi($bot, $texts, $access, $user, $interactiveMenus);
         });
     }
 
@@ -68,6 +70,7 @@ final class MembersAdminHandler
         TextRepository $texts,
         AccessControl $access,
         array $user,
+        InteractiveMenuService $interactiveMenus,
     ): void {
         if (!$access->hasConductorPrivileges($user)) {
             $bot->sendMessage($texts->get('admin.only_conductor_or_owner'));
@@ -100,9 +103,14 @@ final class MembersAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
-        $bot->sendMessage(
-            text: $texts->get('admin.members_pick_filter'),
-            reply_markup: $keyboard,
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('admin.members_pick_filter'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
         );
     }
 
@@ -110,8 +118,11 @@ final class MembersAdminHandler
         Nutgram $bot,
         TextRepository $texts,
         UserRepository $users,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
         string $filter,
         int $page = 0,
+        ?int $chatId = null,
     ): void {
         $all = $users->listSingingMembersForAdmin($filter === 'all' ? null : $filter);
         $members = InlineMenuHelper::pageSlice($all, $page);
@@ -174,14 +185,24 @@ final class MembersAdminHandler
             'bl:menu',
         );
 
-        $bot->sendMessage(text: implode("\n", $lines), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $chatId ?? $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     public static function sendMemberActions(
         Nutgram $bot,
         TextRepository $texts,
         UserRepository $users,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
         int $targetId,
+        ?int $chatId = null,
     ): void {
         $target = $users->findById($targetId);
         if ($target === null) {
@@ -241,7 +262,15 @@ final class MembersAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'bl:menu');
 
-        $bot->sendMessage(text: $text, reply_markup: $keyboard, parse_mode: ParseMode::HTML);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            $text,
+            $keyboard,
+            $chatId ?? $bot->chatId() ?? $ownerTelegramId,
+            ParseMode::HTML,
+        );
     }
 
     public static function handleCallback(
@@ -250,6 +279,7 @@ final class MembersAdminHandler
         UserRepository $users,
         AccessControl $access,
         MemberBlockService $blocks,
+        InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
     ): bool {
@@ -267,7 +297,7 @@ final class MembersAdminHandler
         if ($data === 'bl:menu') {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::openFilterUi($bot, $texts, $access, $actor);
+            self::openFilterUi($bot, $texts, $access, $actor, $interactiveMenus);
 
             return true;
         }
@@ -282,7 +312,15 @@ final class MembersAdminHandler
 
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendMemberList($bot, $texts, $users, $filter, (int) $m[2]);
+            self::sendMemberList(
+                $bot,
+                $texts,
+                $users,
+                $interactiveMenus,
+                $actorTelegramId,
+                $filter,
+                (int) $m[2],
+            );
 
             return true;
         }
@@ -296,14 +334,14 @@ final class MembersAdminHandler
             }
 
             $bot->answerCallbackQuery();
-            self::sendMemberList($bot, $texts, $users, $filter);
+            self::sendMemberList($bot, $texts, $users, $interactiveMenus, $actorTelegramId, $filter);
 
             return true;
         }
 
         if (preg_match('/^bl:p:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
-            self::sendMemberActions($bot, $texts, $users, (int) $m[1]);
+            self::sendMemberActions($bot, $texts, $users, $interactiveMenus, $actorTelegramId, (int) $m[1]);
 
             return true;
         }
@@ -332,7 +370,7 @@ final class MembersAdminHandler
                 );
             }
 
-            self::sendMemberActions($bot, $texts, $users, $targetId);
+            self::sendMemberActions($bot, $texts, $users, $interactiveMenus, $actorTelegramId, $targetId);
 
             return true;
         }
@@ -363,7 +401,7 @@ final class MembersAdminHandler
                 );
             }
 
-            self::sendMemberActions($bot, $texts, $users, $targetId);
+            self::sendMemberActions($bot, $texts, $users, $interactiveMenus, $actorTelegramId, $targetId);
 
             return true;
         }

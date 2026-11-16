@@ -9,6 +9,7 @@ use App\Domain\UserStatus;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\UserIdentitySync;
+use App\Telegram\InteractiveMenuService;
 use App\Telegram\MenuKeyboard;
 use App\Telegram\PartKeyboard;
 use App\Text\TextRepository;
@@ -21,8 +22,9 @@ final class StartHandler
         TextRepository $texts,
         UserRepository $users,
         AccessControl $access,
+        InteractiveMenuService $interactiveMenus,
     ): void {
-        $bot->onCommand('start', function (Nutgram $bot) use ($texts, $users, $access): void {
+        $bot->onCommand('start', function (Nutgram $bot) use ($texts, $users, $access, $interactiveMenus): void {
             $telegramId = $bot->userId();
             if ($telegramId === null) {
                 return;
@@ -34,10 +36,10 @@ final class StartHandler
             if ($access->isOwnerTelegramId($telegramId)) {
                 $user = $users->findByTelegramId($telegramId);
                 if ($user !== null) {
-                    if (ProfileHandler::promptOwnerPartIfNeeded($bot, $texts, $user)) {
+                    if (ProfileHandler::promptOwnerPartIfNeeded($bot, $texts, $user, $interactiveMenus)) {
                         return;
                     }
-                    self::respondByStatus($bot, $texts, $user);
+                    self::respondByStatus($bot, $texts, $user, $interactiveMenus);
                 }
 
                 return;
@@ -56,14 +58,19 @@ final class StartHandler
                 $users->updateTelegramUsername((int) $user['id'], $username);
             }
 
-            self::respondByStatus($bot, $texts, $user);
+            self::respondByStatus($bot, $texts, $user, $interactiveMenus);
         });
     }
 
     /**
      * @param array<string, mixed> $user
      */
-    public static function respondByStatus(Nutgram $bot, TextRepository $texts, array $user): void
+    public static function respondByStatus(
+        Nutgram $bot,
+        TextRepository $texts,
+        array $user,
+        InteractiveMenuService $interactiveMenus,
+    ): void
     {
         $status = (string) ($user['status'] ?? '');
 
@@ -99,7 +106,7 @@ final class StartHandler
         }
 
         if ($status === UserStatus::ACTIVE) {
-            if (ProfileHandler::promptMissingVoicePartIfNeeded($bot, $texts, $user)) {
+            if (ProfileHandler::promptMissingVoicePartIfNeeded($bot, $texts, $user, $interactiveMenus)) {
                 return;
             }
 

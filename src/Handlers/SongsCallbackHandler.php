@@ -176,9 +176,13 @@ final class SongsCallbackHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'snd:pk:' . $songId);
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
             $deps->texts->get('songs.pick_part_for_recordings', ['title' => (string) $song['title']]),
-            reply_markup: $keyboard,
+            $keyboard,
         );
     }
 }

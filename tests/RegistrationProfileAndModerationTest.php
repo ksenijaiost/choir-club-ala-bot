@@ -21,6 +21,7 @@ use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Testing\FakeNutgram;
+use SergiX44\Nutgram\Testing\FakeNutgram as FakeNutgramClass;
 use SergiX44\Nutgram\Telegram\Properties\ChatType;
 use SergiX44\Nutgram\Telegram\Properties\UpdateType;
 use SergiX44\Nutgram\Telegram\Types\Chat\Chat;
@@ -231,7 +232,8 @@ final class RegistrationProfileAndModerationTest extends TestCase
      */
     private function assertEditMessageTextContains(Nutgram $bot, callable $assertion): void
     {
-        for ($i = 0; $i < 10; $i++) {
+        $limit = $this->testingHistoryCount($bot);
+        for ($i = 0; $i < $limit; $i++) {
             try {
                 $bot->assertRaw(function (Request $request) use ($assertion): bool {
                     if ($request->getUri()->getPath() !== 'editMessageText') {
@@ -276,6 +278,18 @@ final class RegistrationProfileAndModerationTest extends TestCase
             'pdo' => $pdo,
             'requestId' => $requestId,
         ];
+    }
+
+    private function testingHistoryCount(Nutgram $bot): int
+    {
+        if (!$bot instanceof FakeNutgramClass) {
+            return 0;
+        }
+
+        $history = new \ReflectionProperty(FakeNutgramClass::class, 'testingHistory');
+        $history->setAccessible(true);
+
+        return count($history->getValue($bot));
     }
 
     private function testConfig(): Config
