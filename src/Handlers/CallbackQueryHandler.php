@@ -12,6 +12,7 @@ use App\Repositories\RegistrationRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AdminChatResolver;
+use App\Services\ErrorReportService;
 use App\Services\MemberBlockService;
 use App\Services\RegistrationAdminMessageBuilder;
 use App\Services\UserIdentitySync;
@@ -42,8 +43,9 @@ final class CallbackQueryHandler
         AdminHistoryContext $adminHistory,
         AdminChatDeps $adminChat,
         InteractiveMenuService $interactiveMenus,
+        ErrorReportService $errorReports,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $interactiveMenus): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $interactiveMenus, $errorReports): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -57,6 +59,12 @@ final class CallbackQueryHandler
             $actorTelegramId = $callback->from?->id;
             if ($actorTelegramId === null) {
                 return;
+            }
+
+            if (str_starts_with($data, 'err:')) {
+                if (ErrorReportHandler::handleCallback($bot, $texts, $schedule->flows, $errorReports, $data, $actorTelegramId)) {
+                    return;
+                }
             }
 
             if ($data === InlineMenuHelper::CLOSE_CALLBACK) {

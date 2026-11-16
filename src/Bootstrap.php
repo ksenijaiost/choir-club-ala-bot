@@ -6,6 +6,11 @@ namespace App;
 
 use App\Database\Connection;
 use App\Handlers\HandlerRegistry;
+use App\Repositories\BotSettingsRepository;
+use App\Repositories\ErrorReportRepository;
+use App\Repositories\UserRepository;
+use App\Services\AdminChatResolver;
+use App\Services\ErrorReportService;
 use App\Telegram\NutgramErrorHooks;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -52,11 +57,32 @@ final class Bootstrap
         return new Nutgram($config->botToken);
     }
 
+    public static function errorReportService(): ErrorReportService
+    {
+        $config = self::config();
+        $texts = self::texts();
+        $pdo = self::pdo();
+        $users = new UserRepository($pdo);
+        $settings = new BotSettingsRepository($pdo);
+        $adminChatResolver = new AdminChatResolver($settings, $config);
+
+        return new ErrorReportService(
+            new ErrorReportRepository($pdo),
+            $users,
+            $texts,
+            $config,
+            $adminChatResolver,
+        );
+    }
+
     public static function registerHandlers(Nutgram $bot): void
     {
         $config = self::config();
         $texts = self::texts();
-        HandlerRegistry::register($bot, $texts, $config, self::pdo());
-        NutgramErrorHooks::register($bot, $config, $texts);
+        $pdo = self::pdo();
+        $errorReports = self::errorReportService();
+
+        HandlerRegistry::register($bot, $texts, $config, $pdo, $errorReports);
+        NutgramErrorHooks::register($bot, $config, $texts, $errorReports);
     }
 }

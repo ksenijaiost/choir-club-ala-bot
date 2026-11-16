@@ -7,6 +7,7 @@ use App\Http\AdminGate;
 use App\Repositories\BotSettingsRepository;
 use App\Services\AdminChatBotCommands;
 use App\Services\AdminChatResolver;
+use App\Services\PrivateChatBotCommands;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
@@ -39,6 +40,12 @@ if ($ok) {
     echo "Webhook set to {$config->webhookUrl}\n";
 
     $texts = Bootstrap::texts();
+    try {
+        PrivateChatBotCommands::register($bot, $texts);
+        echo "Private chat commands registered.\n";
+    } catch (\Throwable $e) {
+        echo 'Private chat commands registration failed: ' . $e->getMessage() . "\n";
+    }
     $settings = new BotSettingsRepository(Bootstrap::pdo());
     $resolver = new AdminChatResolver($settings, $config);
     $adminChatId = $resolver->resolvedIdAsInt();

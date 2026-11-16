@@ -416,7 +416,23 @@
     "unexcused_no_reason": "{line} (без причины)"
   },
   "errors": {
-    "generic": "Что-то пошло не так. Попробуй позже или напиши дирижёру.",
+    "generic_with_report": "Что-то пошло не так. Нажми «🆘 Сообщить о проблеме», и техспец разберётся.",
+    "report_button": "🆘 Сообщить о проблеме",
+    "report_ask_comment": "Опиши коротко, что ты делал(а)",
+    "report_skip": "Пропустить",
+    "report_thanks": "Спасибо! Передала техспецу.",
+    "report_already_sent": "Уже отправлено, спасибо!",
+    "report_rate_limited": "Ты уже отправил(а) несколько сообщений, техспец посмотрит",
+    "report_admin_message": "🆘 Проблема у {user_line}\nID: {telegram_id}\nПартия: {part}\nВремя (Алматы): {datetime}\nДействие: {action}\n{error_block}{comment_block}update_id: {update_id}",
+    "report_admin_error_block": "Ошибка: {exception_class}: {exception_message}\n",
+    "report_admin_comment_block": "Комментарий: {comment}\n",
+    "generic": "Что-то пошло не так. Нажми «🆘 Сообщить о проблеме», и техспец разберётся.",
     "unknown_command": "Не понял команду. Используй кнопки меню."
+  },
+  "commands": {
+    "start": "start",
+    "help": "help",
+    "desc_start": "Начать с ботом",
+    "desc_help": "Сообщить о проблеме"
   }
 }

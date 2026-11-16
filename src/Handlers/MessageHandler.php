@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Domain\UserStatus;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\ErrorReportService;
 use App\Services\UserIdentitySync;
 use App\Telegram\MenuKeyboard;
 use App\Telegram\PartKeyboard;
@@ -27,8 +28,9 @@ final class MessageHandler
         ?MaterialsDeps $materials = null,
         ?AdminHistoryContext $adminHistory = null,
         ?AdminChatDeps $adminChat = null,
+        ?ErrorReportService $errorReports = null,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $errorReports): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -56,6 +58,13 @@ final class MessageHandler
             }
 
             if (str_starts_with($text, '/')) {
+                return;
+            }
+
+            if (
+                $errorReports !== null
+                && ErrorReportHandler::handleFlowMessage($bot, $schedule->flows, $errorReports, $telegramId, $text)
+            ) {
                 return;
             }
 
