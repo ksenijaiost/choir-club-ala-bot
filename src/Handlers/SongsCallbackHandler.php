@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Domain\MaterialType;
 use App\Domain\VoicePart;
+use App\Services\VoicePartRules;
 use App\Services\SongDeliveryService;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
@@ -54,7 +55,7 @@ final class SongsCallbackHandler
 
         if (preg_match('/^snd:my:pg:([a-z0-9_]+):(\d+)$/', $data, $m) === 1) {
             $part = $m[1];
-            if (!VoicePart::isValid($part)) {
+            if ($part !== VoicePartRules::RECORDINGS_ALL_PARTS && !VoicePart::isValid($part)) {
                 $bot->answerCallbackQuery();
 
                 return true;
@@ -121,6 +122,15 @@ final class SongsCallbackHandler
 
         if (preg_match('/^snd:my:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
             $part = $m[2];
+            if ($part === VoicePartRules::RECORDINGS_ALL_PARTS) {
+                $bot->answerCallbackQuery();
+                CallbackUi::clearKeyboard($bot);
+                $rows = $deps->materials->listCurrentRecordingsAllParts((int) $m[1]);
+                $delivery->sendRecordingFiles($bot, $rows);
+
+                return true;
+            }
+
             if (!VoicePart::isValid($part)) {
                 $bot->answerCallbackQuery();
 

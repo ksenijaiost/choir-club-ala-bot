@@ -93,16 +93,18 @@ final class AdminHistoryHandler
         $prevYear = (int) $prev->format('Y');
         $prevMonth = (int) $prev->format('n');
 
-        $partCode = (string) ($user['voice_part'] ?? '');
-        $partLabel = $partCode !== ''
-            ? $ctx->texts->get('parts.' . $partCode)
-            : $ctx->texts->get('profile.part_none');
+        $header = \App\Services\VoicePartRules::isConductor($user)
+            ? $ctx->texts->get('history.report_header_leader', [
+                'name' => $ctx->roles->displayNameWithBadge($user),
+            ])
+            : $ctx->texts->get('history.report_header', [
+                'name' => $ctx->roles->displayNameWithBadge($user),
+                'part' => \App\Services\VoicePartRules::partLabelForDisplay($ctx->texts, $user)
+                    ?? $ctx->texts->get('profile.part_none'),
+            ]);
 
         $lines = [
-            $ctx->texts->get('history.report_header', [
-                'name' => $ctx->roles->displayNameWithBadge($user),
-                'part' => $partLabel,
-            ]),
+            $header,
             $ctx->texts->get('history.streak_line', [
                 'streak' => (string) (int) ($user['consecutive_unexcused'] ?? 0),
             ]),

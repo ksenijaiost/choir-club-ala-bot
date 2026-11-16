@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Telegram;
 
-use App\Domain\UserRole;
 use App\Domain\VoicePart;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -23,15 +22,6 @@ final class PartKeyboard
     public static function profile(TextRepository $texts, array $user): InlineKeyboardMarkup
     {
         $keyboard = self::partGrid($texts, 'prf:pt:');
-        $role = (string) ($user['role'] ?? '');
-        if (in_array($role, [UserRole::OWNER, UserRole::CONDUCTOR], true)) {
-            $keyboard = $keyboard->addRow(
-                InlineKeyboardButton::make(
-                    $texts->get('profile.part_none_button'),
-                    callback_data: 'prf:pt:none',
-                ),
-            );
-        }
 
         return InlineMenuHelper::appendFooter($keyboard, $texts);
     }
