@@ -92,7 +92,10 @@ final class TranslitTextUploadTest extends TestCase
         self::assertNotNull($current);
         self::assertSame("У-у-у\nНа небе", $current['text_content']);
         self::assertNull($current['telegram_file_id']);
-        $bot->assertReplyText($texts->get('materials.translit_saved', ['song' => 'Новая песня']));
+        $bot->assertReplyText(
+            $texts->get('materials.translit_saved', ['song' => 'Новая песня']),
+            index: 1,
+        );
     }
 
     public function testReplaceExistingTranslitArchivesPrevious(): void

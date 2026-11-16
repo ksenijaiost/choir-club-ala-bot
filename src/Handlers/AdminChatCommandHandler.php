@@ -26,7 +26,7 @@ final class AdminChatCommandHandler
     ): void {
         $songPresenter = new AdminChatSongListPresenter($songs, $materials, $texts);
 
-        $bot->onCommand('songs', function (Nutgram $bot) use ($access, $users, $songPresenter, $texts): void {
+        $bot->onCommand('songs', function (Nutgram $bot) use ($access, $users, $songPresenter): void {
             if (!self::isAdminChatMessage($bot, $access)) {
                 return;
             }

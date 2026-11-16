@@ -54,9 +54,7 @@ final class AdminChatMemberListPresenter
         }
 
         if ($conductor !== null) {
-            $lines[] = $this->texts->get('admin_chat.members_conductor', [
-                'line' => $this->formatPersonLine($conductor),
-            ]);
+            $lines[] = $this->formatConductorLine($conductor);
             $lines[] = '';
         }
 
@@ -116,6 +114,20 @@ final class AdminChatMemberListPresenter
         }
 
         return \App\Telegram\TelegramMessageChunker::splitByLines(implode("\n", $lines));
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    private function formatConductorLine(array $user): string
+    {
+        $username = trim((string) ($user['telegram_username'] ?? ''));
+        $usernameSuffix = $username !== '' ? ' @' . $username : '';
+
+        return $this->texts->get('admin_chat.members_conductor', [
+            'name' => (string) ($user['display_name'] ?? ''),
+            'username' => $usernameSuffix,
+        ]);
     }
 
     /**

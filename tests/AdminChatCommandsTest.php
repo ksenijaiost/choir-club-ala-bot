@@ -145,8 +145,9 @@ final class AdminChatCommandsTest extends TestCase
         $materials = new MaterialRepository($pdo);
         $access = new AccessControl($this->testConfig(), null);
 
-        $bot = Nutgram::fake(config: ['chat_id' => self::ADMIN_CHAT_ID]);
+        $bot = Nutgram::fake();
         AdminChatCommandHandler::register($bot, $texts, $access, $users, $songs, $materials);
+        $bot->willReceivePartial(['id' => self::ADMIN_CHAT_ID, 'type' => 'supergroup']);
         $bot->setCommonUser($this->tgUser(self::MEMBER_TG));
         $bot->hearCommand('songs')->reply();
         $bot->assertCalled('sendMessage', 0);
@@ -165,8 +166,9 @@ final class AdminChatCommandsTest extends TestCase
         $materials = new MaterialRepository($pdo);
         $access = new AccessControl($this->testConfig(), null);
 
-        $bot = Nutgram::fake(config: ['chat_id' => self::ADMIN_CHAT_ID]);
+        $bot = Nutgram::fake();
         AdminChatCommandHandler::register($bot, $texts, $access, $users, $songs, $materials);
+        $bot->willReceivePartial(['id' => self::ADMIN_CHAT_ID, 'type' => 'supergroup']);
         $bot->setCommonUser($this->tgUser(self::HELPER_TG));
         $bot->hearCommand('songs')->reply();
         $bot->assertCalled('sendMessage');
