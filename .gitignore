@@ -20,6 +20,9 @@ build/
 
 /storage/*
 !storage/.gitkeep
+!storage/logs/
+storage/logs/*
+!storage/logs/.gitignore
 *.sqlite
 *.sqlite3
 *.db

@@ -6,6 +6,7 @@ namespace App;
 
 use App\Database\Connection;
 use App\Handlers\HandlerRegistry;
+use App\Telegram\NutgramErrorHooks;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 
@@ -53,6 +54,9 @@ final class Bootstrap
 
     public static function registerHandlers(Nutgram $bot): void
     {
-        HandlerRegistry::register($bot, self::texts(), self::config(), self::pdo());
+        $config = self::config();
+        $texts = self::texts();
+        HandlerRegistry::register($bot, $texts, $config, self::pdo());
+        NutgramErrorHooks::register($bot, $config, $texts);
     }
 }
