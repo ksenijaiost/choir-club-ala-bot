@@ -78,14 +78,14 @@ final class ConductorVoicePartTest extends TestCase
 
         $users = new UserRepository($pdo);
         $cid = $users->create(8804, 'Дирижёр', null, UserRole::CONDUCTOR, UserStatus::ACTIVE);
-        $users->create(8805, 'Сопрано', 'soprano_1', UserRole::MEMBER, UserStatus::ACTIVE);
+        $memberId = $users->create(8805, 'Сопрано', 'soprano_1', UserRole::MEMBER, UserStatus::ACTIVE);
 
         $all = array_map(static fn (array $r): int => (int) $r['id'], $users->listSingingMembersForAdmin(null));
         self::assertContains($cid, $all);
 
         $soprano = array_map(static fn (array $r): int => (int) $r['id'], $users->listSingingMembersForAdmin('soprano_1'));
         self::assertNotContains($cid, $soprano);
-        self::assertContains(8805, $soprano);
+        self::assertContains($memberId, $soprano);
     }
 
     public function testConductorCannotSetVoicePartViaRepository(): void

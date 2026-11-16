@@ -122,6 +122,6 @@ final class MaterialsAdminChatHandler
             'admin_chat_message_id' => $messageId,
         ]);
 
-        MaterialsFlowHandler::sendSongPicker($bot, $deps, $chatId);
+        MaterialsFlowHandler::sendSongPicker($bot, $deps, page: 0, chatId: $chatId);
     }
 }

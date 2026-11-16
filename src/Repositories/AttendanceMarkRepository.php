@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Support\SqlPagination;
+
 final class AttendanceMarkRepository
 {
     public function __construct(private readonly \PDO $pdo)
@@ -85,6 +87,7 @@ final class AttendanceMarkRepository
      */
     public function listForUserRecent(int $userId, int $limit = 20): array
     {
+        $limit = SqlPagination::clampLimit($limit);
         $stmt = $this->pdo->prepare(
             'SELECT am.*, r.starts_at, r.ends_at, r.address, r.status AS rehearsal_status
              FROM attendance_marks am

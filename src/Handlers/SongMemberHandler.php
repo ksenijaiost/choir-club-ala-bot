@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Domain\VoicePart;
 use App\Services\VoicePartRules;
+use App\Support\SqlPagination;
 use App\Services\SongDeliveryService;
 use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
@@ -30,8 +31,11 @@ final class SongMemberHandler
             return;
         }
 
-        $offset = $page * InlineMenuHelper::PAGE_SIZE;
-        $songs = $deps->songs->listWithCurrentMaterials($offset, InlineMenuHelper::PAGE_SIZE);
+        $page = SqlPagination::clampPage($page);
+        $songs = $deps->songs->listWithCurrentMaterials(
+            SqlPagination::offsetForPage($page, InlineMenuHelper::PAGE_SIZE),
+            InlineMenuHelper::PAGE_SIZE,
+        );
         $keyboard = InlineKeyboardMarkup::make();
 
         foreach ($songs as $song) {
