@@ -23,6 +23,6 @@ final class MaterialType
 
     public static function isSingleton(string $type): bool
     {
-        return $type === self::NOTES || $type === self::TRANSLIT;
+        return $type === self::TRANSLIT;
     }
 }

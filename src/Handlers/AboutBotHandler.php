@@ -8,6 +8,7 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -25,8 +26,9 @@ final class AboutBotHandler
         TextRepository $texts,
         AccessControl $access,
         array $user,
+        InteractiveMenuService $interactiveMenus,
     ): void {
-        self::sendSectionPicker($bot, $texts, $access, $user);
+        self::sendSectionPicker($bot, $texts, $access, $user, $interactiveMenus);
     }
 
     public static function handleCallback(
@@ -34,6 +36,7 @@ final class AboutBotHandler
         TextRepository $texts,
         AccessControl $access,
         UserRepository $users,
+        InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
     ): void {
@@ -47,7 +50,7 @@ final class AboutBotHandler
         $bot->answerCallbackQuery();
 
         if ($data === self::HOME) {
-            self::editSectionPicker($bot, $texts, $access, $actor);
+            self::editSectionPicker($bot, $texts, $access, $actor, $interactiveMenus, $actorTelegramId);
 
             return;
         }
@@ -71,6 +74,8 @@ final class AboutBotHandler
             $bot,
             self::sectionText($texts, $sectionId),
             $keyboard,
+            $interactiveMenus,
+            $actorTelegramId,
         );
     }
 
@@ -143,21 +148,31 @@ final class AboutBotHandler
         TextRepository $texts,
         AccessControl $access,
         array $user,
+        InteractiveMenuService $interactiveMenus,
     ): void {
         $sections = self::visibleSectionIds($access, $user);
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+
         if (count($sections) === 1) {
             $keyboard = InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $texts);
-            $bot->sendMessage(
+            InlineMenuHelper::sendInteractiveMenu(
+                $bot,
+                $interactiveMenus,
+                $ownerTelegramId,
                 self::sectionText($texts, $sections[0]),
-                reply_markup: $keyboard,
+                $keyboard,
             );
 
             return;
         }
 
-        $bot->sendMessage(
+        $keyboard = self::buildPickerKeyboard($texts, $sections);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
             $texts->get('about.pick_section'),
-            reply_markup: self::buildPickerKeyboard($texts, $sections),
+            $keyboard,
         );
     }
 
@@ -169,12 +184,16 @@ final class AboutBotHandler
         TextRepository $texts,
         AccessControl $access,
         array $user,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
     ): void {
         $sections = self::visibleSectionIds($access, $user);
         CallbackUi::editCurrentMessage(
             $bot,
             $texts->get('about.pick_section'),
             self::buildPickerKeyboard($texts, $sections),
+            $interactiveMenus,
+            $ownerTelegramId,
         );
     }
 

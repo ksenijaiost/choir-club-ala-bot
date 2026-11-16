@@ -151,13 +151,18 @@ final class MaterialsAdminChatHandler
                 return;
             }
 
-            $deps->service->replaceRecordingFile($user, $target, $file['file_id'], $file['file_unique_id'], $messageId);
+            $type = (string) ($target['type'] ?? '');
+            if ($type === MaterialType::NOTES) {
+                $deps->service->replaceNotesFile($user, $target, $file['file_id'], $file['file_unique_id'], $messageId);
+            } else {
+                $deps->service->replaceRecordingFile($user, $target, $file['file_id'], $file['file_unique_id'], $messageId);
+            }
             $deps->flows->clear((int) $user['telegram_id']);
             $song = $deps->songs->findById((int) $target['song_id']);
             if ($song !== null) {
                 $bot->sendMessage($deps->service->uploadSuccessText(
                     $song,
-                    (string) $target['type'],
+                    $type,
                     [],
                 ));
             }

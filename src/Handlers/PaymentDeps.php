@@ -12,6 +12,7 @@ use App\Repositories\UserRepository;
 use App\Services\NotificationRecipientResolver;
 use App\Services\PaymentReminderTextService;
 use App\Services\PaymentTexts;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 
 final class PaymentDeps
@@ -26,6 +27,7 @@ final class PaymentDeps
         public readonly BotSettingsRepository $settings,
         public readonly UserFlowRepository $flows,
         public readonly PaymentReminderTextService $reminderTexts,
+        public readonly InteractiveMenuService $interactiveMenus,
     ) {
     }
 }

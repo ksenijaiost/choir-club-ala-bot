@@ -8,6 +8,7 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -15,9 +16,14 @@ use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class ConductorAdminHandler
 {
-    public static function register(Nutgram $bot, TextRepository $texts, UserRepository $users, AccessControl $access): void
-    {
-        $bot->onCommand('conductor', function (Nutgram $bot) use ($texts, $users, $access): void {
+    public static function register(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserRepository $users,
+        AccessControl $access,
+        InteractiveMenuService $interactiveMenus,
+    ): void {
+        $bot->onCommand('conductor', function (Nutgram $bot) use ($texts, $users, $access, $interactiveMenus): void {
             $telegramId = $bot->userId();
             if ($telegramId === null) {
                 return;
@@ -28,7 +34,7 @@ final class ConductorAdminHandler
                 return;
             }
 
-            self::openConductorPicker($bot, $texts, $users, $access, $user);
+            self::openConductorPicker($bot, $texts, $users, $access, $user, $interactiveMenus);
         });
     }
 
@@ -41,6 +47,7 @@ final class ConductorAdminHandler
         UserRepository $users,
         AccessControl $access,
         array $user,
+        InteractiveMenuService $interactiveMenus,
     ): void {
         if (!$access->isOwner($user)) {
             $bot->sendMessage($texts->get('admin.only_owner'));
@@ -48,11 +55,19 @@ final class ConductorAdminHandler
             return;
         }
 
-        self::sendConductorUi($bot, $texts, $users);
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        self::sendConductorUi($bot, $texts, $users, $interactiveMenus, $ownerTelegramId, 0);
     }
 
-    public static function sendConductorUi(Nutgram $bot, TextRepository $texts, UserRepository $users, int $page = 0): void
-    {
+    public static function sendConductorUi(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserRepository $users,
+        InteractiveMenuService $interactiveMenus,
+        int $ownerTelegramId,
+        int $page = 0,
+        ?int $chatId = null,
+    ): void {
         $current = $users->findActiveConductor();
         $lines = [$texts->get('admin.conductor_manage_header')];
 
@@ -85,7 +100,14 @@ final class ConductorAdminHandler
 
         $keyboard = InlineMenuHelper::appendPaginationAndFooter($keyboard, $texts, $page, $total, 'oc:pg:');
 
-        $bot->sendMessage(text: implode("\n", $lines), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $chatId ?? $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     public static function handleCallback(
@@ -93,6 +115,7 @@ final class ConductorAdminHandler
         TextRepository $texts,
         UserRepository $users,
         AccessControl $access,
+        InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
     ): bool {
@@ -110,7 +133,7 @@ final class ConductorAdminHandler
         if (preg_match('/^oc:pg:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendConductorUi($bot, $texts, $users, (int) $m[1]);
+            self::sendConductorUi($bot, $texts, $users, $interactiveMenus, $actorTelegramId, (int) $m[1]);
 
             return true;
         }
@@ -141,7 +164,7 @@ final class ConductorAdminHandler
         $bot->sendMessage($texts->get('admin.conductor_appointed', [
             'name' => (string) $target['display_name'],
         ]));
-        self::sendConductorUi($bot, $texts, $users);
+        self::sendConductorUi($bot, $texts, $users, $interactiveMenus, $actorTelegramId);
 
         return true;
     }

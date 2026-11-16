@@ -34,16 +34,19 @@ final class AdminHistoryHandler
             return;
         }
 
-        self::sendMemberPicker($bot, $ctx->texts, $ctx->users, $ctx->roles, 0);
+        $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+        self::sendMemberPicker($bot, $ctx, $ctx->roles, 0, $ownerTelegramId);
     }
 
     public static function sendMemberPicker(
         Nutgram $bot,
-        TextRepository $texts,
-        \App\Repositories\UserRepository $users,
+        AdminHistoryContext $ctx,
         UserRolePresenter $roles,
         int $page,
+        int $ownerTelegramId,
     ): void {
+        $texts = $ctx->texts;
+        $users = $ctx->users;
         $all = $users->listSingingMembersForAdmin(null, false);
         $total = count($all);
         if ($total === 0) {
@@ -70,13 +73,21 @@ final class AdminHistoryHandler
             'hst:pg:',
         );
 
-        $bot->sendMessage($texts->get('history.pick_member'), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $ctx->interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('history.pick_member'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
-  public static function sendMemberReport(
+    public static function sendMemberReport(
         Nutgram $bot,
         AdminHistoryContext $ctx,
         int $userId,
+        int $ownerTelegramId,
     ): void {
         $user = $ctx->users->findById($userId);
         if ($user === null) {
@@ -131,7 +142,14 @@ final class AdminHistoryHandler
             'hst:pg:0',
         );
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $ctx->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     private static function paymentLine(AdminHistoryContext $ctx, int $userId, int $year, int $month): string
@@ -174,7 +192,8 @@ final class AdminHistoryHandler
         if (preg_match('/^hst:pg:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendMemberPicker($bot, $ctx->texts, $ctx->users, $ctx->roles, (int) $m[1]);
+            $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+            self::sendMemberPicker($bot, $ctx, $ctx->roles, (int) $m[1], $ownerTelegramId);
 
             return true;
         }
@@ -182,7 +201,8 @@ final class AdminHistoryHandler
         if (preg_match('/^hst:u:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendMemberReport($bot, $ctx, (int) $m[1]);
+            $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+            self::sendMemberReport($bot, $ctx, (int) $m[1], $ownerTelegramId);
 
             return true;
         }

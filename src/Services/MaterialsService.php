@@ -12,6 +12,8 @@ use App\Text\TextRepository;
 
 final class MaterialsService
 {
+    public const TEXT_NOTES_SEPARATOR = "\n\n__________\n\n";
+
     public function __construct(
         private readonly MaterialRepository $materials,
         private readonly SongRepository $songs,
@@ -29,6 +31,10 @@ final class MaterialsService
 
     public function needsReplaceConfirm(int $songId, string $type): bool
     {
+        if ($type === MaterialType::NOTES) {
+            return $this->materials->countCurrentNotes($songId) > 0;
+        }
+
         if (!MaterialType::isSingleton($type)) {
             return false;
         }
@@ -39,6 +45,7 @@ final class MaterialsService
     /**
      * @param array<string, mixed> $uploader
      * @param list<string>|null $voiceParts
+     * @param 'add'|'replace_all'|null $notesUploadMode
      */
     public function saveUpload(
         array $uploader,
@@ -49,6 +56,7 @@ final class MaterialsService
         string $fileUniqueId,
         ?int $adminChatMessageId,
         bool $replaceConfirmed = false,
+        ?string $notesUploadMode = null,
     ): array {
         $song = $this->songs->findById($songId);
         if ($song === null) {
@@ -58,7 +66,29 @@ final class MaterialsService
         $existing = null;
         $savedVoiceParts = [];
 
-        if (MaterialType::isSingleton($type)) {
+        if ($type === MaterialType::NOTES) {
+            $notesCount = $this->materials->countCurrentNotes($songId);
+            if ($notesCount > 0) {
+                if ($notesUploadMode === null) {
+                    throw new \InvalidArgumentException('notes_choice_required');
+                }
+                if ($notesUploadMode === 'replace_all') {
+                    $existing = $this->materials->listCurrentNotes($songId)[0] ?? [];
+                    $this->materials->archiveAllCurrentByType($songId, MaterialType::NOTES);
+                }
+            }
+
+            $materialId = $this->materials->insert(
+                $songId,
+                $type,
+                null,
+                $fileId,
+                $fileUniqueId,
+                (int) $uploader['id'],
+                $adminChatMessageId,
+                true,
+            );
+        } elseif (MaterialType::isSingleton($type)) {
             $existing = $this->materials->findCurrentSingleton($songId, $type);
             if ($existing !== null) {
                 if (!$replaceConfirmed) {
@@ -104,6 +134,7 @@ final class MaterialsService
 
     /**
      * @param array<string, mixed> $uploader
+     * @param 'append_end'|'append_start'|'replace'|null $textNotesMode
      */
     public function saveTextUpload(
         array $uploader,
@@ -112,6 +143,7 @@ final class MaterialsService
         string $textContent,
         ?int $adminChatMessageId,
         bool $replaceConfirmed = false,
+        ?string $textNotesMode = null,
     ): array {
         if ($type !== MaterialType::TRANSLIT) {
             throw new \InvalidArgumentException('text_upload_type');
@@ -127,12 +159,38 @@ final class MaterialsService
             throw new \InvalidArgumentException('Song not found');
         }
 
-        $existing = $this->materials->findCurrentSingleton($songId, $type);
-        if ($existing !== null) {
-            if (!$replaceConfirmed) {
-                throw new \InvalidArgumentException('replace_confirm_required');
+        $existing = null;
+        $textNotesAction = 'created';
+        $row = $this->materials->findCurrentSingleton($songId, $type);
+        if ($row !== null) {
+            $existing = $row;
+            $oldText = trim((string) ($row['text_content'] ?? ''));
+            $hasLegacyFile = trim((string) ($row['telegram_file_id'] ?? '')) !== '';
+
+            if ($oldText === '' && $hasLegacyFile) {
+                $mode = $textNotesMode ?? ($replaceConfirmed ? 'replace' : null);
+                if ($mode !== 'replace') {
+                    throw new \InvalidArgumentException('text_notes_file_only');
+                }
+                $this->materials->archiveSingleton($songId, $type);
+                $textNotesAction = 'replace';
+            } elseif ($oldText !== '') {
+                $mode = $textNotesMode ?? ($replaceConfirmed ? 'replace' : null);
+                if ($mode === null) {
+                    throw new \InvalidArgumentException('text_notes_choice_required');
+                }
+
+                $textNotesAction = $mode;
+                $textContent = match ($mode) {
+                    'append_end' => $oldText . self::TEXT_NOTES_SEPARATOR . $textContent,
+                    'append_start' => $textContent . self::TEXT_NOTES_SEPARATOR . $oldText,
+                    'replace' => $textContent,
+                    default => throw new \InvalidArgumentException('invalid_text_notes_mode'),
+                };
+                $this->materials->archiveSingleton($songId, $type);
+            } else {
+                $this->materials->archiveSingleton($songId, $type);
             }
-            $this->materials->archiveSingleton($songId, $type);
         }
 
         $materialId = $this->materials->insert(
@@ -153,7 +211,24 @@ final class MaterialsService
             'type' => $type,
             'voice_parts' => [],
             'archived_previous' => $existing,
+            'text_notes_action' => $textNotesAction,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    public function textNotesSavedMessage(array $result): string
+    {
+        $song = (string) ($result['song']['title'] ?? '');
+        $action = (string) ($result['text_notes_action'] ?? 'created');
+
+        return match ($action) {
+            'append_end' => $this->texts->get('materials.text_notes_saved_append_end', ['song' => $song]),
+            'append_start' => $this->texts->get('materials.text_notes_saved_append_start', ['song' => $song]),
+            'replace' => $this->texts->get('materials.text_notes_saved_replace', ['song' => $song]),
+            default => $this->texts->get('materials.text_notes_saved_new', ['song' => $song]),
+        };
     }
 
     /**
@@ -176,6 +251,30 @@ final class MaterialsService
             $fileUniqueId,
             (int) $uploader['id'],
             $adminChatMessageId,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $uploader
+     * @param array<string, mixed> $targetMaterial
+     */
+    public function replaceNotesFile(
+        array $uploader,
+        array $targetMaterial,
+        string $fileId,
+        string $fileUniqueId,
+        ?int $adminChatMessageId,
+    ): void {
+        $this->materials->archiveById((int) $targetMaterial['id']);
+        $this->materials->insert(
+            (int) $targetMaterial['song_id'],
+            MaterialType::NOTES,
+            null,
+            $fileId,
+            $fileUniqueId,
+            (int) $uploader['id'],
+            $adminChatMessageId,
+            true,
         );
     }
 

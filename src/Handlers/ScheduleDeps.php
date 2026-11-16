@@ -13,6 +13,7 @@ use App\Repositories\UserRepository;
 use App\Services\ScheduleBroadcastService;
 use App\Services\ScheduleGenerator;
 use App\Services\SchedulePresenter;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 
 final class ScheduleDeps
@@ -28,6 +29,7 @@ final class ScheduleDeps
         public readonly ScheduleBroadcastService $broadcast,
         public readonly UserRepository $users,
         public readonly TextRepository $texts,
+        public readonly InteractiveMenuService $interactiveMenus,
     ) {
     }
 }

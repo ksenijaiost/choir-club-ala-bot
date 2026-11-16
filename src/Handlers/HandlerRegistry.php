@@ -16,6 +16,7 @@ use App\Repositories\SongRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserFlowRepository;
+use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AdminChatResolver;
@@ -35,6 +36,7 @@ use App\Services\PaymentTexts;
 use App\Services\ScheduleBroadcastService;
 use App\Services\ScheduleGenerator;
 use App\Services\SchedulePresenter;
+use App\Telegram\InteractiveMenuService;
 use App\Telegram\NutgramOutbound;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -54,6 +56,7 @@ final class HandlerRegistry
         $templates = new ScheduleTemplateRepository($pdo);
         $rehearsals = new RehearsalRepository($pdo);
         $flows = new UserFlowRepository($pdo);
+        $interactiveMenus = new InteractiveMenuService(new UserOpenMenuRepository($pdo));
         $generator = new ScheduleGenerator($templates, $rehearsals, $settings);
         $presenter = new SchedulePresenter($rehearsals, $texts);
         $broadcast = new ScheduleBroadcastService($users, $texts);
@@ -69,6 +72,7 @@ final class HandlerRegistry
             $broadcast,
             $users,
             $texts,
+            $interactiveMenus,
         );
 
         $marks = new AttendanceMarkRepository($pdo);
@@ -91,6 +95,7 @@ final class HandlerRegistry
             $settings,
             $flows,
             new PaymentReminderTextService($settings, $texts, $paymentTexts),
+            $interactiveMenus,
         );
 
         $songRepo = new SongRepository($pdo);
@@ -104,6 +109,7 @@ final class HandlerRegistry
             new MaterialsService($materialRepo, $songRepo, $texts),
             new SongDeliveryService($materialRepo, $texts, new MaterialsService($materialRepo, $songRepo, $texts)),
             $texts,
+            $interactiveMenus,
         );
 
         $rolePresenter = new UserRolePresenter($texts);
@@ -116,9 +122,10 @@ final class HandlerRegistry
             new AttendanceHistoryPresenter($texts),
             new PaymentTexts($texts),
             $rolePresenter,
+            $interactiveMenus,
         );
 
-        $adminChat = new AdminChatDeps($config, $settings, $adminChatResolver, $flows, $texts);
+        $adminChat = new AdminChatDeps($config, $settings, $adminChatResolver, $flows, $texts, $interactiveMenus);
 
         $attendance = new AttendanceDeps(
             $config,
@@ -133,6 +140,7 @@ final class HandlerRegistry
             new AttendanceHistoryPresenter($texts),
             $texts,
             new CheckInSessionRepository($pdo),
+            $interactiveMenus,
         );
 
         CallbackQueryHandler::register(
@@ -149,13 +157,14 @@ final class HandlerRegistry
             $materials,
             $adminHistory,
             $adminChat,
+            $interactiveMenus,
         );
         MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
         AdminChatCommandHandler::register($bot, $texts, $access, $users, $songRepo, $materialRepo);
-        StartHandler::register($bot, $texts, $users, $access);
-        ConductorAdminHandler::register($bot, $texts, $users, $access);
-        HelpersAdminHandler::register($bot, $texts, $users, $access);
-        MembersAdminHandler::register($bot, $texts, $users, $access, $blockService);
+        StartHandler::register($bot, $texts, $users, $access, $interactiveMenus);
+        ConductorAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);
+        HelpersAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);
+        MembersAdminHandler::register($bot, $texts, $users, $access, $blockService, $interactiveMenus);
         MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat);
     }
 }

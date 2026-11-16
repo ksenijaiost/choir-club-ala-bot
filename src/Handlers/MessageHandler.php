@@ -138,11 +138,21 @@ final class MessageHandler
                     return;
                 }
 
-                if ($materials !== null && $telegramId !== null && ProfileHandler::handleFlowMessage(
+                if ($telegramId !== null && ProfileHandler::handleFlowMessage(
                     $bot,
                     $texts,
                     $users,
-                    $materials->flows,
+                    $schedule->flows,
+                    $telegramId,
+                    $text,
+                    $schedule->interactiveMenus,
+                )) {
+                    return;
+                }
+
+                if ($materials !== null && $telegramId !== null && MaterialsFlowHandler::handleFlowMessage(
+                    $bot,
+                    $materials,
                     $telegramId,
                     $text,
                 )) {
@@ -271,19 +281,19 @@ final class MessageHandler
         }
 
         if ($text === $texts->get('menu.admin_helpers')) {
-            HelpersAdminHandler::openHelpersUi($bot, $texts, $users, $access, $user);
+            HelpersAdminHandler::openHelpersUi($bot, $texts, $users, $access, $user, $schedule->interactiveMenus);
 
             return;
         }
 
         if ($text === $texts->get('menu.assign_conductor')) {
-            ConductorAdminHandler::openConductorPicker($bot, $texts, $users, $access, $user);
+            ConductorAdminHandler::openConductorPicker($bot, $texts, $users, $access, $user, $schedule->interactiveMenus);
 
             return;
         }
 
         if ($text === $texts->get('menu.admin_members')) {
-            MembersAdminHandler::openFilterUi($bot, $texts, $access, $user);
+            MembersAdminHandler::openFilterUi($bot, $texts, $access, $user, $schedule->interactiveMenus);
 
             return;
         }
@@ -307,13 +317,13 @@ final class MessageHandler
         }
 
         if ($text === $texts->get('menu.admin_schedule')) {
-            ScheduleAdminHandler::openAdminHome($bot, $texts, $access, $user);
+            ScheduleAdminHandler::openAdminHome($bot, $schedule, $access, $user);
 
             return;
         }
 
         if ($text === $texts->get('menu.admin_attendance')) {
-            AttendanceAdminHandler::openHome($bot, $texts, $access, $user);
+            AttendanceAdminHandler::openHome($bot, $attendance, $access, $user);
 
             return;
         }
@@ -349,13 +359,13 @@ final class MessageHandler
         }
 
         if ($text === $texts->get('menu.my_profile')) {
-            ProfileHandler::openProfile($bot, $texts, $users, $user);
+            ProfileHandler::openProfile($bot, $texts, $users, $user, $schedule->interactiveMenus);
 
             return;
         }
 
         if ($text === $texts->get('menu.about_bot')) {
-            AboutBotHandler::openHome($bot, $texts, $access, $user);
+            AboutBotHandler::openHome($bot, $texts, $access, $user, $schedule->interactiveMenus);
 
             return;
         }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
+
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -66,14 +69,37 @@ final class AdminChatCommandsTest extends TestCase
 
         self::assertStringContainsString('Аве Мария', $body);
         self::assertStringContainsString('ноты ✅', $body);
-        self::assertStringContainsString('транслит ✅', $body);
+        self::assertStringContainsString('заметки ✅', $body);
         self::assertStringContainsString('записи: 2 шт.', $body);
         self::assertStringContainsString('Сопрано 1', $body);
         self::assertStringContainsString('Бас', $body);
         self::assertStringContainsString('Благослови', $body);
-        self::assertStringContainsString('транслит ❌', $body);
+        self::assertStringContainsString('заметки ❌', $body);
         self::assertStringContainsString('записей нет', $body);
         self::assertStringContainsString('Гимн', $body);
+    }
+
+    public function testSongsListShowsMultipleNotesCount(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $pdo = Connection::make($this->testConfig());
+        (new Migrator($pdo, 'sqlite'))->migrate();
+
+        $users = new UserRepository($pdo);
+        $uploaderId = $users->create(self::ADMIN_TG, 'Админ', 'tenor', UserRole::ADMIN, UserStatus::ACTIVE);
+
+        $songs = new SongRepository($pdo);
+        $materials = new MaterialRepository($pdo);
+        $songId = $songs->create('Две страницы');
+
+        $materials->insert($songId, MaterialType::NOTES, null, 'f1', 'u1', $uploaderId, null, true);
+        $materials->insert($songId, MaterialType::NOTES, null, 'f2', 'u2', $uploaderId, null, true);
+
+        $presenter = new AdminChatSongListPresenter($songs, $materials, $texts);
+        $body = implode("\n", $presenter->buildMessageChunks());
+
+        self::assertStringContainsString('Две страницы', $body);
+        self::assertStringContainsString('ноты 2 шт.', $body);
     }
 
     public function testSongsEmptyList(): void
@@ -130,11 +156,13 @@ final class AdminChatCommandsTest extends TestCase
         $presenter = new AdminChatMemberListPresenter($users, $texts, new UserRolePresenter($texts));
         $body = implode("\n", $presenter->buildMessageChunks());
 
-        self::assertStringContainsString('Дирижёр: Надима @nadima', $body);
+        self::assertStringContainsString('Дирижёр:', $body);
+        self::assertStringContainsString('tg://user?id=91100', $body);
+        self::assertStringContainsString('https://t.me/nadima', $body);
         self::assertStringContainsString('Сопрано 1:', $body);
-        self::assertStringContainsString('• Сопран', $body);
-        self::assertStringContainsString('техспец', mb_strtolower($body));
-        self::assertStringContainsString('@owner_k', $body);
+        self::assertStringContainsString('• ', $body);
+        self::assertStringContainsString('tg://user?id=91102', $body);
+        self::assertStringContainsString('https://t.me/owner_k', $body);
         self::assertStringContainsString('Без партии:', $body);
         self::assertStringNotContainsString('Ждёт', $body);
         self::assertStringContainsString('ожидают регистрации — 1', $body);
@@ -287,6 +315,7 @@ final class AdminChatCommandsTest extends TestCase
             $users,
             $access,
             new MemberBlockService($users, new BlockEventRepository($pdo)),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 

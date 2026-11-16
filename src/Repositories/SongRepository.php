@@ -31,6 +31,50 @@ final class SongRepository
     /**
      * @return array<string, mixed>|null
      */
+    public function findByNormalizedTitle(string $title, ?int $excludeSongId = null): ?array
+    {
+        $normalized = self::normalizeTitle($title);
+        if ($excludeSongId !== null) {
+            $stmt = $this->pdo->prepare(
+                'SELECT * FROM songs WHERE title_normalized = ? AND id != ? LIMIT 1'
+            );
+            $stmt->execute([$normalized, $excludeSongId]);
+        } else {
+            $stmt = $this->pdo->prepare('SELECT * FROM songs WHERE title_normalized = ? LIMIT 1');
+            $stmt->execute([$normalized]);
+        }
+
+        $row = $stmt->fetch();
+
+        return $row === false ? null : $row;
+    }
+
+    /**
+     * @return 'ok'|'duplicate'|'not_found'
+     */
+    public function rename(int $songId, string $newTitle): string
+    {
+        $song = $this->findById($songId);
+        if ($song === null) {
+            return 'not_found';
+        }
+
+        $trimmed = trim($newTitle);
+        if ($this->findByNormalizedTitle($trimmed, $songId) !== null) {
+            return 'duplicate';
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE songs SET title = ?, title_normalized = ? WHERE id = ?'
+        );
+        $stmt->execute([$trimmed, self::normalizeTitle($trimmed), $songId]);
+
+        return 'ok';
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
     public function findById(int $id): ?array
     {
         $stmt = $this->pdo->prepare('SELECT * FROM songs WHERE id = ? LIMIT 1');
@@ -120,16 +164,14 @@ final class SongRepository
     }
 
     /**
-     * @return list<array{id: int, title: string, has_notes: int, has_translit: int}>
+     * @return list<array{id: int, title: string, notes_count: int, has_translit: int}>
      */
     public function listAllWithCurrentSingletonFlags(): array
     {
         $stmt = $this->pdo->prepare(
             'SELECT s.id, s.title,
-                EXISTS(
-                    SELECT 1 FROM materials m
-                    WHERE m.song_id = s.id AND m.type = ? AND m.is_current = 1
-                ) AS has_notes,
+                (SELECT COUNT(*) FROM materials m
+                    WHERE m.song_id = s.id AND m.type = ? AND m.is_current = 1) AS notes_count,
                 EXISTS(
                     SELECT 1 FROM materials m
                     WHERE m.song_id = s.id AND m.type = ? AND m.is_current = 1
@@ -149,7 +191,7 @@ final class SongRepository
             return [
                 'id' => (int) $row['id'],
                 'title' => (string) $row['title'],
-                'has_notes' => (int) $row['has_notes'],
+                'notes_count' => (int) $row['notes_count'],
                 'has_translit' => (int) $row['has_translit'],
             ];
         }, $rows);

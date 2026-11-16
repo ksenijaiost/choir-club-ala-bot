@@ -207,6 +207,50 @@ final class MaterialsCallbackHandler
             return true;
         }
 
+        if (preg_match('/^mat:up:tr:(end|begin|repl)$/', $data, $m) === 1) {
+            $telegramId = (int) $actor['telegram_id'];
+            $state = $deps->flows->get($telegramId);
+            if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $ctx = $state['context'];
+            $ctx['text_notes_mode'] = match ($m[1]) {
+                'end' => 'append_end',
+                'begin' => 'append_start',
+                default => 'replace',
+            };
+            $ctx['step'] = 'save';
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
+            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+
+            return true;
+        }
+
+        if ($data === 'mat:up:nt:add' || $data === 'mat:up:nt:all') {
+            $telegramId = (int) $actor['telegram_id'];
+            $state = $deps->flows->get($telegramId);
+            if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $ctx = $state['context'];
+            $ctx['notes_mode'] = $data === 'mat:up:nt:add' ? 'add' : 'replace_all';
+            $ctx['step'] = 'save';
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
+            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+
+            return true;
+        }
+
         if (preg_match('/^mat:mg:pg:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
@@ -218,7 +262,45 @@ final class MaterialsCallbackHandler
         if (preg_match('/^mat:mg:sn:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            self::sendRecordingPartPicker($bot, $deps, (int) $m[1]);
+            self::sendSongManageMenu($bot, $deps, (int) $m[1]);
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:ren:(\d+)$/', $data, $m) === 1) {
+            $songId = (int) $m[1];
+            $song = $deps->songs->findById($songId);
+            if ($song === null) {
+                $bot->answerCallbackQuery(text: $deps->texts->get('errors.generic'), show_alert: true);
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $deps->flows->set((int) $actor['telegram_id'], 'material_rename', ['song_id' => $songId]);
+            $keyboard = InlineMenuHelper::appendFooter(
+                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make(),
+                $deps->texts,
+                'mat:mg:sn:' . $songId,
+            );
+            $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+            InlineMenuHelper::sendInteractiveMenu(
+                $bot,
+                $deps->interactiveMenus,
+                $ownerTelegramId,
+                $deps->texts->get('materials.rename_prompt'),
+                $keyboard,
+                $bot->chatId() ?? $ownerTelegramId,
+            );
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:nt:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendNotesList($bot, $deps, (int) $m[1]);
 
             return true;
         }
@@ -234,15 +316,23 @@ final class MaterialsCallbackHandler
         if (preg_match('/^mat:mg:del:(\d+)$/', $data, $m) === 1) {
             $id = (int) $m[1];
             $material = $deps->materials->findById($id);
-            if ($material === null || ($material['type'] ?? '') !== MaterialType::RECORDING) {
+            $type = (string) ($material['type'] ?? '');
+            if ($material === null || !in_array($type, [MaterialType::RECORDING, MaterialType::NOTES], true)) {
                 $bot->answerCallbackQuery(text: $deps->texts->get('errors.generic'), show_alert: true);
 
                 return true;
             }
 
+            $songId = (int) $material['song_id'];
             $deps->materials->archiveById($id);
-            $bot->answerCallbackQuery(text: $deps->texts->get('materials.recording_deleted'));
+            $deletedText = $type === MaterialType::NOTES
+                ? $deps->texts->get('materials.notes_deleted')
+                : $deps->texts->get('materials.recording_deleted');
+            $bot->answerCallbackQuery(text: $deletedText);
             CallbackUi::clearKeyboard($bot);
+            if ($type === MaterialType::NOTES) {
+                self::sendNotesList($bot, $deps, $songId);
+            }
 
             return true;
         }
@@ -250,7 +340,8 @@ final class MaterialsCallbackHandler
         if (preg_match('/^mat:mg:rp:(\d+)$/', $data, $m) === 1) {
             $id = (int) $m[1];
             $material = $deps->materials->findById($id);
-            if ($material === null || ($material['type'] ?? '') !== MaterialType::RECORDING) {
+            $type = (string) ($material['type'] ?? '');
+            if ($material === null || !in_array($type, [MaterialType::RECORDING, MaterialType::NOTES], true)) {
                 $bot->answerCallbackQuery(text: $deps->texts->get('errors.generic'), show_alert: true);
 
                 return true;
@@ -261,7 +352,10 @@ final class MaterialsCallbackHandler
             $deps->flows->set((int) $actor['telegram_id'], 'material_replace_recording', [
                 'material_id' => $id,
             ]);
-            $bot->sendMessage($deps->texts->get('materials.replace_upload_hint'));
+            $hint = $type === MaterialType::NOTES
+                ? $deps->texts->get('materials.replace_notes_hint')
+                : $deps->texts->get('materials.replace_upload_hint');
+            $bot->sendMessage($hint);
 
             return true;
         }
@@ -312,10 +406,18 @@ final class MaterialsCallbackHandler
             'mat:mg:pg:',
         );
 
-        $bot->sendMessage($deps->texts->get('materials.manage_pick_song'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $deps->texts->get('materials.manage_pick_song'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
-    private static function sendRecordingPartPicker(Nutgram $bot, MaterialsDeps $deps, int $songId): void
+    private static function sendSongManageMenu(Nutgram $bot, MaterialsDeps $deps, int $songId): void
     {
         $song = $deps->songs->findById($songId);
         if ($song === null) {
@@ -324,7 +426,21 @@ final class MaterialsCallbackHandler
             return;
         }
 
-        $keyboard = \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make();
+        $notesCount = $deps->materials->countCurrentNotes($songId);
+        $keyboard = \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make()
+            ->addRow(
+                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
+                    $deps->texts->get('buttons.rename_song'),
+                    callback_data: 'mat:mg:ren:' . $songId,
+                ),
+            )
+            ->addRow(
+                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
+                    $deps->texts->get('materials.manage_notes_button', ['count' => (string) $notesCount]),
+                    callback_data: 'mat:mg:nt:' . $songId,
+                ),
+            );
+
         foreach ($deps->materials->listPartsWithRecordingsForSong($songId) as $code) {
             $count = $deps->materials->countRecordingsForPart($songId, $code);
             $keyboard = $keyboard->addRow(
@@ -337,9 +453,69 @@ final class MaterialsCallbackHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:mg:pg:0');
 
-        $bot->sendMessage(
-            $deps->texts->get('materials.manage_pick_part', ['title' => (string) $song['title']]),
-            reply_markup: $keyboard,
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $deps->texts->get('materials.manage_song_menu', ['title' => (string) $song['title']]),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
+    }
+
+    private static function sendNotesList(Nutgram $bot, MaterialsDeps $deps, int $songId): void
+    {
+        $song = $deps->songs->findById($songId);
+        if ($song === null) {
+            $bot->sendMessage($deps->texts->get('errors.generic'));
+
+            return;
+        }
+
+        $rows = $deps->materials->listCurrentNotes($songId);
+        if ($rows === []) {
+            $bot->sendMessage($deps->texts->get('materials.notes_list_empty'));
+
+            return;
+        }
+
+        $lines = [
+            $deps->texts->get('materials.notes_list_header', ['title' => (string) $song['title']]),
+        ];
+
+        $keyboard = \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make();
+        $index = 1;
+        foreach ($rows as $row) {
+            $id = (int) $row['id'];
+            $lines[] = $index . '. ' . ($row['uploaded_at'] ?? '');
+            $keyboard = $keyboard->addRow(
+                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
+                    '✏️ #' . $index,
+                    callback_data: 'mat:mg:rp:' . $id,
+                ),
+                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
+                    '🗑 #' . $index,
+                    callback_data: 'mat:mg:del:' . $id,
+                ),
+            );
+            $index++;
+        }
+
+        $keyboard = InlineMenuHelper::appendFooter(
+            $keyboard,
+            $deps->texts,
+            'mat:mg:sn:' . $songId,
+        );
+
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
         );
     }
 
@@ -395,6 +571,14 @@ final class MaterialsCallbackHandler
             'mat:mg:sn:' . $songId,
         );
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 }

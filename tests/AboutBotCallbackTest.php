@@ -80,7 +80,7 @@ final class AboutBotCallbackTest extends TestCase
             ->assertReplyText($pickSection, index: 1);
     }
 
-    public function testAboutCloseCallbackShowsMenuClosed(): void
+    public function testAboutCloseCallbackDeletesMenuMessage(): void
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $config = $this->testConfig();
@@ -93,12 +93,11 @@ final class AboutBotCallbackTest extends TestCase
         $bot = $this->fakePrivateBot(self::OWNER_TG);
         HandlerRegistry::register($bot, $texts, $config, $pdo);
 
-        $closed = $texts->get('ui.menu_closed');
-
         $bot->hearCallbackQueryData(InlineMenuHelper::CLOSE_CALLBACK)
             ->willStartConversation()
             ->reply()
-            ->assertReplyText($closed, index: 1);
+            ->assertCalled('answerCallbackQuery')
+            ->assertCalled('deleteMessage');
     }
 
     private function fakePrivateBot(int $telegramId): Nutgram

@@ -46,7 +46,15 @@ final class PaymentAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts);
 
-        $bot->sendMessage($deps->texts->get('payment.admin_pick_month'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $deps->texts->get('payment.admin_pick_month'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     public static function handleCallback(
@@ -157,7 +165,15 @@ final class PaymentAdminHandler
             'pay:adm:home',
         );
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     /**

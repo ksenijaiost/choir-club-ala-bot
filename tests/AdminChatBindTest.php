@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -31,7 +33,7 @@ final class AdminChatBindTest extends TestCase
         $settings = new BotSettingsRepository($pdo);
         $flows = new UserFlowRepository($pdo);
         $resolver = new AdminChatResolver($settings, $config);
-        $deps = new AdminChatDeps($config, $settings, $resolver, $flows, $texts);
+        $deps = new AdminChatDeps($config, $settings, $resolver, $flows, $texts, new InteractiveMenuService(new UserOpenMenuRepository($pdo)));
 
         $bot = Nutgram::fake();
         $bot->willReceivePartial([

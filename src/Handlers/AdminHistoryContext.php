@@ -11,6 +11,7 @@ use App\Repositories\UserRepository;
 use App\Services\AttendanceHistoryPresenter;
 use App\Services\PaymentTexts;
 use App\Services\UserRolePresenter;
+use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 
 final class AdminHistoryContext
@@ -24,6 +25,7 @@ final class AdminHistoryContext
         public readonly AttendanceHistoryPresenter $history,
         public readonly PaymentTexts $paymentTexts,
         public readonly UserRolePresenter $roles,
+        public readonly InteractiveMenuService $interactiveMenus,
     ) {
     }
 }

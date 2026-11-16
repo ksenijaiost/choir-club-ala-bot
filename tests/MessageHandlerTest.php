@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repositories\UserOpenMenuRepository;
+use App\Telegram\InteractiveMenuService;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -126,6 +128,11 @@ final class MessageHandlerTest extends TestCase
         return $chat;
     }
 
+    private function interactiveMenus(\PDO $pdo): InteractiveMenuService
+    {
+        return new InteractiveMenuService(new UserOpenMenuRepository($pdo));
+    }
+
     private function testConfig(): Config
     {
         return new Config(
@@ -172,6 +179,7 @@ final class MessageHandlerTest extends TestCase
             $broadcast,
             $users,
             $texts,
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 
@@ -197,6 +205,7 @@ final class MessageHandlerTest extends TestCase
             $settings,
             $flows,
             new \App\Services\PaymentReminderTextService($settings, $texts, $paymentTexts),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 
@@ -229,6 +238,7 @@ final class MessageHandlerTest extends TestCase
             new AttendanceHistoryPresenter($texts),
             $texts,
             new CheckInSessionRepository($pdo),
+                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 }

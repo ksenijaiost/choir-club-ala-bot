@@ -21,8 +21,9 @@ final class AttendanceAdminHandler
     /**
      * @param array<string, mixed> $actor
      */
-    public static function openHome(Nutgram $bot, TextRepository $texts, AccessControl $access, array $actor): void
+    public static function openHome(Nutgram $bot, AttendanceDeps $deps, AccessControl $access, array $actor): void
     {
+        $texts = $deps->texts;
         if (!$access->hasConductorPrivileges($actor)) {
             $bot->sendMessage($texts->get('admin.only_conductor_or_owner'));
 
@@ -37,7 +38,15 @@ final class AttendanceAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
-        $bot->sendMessage($texts->get('attendance.admin_home'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('attendance.admin_home'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     /**
@@ -194,7 +203,15 @@ final class AttendanceAdminHandler
             'atd:rh:pg:',
         );
 
-        $bot->sendMessage($texts->get('attendance.rehearsal_pick'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('attendance.rehearsal_pick'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     private static function sendRehearsalAttendance(
@@ -254,7 +271,15 @@ final class AttendanceAdminHandler
             'atd:rh',
         );
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     private static function sendMarkPicker(
@@ -291,9 +316,14 @@ final class AttendanceAdminHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'atd:rhp:' . $rehearsalId . ':0');
 
-        $bot->sendMessage(
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
             $texts->get('attendance.manual_pick', ['name' => (string) ($user['display_name'] ?? '')]),
-            reply_markup: $keyboard,
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
         );
     }
 
@@ -353,7 +383,15 @@ final class AttendanceAdminHandler
             'atd:ms:pg:',
         );
 
-        $bot->sendMessage($texts->get('attendance.member_pick'), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $texts->get('attendance.member_pick'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 
     private static function sendMemberHistory(
@@ -392,6 +430,14 @@ final class AttendanceAdminHandler
             'atd:ms',
         );
 
-        $bot->sendMessage(implode("\n", $lines), reply_markup: $keyboard);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
     }
 }
