@@ -9,6 +9,8 @@ use App\Services\VoicePartRules;
 use App\Domain\VoicePart;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Services\AdminChatCommandMessenger;
+use App\Services\AdminChatMemberListPresenter;
 use App\Services\MemberBlockService;
 use App\Services\UserRolePresenter;
 use App\Telegram\CallbackUi;
@@ -29,6 +31,19 @@ final class MembersAdminHandler
         MemberBlockService $blocks,
     ): void {
         $bot->onCommand('members', function (Nutgram $bot) use ($texts, $users, $access): void {
+            $chatId = $bot->chatId();
+            if ($chatId !== null && $access->isAdminChatId($chatId)) {
+                $user = AdminChatCommandHandler::resolveActor($bot, $access, $users);
+                if ($user === null || !$access->hasConductorPrivileges($user)) {
+                    return;
+                }
+
+                $presenter = new AdminChatMemberListPresenter($users, $texts, new UserRolePresenter($texts));
+                AdminChatCommandMessenger::sendChunks($bot, (int) $chatId, $presenter->buildMessageChunks());
+
+                return;
+            }
+
             $telegramId = $bot->userId();
             if ($telegramId === null) {
                 return;

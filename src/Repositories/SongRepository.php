@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Domain\MaterialType;
 use App\Support\SqlPagination;
 
 final class SongRepository
@@ -116,5 +117,41 @@ final class SongRepository
         $stmt->execute();
 
         return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * @return list<array{id: int, title: string, has_notes: int, has_translit: int}>
+     */
+    public function listAllWithCurrentSingletonFlags(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT s.id, s.title,
+                EXISTS(
+                    SELECT 1 FROM materials m
+                    WHERE m.song_id = s.id AND m.type = ? AND m.is_current = 1
+                ) AS has_notes,
+                EXISTS(
+                    SELECT 1 FROM materials m
+                    WHERE m.song_id = s.id AND m.type = ? AND m.is_current = 1
+                      AND (
+                        (m.text_content IS NOT NULL AND TRIM(m.text_content) <> \'\')
+                        OR (m.telegram_file_id IS NOT NULL AND TRIM(m.telegram_file_id) <> \'\')
+                      )
+                ) AS has_translit
+             FROM songs s
+             ORDER BY s.title_normalized ASC'
+        );
+        $stmt->execute([MaterialType::NOTES, MaterialType::TRANSLIT]);
+
+        $rows = $stmt->fetchAll() ?: [];
+
+        return array_map(static function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'title' => (string) $row['title'],
+                'has_notes' => (int) $row['has_notes'],
+                'has_translit' => (int) $row['has_translit'],
+            ];
+        }, $rows);
     }
 }

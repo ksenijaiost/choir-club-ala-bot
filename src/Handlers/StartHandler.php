@@ -51,6 +51,11 @@ final class StartHandler
                 return;
             }
 
+            $username = $bot->user()?->username;
+            if ($username !== null && trim($username) !== '') {
+                $users->updateTelegramUsername((int) $user['id'], $username);
+            }
+
             self::respondByStatus($bot, $texts, $user);
         });
     }

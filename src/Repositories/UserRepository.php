@@ -53,6 +53,19 @@ final class UserRepository
         $stmt->execute([$displayName, $userId]);
     }
 
+    public function updateTelegramUsername(int $userId, ?string $username): void
+    {
+        $normalized = $username !== null ? trim($username) : null;
+        if ($normalized === '') {
+            $normalized = null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE users SET telegram_username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        );
+        $stmt->execute([$normalized, $userId]);
+    }
+
     public function updateVoicePart(int $userId, string $voicePart): void
     {
         $this->setVoicePart($userId, $voicePart);
@@ -339,5 +352,46 @@ final class UserRepository
         $stmt->execute($params);
 
         return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * Активные участники хора для отчёта в админ-чате.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listActiveChoirRoster(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM users WHERE status = ? AND role IN (?, ?, ?, ?) ORDER BY display_name ASC'
+        );
+        $stmt->execute([
+            UserStatus::ACTIVE,
+            UserRole::MEMBER,
+            UserRole::ADMIN,
+            UserRole::OWNER,
+            UserRole::CONDUCTOR,
+        ]);
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function countChoirUsersByStatus(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT status, COUNT(*) AS cnt FROM users
+             WHERE role IN (?, ?, ?, ?)
+             GROUP BY status'
+        );
+        $stmt->execute([UserRole::MEMBER, UserRole::ADMIN, UserRole::OWNER, UserRole::CONDUCTOR]);
+
+        $out = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            $out[(string) $row['status']] = (int) $row['cnt'];
+        }
+
+        return $out;
     }
 }
