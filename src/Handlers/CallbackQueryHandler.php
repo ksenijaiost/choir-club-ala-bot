@@ -241,7 +241,11 @@ final class CallbackQueryHandler
 
         $user = $users->findByTelegramId($actorTelegramId);
         if ($user === null || ($user['status'] ?? '') !== UserStatus::PENDING) {
-            $bot->answerCallbackQuery();
+            if ($user !== null && ($user['role'] ?? '') === \App\Domain\UserRole::CONDUCTOR) {
+                $bot->answerCallbackQuery(text: $texts->get('profile.conductor_no_part'), show_alert: true);
+            } else {
+                $bot->answerCallbackQuery();
+            }
 
             return;
         }

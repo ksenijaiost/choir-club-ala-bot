@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Domain\VoicePart;
+use App\Services\VoicePartRules;
 use App\Services\SongDeliveryService;
 use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
@@ -100,12 +101,21 @@ final class SongMemberHandler
         string $partCode,
         int $page,
     ): void {
-        $songs = $deps->materials->listSongsWithRecordingsForPart($partCode);
-        $partLabel = $deps->texts->get('parts.' . $partCode);
+        $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
+        $songs = $allParts
+            ? $deps->materials->listSongsWithRecordingsAnyPart()
+            : $deps->materials->listSongsWithRecordingsForPart($partCode);
+        $partLabel = $allParts
+            ? $deps->texts->get('songs.my_recordings_header_all')
+            : $deps->texts->get('parts.' . $partCode);
         $total = count($songs);
 
         if ($total === 0) {
-            $bot->sendMessage($deps->texts->get('songs.my_recordings_empty', ['part' => $partLabel]));
+            if ($allParts) {
+                $bot->sendMessage($deps->texts->get('songs.my_recordings_empty', ['part' => $partLabel]));
+            } else {
+                $bot->sendMessage($deps->texts->get('songs.my_recordings_empty', ['part' => $partLabel]));
+            }
 
             return;
         }
@@ -132,10 +142,12 @@ final class SongMemberHandler
             'snd:my:pg:' . $partCode . ':',
         );
 
-        $bot->sendMessage(
-            $deps->texts->get('songs.my_recordings_header', ['part' => $partLabel]),
-            reply_markup: $keyboard,
-        );
+        $headerKey = $allParts ? 'songs.my_recordings_header_all' : 'songs.my_recordings_header';
+        $header = $allParts
+            ? $deps->texts->get($headerKey)
+            : $deps->texts->get($headerKey, ['part' => $partLabel]);
+
+        $bot->sendMessage($header, reply_markup: $keyboard);
     }
 
     public static function handleFlowMessage(
@@ -186,6 +198,12 @@ final class SongMemberHandler
         SongDeliveryService $delivery,
         array $user,
     ): void {
+        if (VoicePartRules::isConductor($user)) {
+            self::sendMyRecordingsPage($bot, $deps, VoicePartRules::RECORDINGS_ALL_PARTS, 0);
+
+            return;
+        }
+
         $partCode = (string) ($user['voice_part'] ?? '');
         if ($partCode === '' || !VoicePart::isValid($partCode)) {
             $bot->sendMessage($deps->texts->get('songs.my_recordings_need_part'));

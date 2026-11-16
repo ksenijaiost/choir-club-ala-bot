@@ -94,6 +94,10 @@ final class StartHandler
         }
 
         if ($status === UserStatus::ACTIVE) {
+            if (ProfileHandler::promptMissingVoicePartIfNeeded($bot, $texts, $user)) {
+                return;
+            }
+
             $name = (string) ($user['display_name'] ?? '');
             $bot->sendMessage(
                 text: $texts->get('registration.already_registered', ['name' => $name]),
@@ -111,8 +115,10 @@ final class StartHandler
             return true;
         }
 
-        $part = $user['voice_part'] ?? null;
+        if (($user['role'] ?? '') === UserRole::CONDUCTOR) {
+            return false;
+        }
 
-        return $part === null || $part === '';
+        return !\App\Services\VoicePartRules::hasAssignedVoicePart($user);
     }
 }

@@ -8,6 +8,7 @@ use App\Domain\UserRole;
 use App\Domain\VoicePart;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
+use App\Services\VoicePartRules;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuKeyboard;
@@ -25,31 +26,39 @@ final class ProfileHandler
     public static function openProfile(Nutgram $bot, TextRepository $texts, UserRepository $users, array $user): void
     {
         $fresh = $users->findById((int) $user['id']) ?? $user;
-        $partCode = (string) ($fresh['voice_part'] ?? '');
-        $partLabel = $partCode !== '' && VoicePart::isValid($partCode)
-            ? $texts->get('parts.' . $partCode)
-            : $texts->get('profile.part_none');
+        $isConductor = VoicePartRules::isConductor($fresh);
 
-        $keyboard = InlineKeyboardMarkup::make()
-            ->addRow(
-                InlineKeyboardButton::make(
-                    $texts->get('profile.change_name'),
-                    callback_data: 'prf:nm',
-                ),
+        $keyboard = InlineKeyboardMarkup::make()->addRow(
+            InlineKeyboardButton::make(
+                $texts->get('profile.change_name'),
+                callback_data: 'prf:nm',
+            ),
+        );
+
+        if (!$isConductor) {
+            $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
                     $texts->get('profile.change_part'),
                     callback_data: 'prf:ch',
                 ),
             );
+        }
+
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
-        $bot->sendMessage(
-            $texts->get('profile.card', [
+        if ($isConductor) {
+            $body = $texts->get('profile.card_conductor', [
+                'name' => (string) ($fresh['display_name'] ?? ''),
+            ]);
+        } else {
+            $partLabel = VoicePartRules::partLabelForDisplay($texts, $fresh) ?? $texts->get('profile.part_none');
+            $body = $texts->get('profile.card', [
                 'name' => (string) ($fresh['display_name'] ?? ''),
                 'part' => $partLabel,
-            ]),
-            reply_markup: $keyboard,
-        );
+            ]);
+        }
+
+        $bot->sendMessage($body, reply_markup: $keyboard);
     }
 
     /**
@@ -57,17 +66,28 @@ final class ProfileHandler
      */
     public static function promptOwnerPartIfNeeded(Nutgram $bot, TextRepository $texts, array $user): bool
     {
-        if (($user['role'] ?? '') !== UserRole::OWNER) {
+        return self::promptMissingVoicePartIfNeeded($bot, $texts, $user);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public static function promptMissingVoicePartIfNeeded(Nutgram $bot, TextRepository $texts, array $user): bool
+    {
+        if (!VoicePartRules::requiresAssignedVoicePart($user)) {
             return false;
         }
 
-        $part = $user['voice_part'] ?? null;
-        if ($part !== null && $part !== '') {
+        if (VoicePartRules::hasAssignedVoicePart($user)) {
             return false;
         }
+
+        $prompt = ($user['role'] ?? '') === UserRole::OWNER
+            ? $texts->get('profile.owner_ask_part')
+            : $texts->get('profile.ask_part_required');
 
         $bot->sendMessage(
-            $texts->get('profile.owner_ask_part'),
+            $prompt,
             reply_markup: PartKeyboard::profile($texts, $user),
         );
 
@@ -79,6 +99,12 @@ final class ProfileHandler
      */
     public static function sendPartPicker(Nutgram $bot, TextRepository $texts, array $user): void
     {
+        if (VoicePartRules::isConductor($user)) {
+            $bot->sendMessage($texts->get('profile.conductor_no_part'));
+
+            return;
+        }
+
         $bot->sendMessage(
             $texts->get('profile.pick_part'),
             reply_markup: PartKeyboard::profile($texts, $user),
@@ -152,6 +178,12 @@ final class ProfileHandler
             return true;
         }
 
+        if (VoicePartRules::isConductor($user) && (str_starts_with($data, 'prf:pt:') || $data === 'prf:ch')) {
+            $bot->answerCallbackQuery(text: $texts->get('profile.conductor_no_part'), show_alert: true);
+
+            return true;
+        }
+
         if ($data === 'prf:nm') {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
@@ -169,21 +201,7 @@ final class ProfileHandler
         }
 
         if ($data === 'prf:pt:none') {
-            $role = (string) ($user['role'] ?? '');
-            if (!in_array($role, [UserRole::OWNER, UserRole::CONDUCTOR], true)) {
-                $bot->answerCallbackQuery(text: $texts->get('errors.generic'), show_alert: true);
-
-                return true;
-            }
-
-            $users->setVoicePart((int) $user['id'], null);
-            $bot->answerCallbackQuery(text: $texts->get('profile.part_saved'));
-            CallbackUi::clearKeyboard($bot);
-            $user = $users->findById((int) $user['id']) ?? $user;
-            $bot->sendMessage(
-                $texts->get('profile.part_updated', ['part' => $texts->get('profile.part_none')]),
-                reply_markup: MenuKeyboard::forUser($texts, $user),
-            );
+            $bot->answerCallbackQuery(text: $texts->get('errors.generic'), show_alert: true);
 
             return true;
         }

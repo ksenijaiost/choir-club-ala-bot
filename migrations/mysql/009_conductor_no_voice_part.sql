@@ -1,0 +1,1 @@
+UPDATE users SET voice_part = NULL WHERE role = 'conductor';

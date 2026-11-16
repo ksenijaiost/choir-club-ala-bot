@@ -56,7 +56,7 @@ final class MaterialsUploadTest extends TestCase
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
 
         $users = new UserRepository($pdo);
-        $users->create(8002, 'Дирижёр', 'tenor', UserRole::CONDUCTOR, UserStatus::ACTIVE);
+        $users->create(8002, 'Дирижёр', null, UserRole::CONDUCTOR, UserStatus::ACTIVE);
         $uploader = $users->findByTelegramId(8002);
         self::assertNotNull($uploader);
 

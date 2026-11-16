@@ -263,6 +263,42 @@ final class MaterialRepository
     /**
      * @return list<array<string, mixed>>
      */
+    public function listSongsWithRecordingsAnyPart(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT s.id, s.title, COUNT(DISTINCT m.id) AS recording_count
+             FROM materials m
+             INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
+             INNER JOIN songs s ON s.id = m.song_id
+             WHERE m.type = ? AND m.is_current = 1
+             GROUP BY s.id, s.title
+             ORDER BY s.title_normalized ASC'
+        );
+        $stmt->execute([MaterialType::RECORDING]);
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listCurrentRecordingsAllParts(int $songId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT m.* FROM materials m
+             INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
+             WHERE m.song_id = ? AND m.type = ? AND m.is_current = 1
+             ORDER BY m.uploaded_at DESC'
+        );
+        $stmt->execute([$songId, MaterialType::RECORDING]);
+        $rows = $stmt->fetchAll() ?: [];
+
+        return $this->attachVoiceParts($rows);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function listCurrentForSong(int $songId): array
     {
         $stmt = $this->pdo->prepare(

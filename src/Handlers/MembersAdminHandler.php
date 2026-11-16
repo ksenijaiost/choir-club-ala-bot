@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Domain\UserStatus;
+use App\Services\VoicePartRules;
 use App\Domain\VoicePart;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
@@ -119,16 +120,25 @@ final class MembersAdminHandler
             $statusKey = ($member['status'] ?? '') === UserStatus::BLOCKED
                 ? 'admin.member_status_blocked'
                 : 'admin.member_status_active';
-            $partCode = (string) ($member['voice_part'] ?? '');
-            $partLabel = $partCode !== '' ? $texts->get('parts.' . $partCode) : '—';
-
             $badge = $roles->singingRoleBadge($member);
             $name = (string) $member['display_name'];
-            $lines[] = $texts->get('admin.member_row', [
-                'name' => $badge !== '' ? $name . ' · ' . $badge : $name,
-                'part' => $partLabel,
-                'status' => $texts->get($statusKey),
-            ]);
+            $nameWithBadge = $badge !== '' ? $name . ' · ' . $badge : $name;
+            $statusText = $texts->get($statusKey);
+
+            if (VoicePartRules::isConductor($member)) {
+                $lines[] = $texts->get('admin.member_row_leader', [
+                    'name' => $nameWithBadge,
+                    'status' => $statusText,
+                ]);
+            } else {
+                $partCode = (string) ($member['voice_part'] ?? '');
+                $partLabel = $partCode !== '' ? $texts->get('parts.' . $partCode) : '—';
+                $lines[] = $texts->get('admin.member_row', [
+                    'name' => $nameWithBadge,
+                    'part' => $partLabel,
+                    'status' => $statusText,
+                ]);
+            }
 
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
@@ -163,18 +173,25 @@ final class MembersAdminHandler
             return;
         }
 
-        $partCode = (string) ($target['voice_part'] ?? '');
-        $partLabel = $partCode !== '' ? $texts->get('parts.' . $partCode) : '—';
         $status = (string) ($target['status'] ?? '');
         $statusText = $status === UserStatus::BLOCKED
             ? $texts->get('admin.member_status_blocked')
             : $texts->get('admin.member_status_active');
 
-        $text = $texts->get('admin.member_card', [
-            'name' => (string) $target['display_name'],
-            'part' => $partLabel,
-            'status' => $statusText,
-        ]);
+        if (VoicePartRules::isConductor($target)) {
+            $text = $texts->get('admin.member_card_leader', [
+                'name' => (string) $target['display_name'],
+                'status' => $statusText,
+            ]);
+        } else {
+            $partCode = (string) ($target['voice_part'] ?? '');
+            $partLabel = $partCode !== '' ? $texts->get('parts.' . $partCode) : '—';
+            $text = $texts->get('admin.member_card', [
+                'name' => (string) $target['display_name'],
+                'part' => $partLabel,
+                'status' => $statusText,
+            ]);
+        }
 
         $keyboard = InlineKeyboardMarkup::make();
         if ($status === UserStatus::ACTIVE) {

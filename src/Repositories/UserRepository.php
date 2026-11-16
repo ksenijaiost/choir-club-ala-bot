@@ -60,8 +60,21 @@ final class UserRepository
 
     public function setVoicePart(int $userId, ?string $voicePart): void
     {
+        $existing = $this->findById($userId);
+        if ($existing !== null && ($existing['role'] ?? '') === UserRole::CONDUCTOR) {
+            return;
+        }
+
         $stmt = $this->pdo->prepare('UPDATE users SET voice_part = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
         $stmt->execute([$voicePart, $userId]);
+    }
+
+    public function clearVoicePart(int $userId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE users SET voice_part = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        );
+        $stmt->execute([$userId]);
     }
 
     public function updateStatus(int $userId, string $status): void
@@ -112,13 +125,13 @@ final class UserRepository
         $this->demoteAllConductorsToMember();
 
         if ($existing === null) {
-            $this->create($telegramId, $displayName, 'tenor', UserRole::CONDUCTOR, UserStatus::ACTIVE);
+            $this->create($telegramId, $displayName, null, UserRole::CONDUCTOR, UserStatus::ACTIVE);
 
             return;
         }
 
         $stmt = $this->pdo->prepare(
-            'UPDATE users SET role = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+            'UPDATE users SET role = ?, status = ?, voice_part = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
         );
         $stmt->execute([UserRole::CONDUCTOR, UserStatus::ACTIVE, $existing['id']]);
     }
@@ -139,6 +152,7 @@ final class UserRepository
         try {
             $this->demoteAllConductorsToMember();
             $this->updateRole($userId, UserRole::CONDUCTOR);
+            $this->clearVoicePart($userId);
             $this->pdo->commit();
         } catch (\Throwable $e) {
             $this->pdo->rollBack();
@@ -305,10 +319,7 @@ final class UserRepository
             : [UserStatus::ACTIVE];
 
         $placeholders = implode(', ', array_fill(0, count($statuses), '?'));
-        $sql = "SELECT * FROM users WHERE status IN ({$placeholders}) AND (
-            role IN (?, ?, ?)
-            OR (role = ? AND voice_part IS NOT NULL AND trim(voice_part) != '')
-        )";
+        $sql = "SELECT * FROM users WHERE status IN ({$placeholders}) AND role IN (?, ?, ?, ?)";
         $params = [
             ...$statuses,
             UserRole::MEMBER,
