@@ -149,7 +149,8 @@ final class AdminChatCommandsTest extends TestCase
         AdminChatCommandHandler::register($bot, $texts, $access, $users, $songs, $materials);
         $bot->willReceivePartial(['id' => self::ADMIN_CHAT_ID, 'type' => 'supergroup']);
         $bot->setCommonUser($this->tgUser(self::MEMBER_TG));
-        $bot->hearCommand('songs')->reply();
+        $bot->hearText('/songs')
+            ->reply();
         $bot->assertCalled('sendMessage', 0);
     }
 
