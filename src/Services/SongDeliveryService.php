@@ -320,30 +320,6 @@ final class SongDeliveryService
     }
 
     /**
-     * @param list<array{id: int, title: string}> $songs
-     */
-    public function sendMyRecordingsGrouped(
-        Nutgram $bot,
-        array $songs,
-        string $partCode,
-        bool $allParts,
-    ): void {
-        foreach ($songs as $song) {
-            $songId = (int) ($song['id'] ?? 0);
-            if ($songId <= 0) {
-                continue;
-            }
-
-            $title = (string) ($song['title'] ?? '');
-            $rows = $allParts
-                ? $this->materials->listCurrentRecordingsAllParts($songId)
-                : $this->materials->listCurrentRecordings($songId, $partCode);
-
-            $this->sendSongRecordingsBlock($bot, $songId, $title, $rows);
-        }
-    }
-
-    /**
      * @param list<array<string, mixed>> $rows
      */
     public function sendRecordingFiles(Nutgram $bot, array $rows): void

@@ -147,53 +147,104 @@ final class SongMemberHandler
     public static function sendMyRecordingsPage(
         Nutgram $bot,
         MaterialsDeps $deps,
-        SongDeliveryService $delivery,
         string $partCode,
         int $page,
     ): void {
-        $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
-        $songs = $allParts
-            ? $deps->materials->listSongsWithRecordingsAnyPart()
-            : $deps->materials->listSongsWithRecordingsForPart($partCode);
-        $partLabel = $allParts
-            ? $deps->texts->get('songs.my_recordings_header_all')
-            : $deps->texts->get('parts.' . $partCode);
-        $total = count($songs);
-
-        if ($total === 0) {
-            SafeTelegram::sendMessage($bot, $deps->texts->get('songs.my_recordings_empty', ['part' => $partLabel]));
+        $built = self::buildMyRecordingsPage($deps, $partCode, $page);
+        if ($built === null) {
+            $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
+            $textKey = $allParts ? 'songs.my_recordings_empty_all' : 'songs.my_recordings_empty';
+            SafeTelegram::sendMessage($bot, $deps->texts->get($textKey));
 
             return;
         }
 
-        $pageSongs = InlineMenuHelper::pageSlice($songs, $page);
-        if ($page === 0) {
-            $headerKey = $allParts ? 'songs.my_recordings_header_all' : 'songs.my_recordings_header';
-            $header = $allParts
-                ? $deps->texts->get($headerKey)
-                : $deps->texts->get($headerKey, ['part' => $partLabel]);
-            SafeTelegram::sendMessage($bot, $header);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $built['text'],
+            $built['keyboard'],
+        );
+    }
+
+    public static function editMyRecordingsPage(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        string $partCode,
+        int $page,
+    ): void {
+        $built = self::buildMyRecordingsPage($deps, $partCode, $page);
+        if ($built === null) {
+            return;
         }
 
-        $delivery->sendMyRecordingsGrouped($bot, $pageSongs, $partCode, $allParts);
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $built['text'],
+            $built['keyboard'],
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+        );
+    }
 
-        if ($total > InlineMenuHelper::PAGE_SIZE) {
-            $keyboard = InlineMenuHelper::appendPaginationAndFooter(
-                InlineKeyboardMarkup::make(),
-                $deps->texts,
-                $page,
-                $total,
-                'snd:my:pg:' . $partCode . ':',
-            );
-            $ownerTelegramId = (int) ($bot->userId() ?? 0);
-            InlineMenuHelper::sendInteractiveMenu(
-                $bot,
-                $deps->interactiveMenus,
-                $ownerTelegramId,
-                $deps->texts->get('songs.my_recordings_more_pages'),
-                $keyboard,
+    /**
+     * @return array{text: string, keyboard: InlineKeyboardMarkup}|null
+     */
+    private static function buildMyRecordingsPage(MaterialsDeps $deps, string $partCode, int $page): ?array
+    {
+        $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
+        $songs = $allParts
+            ? $deps->materials->listSongsWithRecordingsAnyPart()
+            : $deps->materials->listSongsWithRecordingsForPart($partCode);
+        $total = count($songs);
+        if ($total === 0) {
+            return null;
+        }
+
+        $page = SqlPagination::clampPage($page);
+        $keyboard = InlineKeyboardMarkup::make();
+        foreach (InlineMenuHelper::pageSlice($songs, $page) as $song) {
+            $id = (int) $song['id'];
+            $title = (string) ($song['title'] ?? '');
+            $count = (int) ($song['recording_count'] ?? 0);
+            $label = $title . ' (' . $count . ')';
+            if (mb_strlen($label) > 48) {
+                $label = mb_substr($title, 0, 35) . '… (' . $count . ')';
+            }
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($label, callback_data: 'snd:my:' . $id . ':' . $partCode),
             );
         }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $deps->texts,
+            $page,
+            $total,
+            'snd:my:pg:' . $partCode . ':',
+        );
+
+        $partLabel = $allParts
+            ? ''
+            : $deps->texts->get('parts.' . $partCode);
+        $headerKey = $allParts ? 'songs.my_recordings_pick_header_all' : 'songs.my_recordings_pick_header';
+        $pageNum = (string) ($page + 1);
+        $pages = (string) InlineMenuHelper::totalPages($total);
+        $text = $allParts
+            ? $deps->texts->get($headerKey, ['page' => $pageNum, 'pages' => $pages])
+            : $deps->texts->get($headerKey, [
+                'part' => $partLabel,
+                'page' => $pageNum,
+                'pages' => $pages,
+            ]);
+
+        return [
+            'text' => $text,
+            'keyboard' => $keyboard,
+        ];
     }
 
     public static function handleFlowMessage(
@@ -246,7 +297,7 @@ final class SongMemberHandler
         array $user,
     ): void {
         if (VoicePartRules::isConductor($user)) {
-            self::sendMyRecordingsPage($bot, $deps, $delivery, VoicePartRules::RECORDINGS_ALL_PARTS, 0);
+            self::sendMyRecordingsPage($bot, $deps, VoicePartRules::RECORDINGS_ALL_PARTS, 0);
 
             return;
         }
@@ -258,6 +309,6 @@ final class SongMemberHandler
             return;
         }
 
-        self::sendMyRecordingsPage($bot, $deps, $delivery, $partCode, 0);
+        self::sendMyRecordingsPage($bot, $deps, $partCode, 0);
     }
 }
