@@ -70,9 +70,7 @@ final class AdminChatCommandsTest extends TestCase
         self::assertStringContainsString('Аве Мария', $body);
         self::assertStringContainsString('ноты ✅', $body);
         self::assertStringContainsString('заметки ✅', $body);
-        self::assertStringContainsString('записи: 2 шт.', $body);
-        self::assertStringContainsString('Сопрано 1', $body);
-        self::assertStringContainsString('Бас', $body);
+        self::assertStringContainsString('записи: Сопрано 1 + Бас; Тенор', $body);
         self::assertStringContainsString('Благослови', $body);
         self::assertStringContainsString('заметки ❌', $body);
         self::assertStringContainsString('записей нет', $body);

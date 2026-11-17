@@ -343,22 +343,17 @@ final class MaterialRepository
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
-     * @return list<array<string, mixed>>
+     * @return array<int, list<list<string>>> song id => list of recordings (each recording is sorted voice part codes)
      */
-    /**
-     * @return array<int, array{count: int, parts: list<string>}>
-     */
-    public function listCurrentRecordingSummariesBySong(): array
+    public function listCurrentRecordingPartSetsBySong(): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT m.song_id,
-                COUNT(DISTINCT m.id) AS recording_count,
-                GROUP_CONCAT(DISTINCT mvp.voice_part) AS parts
+            'SELECT m.song_id, m.id AS material_id, GROUP_CONCAT(mvp.voice_part) AS parts
              FROM materials m
              INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
              WHERE m.type = ? AND m.is_current = 1
-             GROUP BY m.song_id'
+             GROUP BY m.id
+             ORDER BY m.song_id ASC, m.uploaded_at ASC'
         );
         $stmt->execute([MaterialType::RECORDING]);
 
@@ -370,10 +365,12 @@ final class MaterialRepository
                 ? []
                 : array_values(array_unique(explode(',', $rawParts)));
             sort($parts);
-            $map[$songId] = [
-                'count' => (int) $row['recording_count'],
-                'parts' => $parts,
-            ];
+            if ($parts === []) {
+                continue;
+            }
+
+            $map[$songId] ??= [];
+            $map[$songId][] = $parts;
         }
 
         return $map;
