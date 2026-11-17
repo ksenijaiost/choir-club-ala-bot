@@ -12,6 +12,7 @@ use App\Database\Migrator;
 use App\Domain\MaterialType;
 use App\Domain\UserRole;
 use App\Domain\UserStatus;
+use App\Handlers\MaterialsAdminChatHandler;
 use App\Handlers\MaterialsCallbackHandler;
 use App\Handlers\MaterialsDeps;
 use App\Handlers\MaterialsFlowHandler;
@@ -27,6 +28,8 @@ use App\Telegram\TelegramMessageChunker;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ChatType;
+use SergiX44\Nutgram\Telegram\Types\Chat\Chat;
 use SergiX44\Nutgram\Telegram\Types\Message\Message;
 use SergiX44\Nutgram\Telegram\Types\User\User;
 
@@ -54,6 +57,42 @@ final class TranslitTextUploadTest extends TestCase
         $message->text = "/translit\nПривет\nМир";
 
         self::assertSame("Привет\nМир", TranslitUploadCommand::extractText($message));
+    }
+
+    public function testNotesCommandBehavesLikeTranslitWhenExtracting(): void
+    {
+        $message = new Message();
+        $message->text = "/notes\nПривет\nМир";
+
+        self::assertSame("Привет\nМир", TranslitUploadCommand::extractText($message));
+        self::assertTrue(TranslitUploadCommand::isInvoked("/notes\nx"));
+        self::assertTrue(TranslitUploadCommand::isInvoked('/translit'));
+    }
+
+    public function testNotesAndTranslitStartSameUploadFlowInAdminChat(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $deps = $this->materialsDeps($texts);
+        $this->seedAdmin($deps);
+        $access = new AccessControl($this->testConfig());
+
+        foreach (["/notes\nТекст заметок", "/translit\nТекст заметок"] as $command) {
+            $deps->flows->clear(self::ADMIN_TG);
+            $bot = Nutgram::fake();
+            MaterialsAdminChatHandler::register($bot, $texts, $access, $deps);
+            $bot->setCommonUser($this->telegramUser(self::ADMIN_TG));
+            $bot->setCommonChat($this->adminChat());
+
+            $bot->hearText($command)->reply();
+
+            $flow = $deps->flows->get(self::ADMIN_TG);
+            self::assertNotNull($flow);
+            $ctx = $flow['context'] ?? [];
+            self::assertSame('material_upload', $flow['flow'] ?? null);
+            self::assertSame('text_translit', $ctx['source'] ?? null);
+            self::assertSame('Текст заметок', $ctx['text_content'] ?? null);
+            self::assertSame(MaterialType::TRANSLIT, $ctx['type'] ?? null);
+        }
     }
 
     public function testEmptyTranslitCommandReturnsNullBody(): void
@@ -428,6 +467,15 @@ final class TranslitTextUploadTest extends TestCase
         $user->first_name = 'User';
 
         return $user;
+    }
+
+    private function adminChat(): Chat
+    {
+        $chat = new Chat();
+        $chat->id = self::ADMIN_CHAT_ID;
+        $chat->type = ChatType::SUPERGROUP;
+
+        return $chat;
     }
 
     private function testConfig(): Config
