@@ -28,15 +28,15 @@ final class AdminChatSongListPresenter
             return [$this->texts->get('admin_chat.songs_empty')];
         }
 
-        $recordings = $this->materials->listCurrentRecordingSummariesBySong();
+        $recordings = $this->materials->listCurrentRecordingPartSetsBySong();
         $lines = [$this->texts->get('admin_chat.songs_header')];
 
         foreach ($rows as $row) {
             $songId = (int) $row['id'];
             $notesCount = (int) ($row['notes_count'] ?? 0);
             $hasTranslit = ((int) ($row['has_translit'] ?? 0)) > 0;
-            $recording = $recordings[$songId] ?? ['count' => 0, 'parts' => []];
-            $recordingText = $this->formatRecordings($recording['count'], $recording['parts']);
+            $recordingSets = $recordings[$songId] ?? [];
+            $recordingText = $this->formatRecordings($recordingSets);
 
             $lines[] = $this->texts->get('admin_chat.songs_line', [
                 'title' => (string) $row['title'],
@@ -67,15 +67,48 @@ final class AdminChatSongListPresenter
     }
 
     /**
-     * @param list<string> $partCodes
+     * @param list<list<string>> $recordingSets
      */
-    private function formatRecordings(int $count, array $partCodes): string
+    private function formatRecordings(array $recordingSets): string
     {
-        if ($count <= 0 || $partCodes === []) {
+        if ($recordingSets === []) {
             return $this->texts->get('admin_chat.songs_recordings_none');
         }
 
-        usort($partCodes, static function (string $a, string $b): int {
+        $sorted = $recordingSets;
+        usort($sorted, static function (array $a, array $b): int {
+            $aTutti = self::isTutti($a);
+            $bTutti = self::isTutti($b);
+            if ($aTutti !== $bTutti) {
+                return $aTutti ? -1 : 1;
+            }
+
+            $aIndex = self::primaryPartIndex($a);
+            $bIndex = self::primaryPartIndex($b);
+            if ($aIndex !== $bIndex) {
+                return $aIndex <=> $bIndex;
+            }
+
+            return implode(',', $a) <=> implode(',', $b);
+        });
+
+        $items = array_map(fn (array $parts): string => $this->formatRecordingItem($parts), $sorted);
+
+        return $this->texts->get('admin_chat.songs_recordings', [
+            'items' => implode('; ', $items),
+        ]);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private function formatRecordingItem(array $parts): string
+    {
+        if (self::isTutti($parts)) {
+            return $this->texts->get('admin_chat.recording_tutti');
+        }
+
+        usort($parts, static function (string $a, string $b): int {
             $ia = array_search($a, VoicePart::CODES, true);
             $ib = array_search($b, VoicePart::CODES, true);
             $ia = $ia === false ? 999 : $ia;
@@ -86,12 +119,43 @@ final class AdminChatSongListPresenter
 
         $labels = array_map(
             fn (string $code): string => $this->texts->get('parts.' . $code),
-            $partCodes,
+            $parts,
         );
 
-        return $this->texts->get('admin_chat.songs_recordings', [
-            'count' => (string) $count,
-            'parts' => implode(', ', $labels),
-        ]);
+        return implode(' + ', $labels);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private static function isTutti(array $parts): bool
+    {
+        if (count($parts) !== count(VoicePart::CODES)) {
+            return false;
+        }
+
+        foreach (VoicePart::CODES as $code) {
+            if (!in_array($code, $parts, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private static function primaryPartIndex(array $parts): int
+    {
+        $min = 999;
+        foreach ($parts as $code) {
+            $index = array_search($code, VoicePart::CODES, true);
+            if ($index !== false && $index < $min) {
+                $min = $index;
+            }
+        }
+
+        return $min;
     }
 }
