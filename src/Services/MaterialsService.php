@@ -334,29 +334,11 @@ final class MaterialsService
      */
     public function formatRecordingPartsLabel(array $parts): string
     {
-        if ($this->isTuttiRecording($parts)) {
+        if (VoicePart::isTuttiParts($parts)) {
             return $this->texts->get('admin_chat.recording_tutti');
         }
 
         return $this->formatVoicePartsLabel($parts);
-    }
-
-    /**
-     * @param list<string> $parts
-     */
-    private function isTuttiRecording(array $parts): bool
-    {
-        if (count($parts) !== count(VoicePart::CODES)) {
-            return false;
-        }
-
-        foreach (VoicePart::CODES as $code) {
-            if (!in_array($code, $parts, true)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /**

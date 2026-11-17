@@ -286,6 +286,11 @@
     "my_recordings_empty_all": "Пока нет записей.",
     "my_recordings_need_part": "Сначала укажи партию в профиле (или попроси дирижёра обновить данные).",
     "pick_part_for_recordings": "Записи партий — «{title}». Выбери партию:",
+    "pick_part_for_recordings_others": "Записи партий — «{title}». Другие партии:",
+    "recordings_your_part_button": "⭐ {part} ({count})",
+    "recordings_tutti_button": "Тутти ({count})",
+    "recordings_other_parts_button": "Другие партии",
+    "recordings_no_for_your_part": "Для твоей партии записей пока нет",
     "catalog_header": "Выбери песню из списка или напиши часть названия (стр. {page}/{pages}):",
     "catalog_empty": "Пока нет песен с загруженными материалами.",
     "recording_caption": "Партии: {parts}"
