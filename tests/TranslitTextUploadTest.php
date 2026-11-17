@@ -100,7 +100,7 @@ final class TranslitTextUploadTest extends TestCase
         );
     }
 
-    public function testMemberSongCardUsesTextNotesButtonLabel(): void
+    public function testMemberSongCardShowsShortTextNotesWithoutButton(): void
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $deps = $this->materialsDeps($texts);
@@ -117,8 +117,19 @@ final class TranslitTextUploadTest extends TestCase
         $member = $deps->users->findByTelegramId(self::MEMBER_TG);
         self::assertNotNull($member);
         $deps->delivery->sendSongCard($bot, $song, $member);
-        $header = $texts->get('songs.card_header', ['title' => 'Тест']);
-        $bot->assertReplyText($header);
+        $bot->assertReplyText("🎵 Тест\n\nЗаметка");
+        $history = $bot->getRequestHistory();
+        $body = json_decode((string) $history[array_key_last($history)]['request']->getBody(), true);
+        $keyboard = $body['reply_markup']['inline_keyboard'] ?? [];
+        $callbacks = [];
+        foreach ($keyboard as $row) {
+            foreach ($row as $button) {
+                if (isset($button['callback_data'])) {
+                    $callbacks[] = (string) $button['callback_data'];
+                }
+            }
+        }
+        self::assertNotContains('snd:tr:' . $song['id'], $callbacks);
     }
 
     public function testAppendEndMergesExistingText(): void

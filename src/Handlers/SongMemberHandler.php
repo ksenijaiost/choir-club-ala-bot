@@ -8,6 +8,7 @@ use App\Domain\VoicePart;
 use App\Services\VoicePartRules;
 use App\Support\SqlPagination;
 use App\Services\SongDeliveryService;
+use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -19,16 +20,52 @@ final class SongMemberHandler
     {
         $deps->flows->set($telegramId, 'song_search', []);
         self::sendMaterialCatalog($bot, $deps, 0);
-        $bot->sendMessage($deps->texts->get('songs.ask_title'));
     }
 
     public static function sendMaterialCatalog(Nutgram $bot, MaterialsDeps $deps, int $page): void
     {
-        $total = $deps->songs->countWithCurrentMaterials();
-        if ($total === 0) {
+        $built = self::buildMaterialCatalog($bot, $deps, $page);
+        if ($built === null) {
             $bot->sendMessage($deps->texts->get('songs.catalog_empty'));
 
             return;
+        }
+
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $built['text'],
+            $built['keyboard'],
+        );
+    }
+
+    public static function editMaterialCatalog(Nutgram $bot, MaterialsDeps $deps, int $page): void
+    {
+        $built = self::buildMaterialCatalog($bot, $deps, $page);
+        if ($built === null) {
+            return;
+        }
+
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $built['text'],
+            $built['keyboard'],
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+        );
+    }
+
+    /**
+     * @return array{text: string, keyboard: InlineKeyboardMarkup}|null
+     */
+    private static function buildMaterialCatalog(Nutgram $bot, MaterialsDeps $deps, int $page): ?array
+    {
+        $total = $deps->songs->countWithCurrentMaterials();
+        if ($total === 0) {
+            return null;
         }
 
         $page = SqlPagination::clampPage($page);
@@ -55,17 +92,13 @@ final class SongMemberHandler
             'snd:cat:pg:',
         );
 
-        $ownerTelegramId = (int) ($bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu(
-            $bot,
-            $deps->interactiveMenus,
-            $ownerTelegramId,
-            $deps->texts->get('songs.catalog_header', [
+        return [
+            'text' => $deps->texts->get('songs.catalog_header', [
                 'page' => (string) ($page + 1),
                 'pages' => (string) InlineMenuHelper::totalPages($total),
             ]),
-            $keyboard,
-        );
+            'keyboard' => $keyboard,
+        ];
     }
 
     public static function sendSearchResults(

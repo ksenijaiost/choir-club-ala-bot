@@ -79,7 +79,7 @@ final class SongCardMaterialsMenuTest extends TestCase
         self::assertNotContains('snd:pr:' . $song['id'], $callbacks);
     }
 
-    public function testSongWithOnlyTranslitShowsTranslitButton(): void
+    public function testShortTranslitTextInCardOmitsTranslitButton(): void
     {
         $song = $this->song('Заметки');
         $service = new MaterialsService($this->materials, $this->songs, $this->texts);
@@ -92,7 +92,7 @@ final class SongCardMaterialsMenuTest extends TestCase
         $this->delivery->sendSongCard($bot, $song, $member);
 
         $callbacks = $this->callbackDataFromLastMessage($bot);
-        self::assertContains('snd:tr:' . $song['id'], $callbacks);
+        self::assertNotContains('snd:tr:' . $song['id'], $callbacks);
         self::assertNotContains('snd:nt:' . $song['id'], $callbacks);
         self::assertNotContains('snd:pr:' . $song['id'], $callbacks);
     }

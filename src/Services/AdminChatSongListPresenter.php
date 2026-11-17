@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Domain\VoicePart;
 use App\Repositories\MaterialRepository;
 use App\Repositories\SongRepository;
+use App\Telegram\TelegramHtml;
+use App\Telegram\TelegramMessageChunker;
 use App\Text\TextRepository;
 
 final class AdminChatSongListPresenter
@@ -29,52 +31,58 @@ final class AdminChatSongListPresenter
         }
 
         $recordings = $this->materials->listCurrentRecordingPartSetsBySong();
-        $lines = [$this->texts->get('admin_chat.songs_header')];
-
+        $blocks = [];
         foreach ($rows as $row) {
             $songId = (int) $row['id'];
             $notesCount = (int) ($row['notes_count'] ?? 0);
             $hasTranslit = ((int) ($row['has_translit'] ?? 0)) > 0;
             $recordingSets = $recordings[$songId] ?? [];
-            $recordingText = $this->formatRecordings($recordingSets);
+            $recordingDetail = $this->formatRecordingsDetail($recordingSets);
 
-            $lines[] = $this->texts->get('admin_chat.songs_line', [
-                'title' => (string) $row['title'],
-                'notes' => $this->formatNotesCount($notesCount),
-                'translit' => $hasTranslit
-                    ? $this->texts->get('admin_chat.mark_yes')
-                    : $this->texts->get('admin_chat.mark_no'),
-                'recordings' => $recordingText,
-            ]);
+            $lines = [
+                '<b>' . TelegramHtml::escape((string) $row['title']) . '</b>',
+                $this->texts->get('admin_chat.songs_block_notes', ['count' => (string) $notesCount]),
+                $hasTranslit
+                    ? $this->texts->get('admin_chat.songs_block_translit_yes')
+                    : $this->texts->get('admin_chat.songs_block_translit_no'),
+                $this->texts->get('admin_chat.songs_block_recordings', ['detail' => $recordingDetail]),
+            ];
+            $blocks[] = implode("\n", $lines);
         }
 
-        $body = implode("\n", $lines);
-
-        return \App\Telegram\TelegramMessageChunker::splitByLines($body);
-    }
-
-    private function formatNotesCount(int $count): string
-    {
-        if ($count <= 0) {
-            return $this->texts->get('admin_chat.mark_no');
+        $header = $this->texts->get('admin_chat.songs_header');
+        $songChunks = TelegramMessageChunker::splitByBlocks($blocks);
+        if ($songChunks === []) {
+            return [$header];
         }
 
-        if ($count === 1) {
-            return $this->texts->get('admin_chat.mark_yes');
+        $chunks = [];
+        $first = $header . "\n\n" . $songChunks[0];
+        $chunks[] = $first;
+        for ($i = 1, $n = count($songChunks); $i < $n; $i++) {
+            $chunks[] = $songChunks[$i];
         }
 
-        return $this->texts->get('admin_chat.notes_many', ['count' => (string) $count]);
+        return $chunks;
     }
 
     /**
      * @param list<list<string>> $recordingSets
      */
-    private function formatRecordings(array $recordingSets): string
+    private function formatRecordingsDetail(array $recordingSets): string
     {
         if ($recordingSets === []) {
-            return $this->texts->get('admin_chat.songs_recordings_none');
+            return $this->texts->get('admin_chat.word_no');
         }
 
+        return $this->formatRecordingItems($recordingSets);
+    }
+
+    /**
+     * @param list<list<string>> $recordingSets
+     */
+    private function formatRecordingItems(array $recordingSets): string
+    {
         $sorted = $recordingSets;
         usort($sorted, static function (array $a, array $b): int {
             $aTutti = self::isTutti($a);
@@ -94,9 +102,7 @@ final class AdminChatSongListPresenter
 
         $items = array_map(fn (array $parts): string => $this->formatRecordingItem($parts), $sorted);
 
-        return $this->texts->get('admin_chat.songs_recordings', [
-            'items' => implode('; ', $items),
-        ]);
+        return implode('; ', $items);
     }
 
     /**

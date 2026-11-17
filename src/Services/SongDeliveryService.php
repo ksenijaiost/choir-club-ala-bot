@@ -8,9 +8,11 @@ use App\Domain\MaterialType;
 use App\Repositories\MaterialRepository;
 use App\Repositories\SongRepository;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\TelegramHtml;
 use App\Telegram\TelegramMessageChunker;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Input\InputMediaDocument;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -46,13 +48,18 @@ final class SongDeliveryService
         }
 
         $summary = $this->songs->materialsSummary($songId, $voicePart);
-        $keyboard = $this->buildSongCardKeyboard($songId, $summary, $anyRecordings);
-        $text = $this->texts->get('songs.card_header', ['title' => $title]);
+        $translitCard = $this->resolveTranslitCardState($songId, $summary);
+        $keyboard = $this->buildSongCardKeyboard($songId, $summary, $anyRecordings, $translitCard);
+        $text = '🎵 ' . TelegramHtml::escape($title);
+        $parseMode = ParseMode::HTML;
+        if ($translitCard['preview'] !== null && $translitCard['preview'] !== '') {
+            $text .= "\n\n" . TelegramHtml::escape($translitCard['preview']);
+        }
         if ($this->songCardHasNoMaterials($summary, $anyRecordings)) {
-            $text .= "\n\n" . $this->texts->get('songs.card_no_materials');
+            $text .= "\n\n" . TelegramHtml::escape($this->texts->get('songs.card_no_materials'));
         }
 
-        $bot->sendMessage($text, reply_markup: $keyboard);
+        $bot->sendMessage($text, reply_markup: $keyboard, parse_mode: $parseMode);
     }
 
     /**
@@ -62,11 +69,15 @@ final class SongDeliveryService
      *     recordings_total: int,
      *     recordings_for_part: int
      * } $summary
+     * @param array{preview: ?string, show_file_button: bool, show_full_button: bool} $translitCard
      */
-    public function buildSongCardKeyboard(int $songId, array $summary, bool $anyRecordings): InlineKeyboardMarkup
+    public function buildSongCardKeyboard(int $songId, array $summary, bool $anyRecordings, ?array $translitCard = null): InlineKeyboardMarkup
     {
+        if ($translitCard === null) {
+            $translitCard = $this->resolveTranslitCardState($songId, $summary);
+        }
+
         $showNotes = $summary['notes_count'] > 0;
-        $showTranslit = $summary['has_translit'];
         $showRecordings = $anyRecordings
             ? $summary['recordings_total'] > 0
             : $summary['recordings_for_part'] > 0;
@@ -79,7 +90,7 @@ final class SongDeliveryService
                 callback_data: 'snd:nt:' . $songId,
             );
         }
-        if ($showTranslit) {
+        if ($translitCard['show_file_button']) {
             $row[] = InlineKeyboardButton::make(
                 $this->texts->get('buttons.translit'),
                 callback_data: 'snd:tr:' . $songId,
@@ -87,6 +98,14 @@ final class SongDeliveryService
         }
         if ($row !== []) {
             $keyboard = $keyboard->addRow(...$row);
+        }
+        if ($translitCard['show_full_button']) {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    $this->texts->get('buttons.translit_full'),
+                    callback_data: 'snd:tr:' . $songId,
+                ),
+            );
         }
         if ($showRecordings) {
             $keyboard = $keyboard->addRow(
@@ -98,6 +117,54 @@ final class SongDeliveryService
         }
 
         return InlineMenuHelper::appendFooter($keyboard, $this->texts);
+    }
+
+    /**
+     * @param array{
+     *     notes_count: int,
+     *     has_translit: bool,
+     *     recordings_total: int,
+     *     recordings_for_part: int
+     * } $summary
+     *
+     * @return array{preview: ?string, show_file_button: bool, show_full_button: bool}
+     */
+    private function resolveTranslitCardState(int $songId, array $summary): array
+    {
+        if (!$summary['has_translit']) {
+            return [
+                'preview' => null,
+                'show_file_button' => false,
+                'show_full_button' => false,
+            ];
+        }
+
+        $row = $this->materials->findCurrentSingleton($songId, MaterialType::TRANSLIT);
+        if ($row === null) {
+            return [
+                'preview' => null,
+                'show_file_button' => false,
+                'show_full_button' => false,
+            ];
+        }
+
+        $textContent = trim((string) ($row['text_content'] ?? ''));
+        $fileId = trim((string) ($row['telegram_file_id'] ?? ''));
+        if ($textContent === '') {
+            return [
+                'preview' => null,
+                'show_file_button' => $fileId !== '',
+                'show_full_button' => false,
+            ];
+        }
+
+        $preview = SongTranslitPreview::build($textContent);
+
+        return [
+            'preview' => $preview['text'],
+            'show_file_button' => false,
+            'show_full_button' => !$preview['complete'],
+        ];
     }
 
     /**

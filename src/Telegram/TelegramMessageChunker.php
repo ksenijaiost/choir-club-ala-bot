@@ -59,4 +59,48 @@ final class TelegramMessageChunker
 
         return $chunks !== [] ? $chunks : [$normalized];
     }
+
+    /**
+     * Pack blocks without splitting a single block across chunks.
+     *
+     * @param list<string> $blocks
+     * @return list<string>
+     */
+    public static function splitByBlocks(
+        array $blocks,
+        int $maxLength = self::MAX_MESSAGE_LENGTH,
+        string $blockSeparator = "\n\n",
+    ): array {
+        if ($blocks === []) {
+            return [];
+        }
+
+        $chunks = [];
+        $current = '';
+        foreach ($blocks as $block) {
+            if ($block === '') {
+                continue;
+            }
+
+            if ($current === '') {
+                $current = $block;
+
+                continue;
+            }
+
+            $candidate = $current . $blockSeparator . $block;
+            if (mb_strlen($candidate) > $maxLength) {
+                $chunks[] = $current;
+                $current = $block;
+            } else {
+                $current = $candidate;
+            }
+        }
+
+        if ($current !== '') {
+            $chunks[] = $current;
+        }
+
+        return $chunks;
+    }
 }
