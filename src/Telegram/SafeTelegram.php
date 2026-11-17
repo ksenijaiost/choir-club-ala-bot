@@ -115,4 +115,33 @@ final class SafeTelegram
             error_log('[telegram] deleteMessage warning: ' . $e->getMessage());
         }
     }
+
+    public static function sendAudio(
+        Nutgram $bot,
+        string $audio,
+        ?string $caption = null,
+        ?int $chatId = null,
+        ?ParseMode $parseMode = null,
+    ): void {
+        try {
+            self::call(static function () use ($bot, $audio, $caption, $chatId, $parseMode): mixed {
+                if ($chatId !== null) {
+                    return $bot->sendAudio(
+                        audio: $audio,
+                        caption: $caption !== null && $caption !== '' ? $caption : null,
+                        chat_id: $chatId,
+                        parse_mode: $parseMode,
+                    );
+                }
+
+                return $bot->sendAudio(
+                    audio: $audio,
+                    caption: $caption !== null && $caption !== '' ? $caption : null,
+                    parse_mode: $parseMode,
+                );
+            });
+        } catch (\Throwable $e) {
+            error_log('[telegram] sendAudio warning: ' . $e->getMessage());
+        }
+    }
 }

@@ -62,7 +62,7 @@ final class SongsCallbackHandler
 
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            SongMemberHandler::sendMyRecordingsPage($bot, $deps, $part, (int) $m[2]);
+            SongMemberHandler::sendMyRecordingsPage($bot, $deps, $delivery, $part, (int) $m[2]);
 
             return true;
         }

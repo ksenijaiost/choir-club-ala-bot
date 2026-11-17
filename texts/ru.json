@@ -284,6 +284,7 @@
     "my_recordings_header_all": "Записи всех партий:",
     "my_recordings_empty": "Пока нет записей для партии {part}.",
     "my_recordings_need_part": "Сначала укажи партию в профиле (или попроси дирижёра обновить данные).",
+    "my_recordings_more_pages": "Ещё песни — перелистай:",
     "pick_part_for_recordings": "Записи партий — «{title}». Выбери партию:",
     "catalog_header": "Выбери песню из списка или напиши часть названия (стр. {page}/{pages}):",
     "catalog_empty": "Пока нет песен с загруженными материалами.",

@@ -8,6 +8,7 @@ use App\Domain\MaterialType;
 use App\Domain\VoicePart;
 use App\Repositories\MaterialRepository;
 use App\Repositories\SongRepository;
+use App\Telegram\TelegramHtml;
 use App\Text\TextRepository;
 
 final class MaterialsService
@@ -316,13 +317,46 @@ final class MaterialsService
     /**
      * @param array<string, mixed> $material
      */
-    public function recordingCaption(array $material): string
+    public function recordingCaption(string $songTitle, array $material): string
     {
         $parts = $material['voice_parts'] ?? $this->materials->listVoiceParts((int) ($material['id'] ?? 0));
+        $partsLabel = $this->formatRecordingPartsLabel(is_array($parts) ? $parts : []);
 
-        return $this->texts->get('songs.recording_caption', [
-            'parts' => $this->formatVoicePartsLabel(is_array($parts) ? $parts : []),
-        ]);
+        return '🎵 <b>' . TelegramHtml::escape($songTitle) . '</b>'
+            . "\n"
+            . $this->texts->get('songs.recording_caption', [
+                'parts' => $partsLabel,
+            ]);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    public function formatRecordingPartsLabel(array $parts): string
+    {
+        if ($this->isTuttiRecording($parts)) {
+            return $this->texts->get('admin_chat.recording_tutti');
+        }
+
+        return $this->formatVoicePartsLabel($parts);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private function isTuttiRecording(array $parts): bool
+    {
+        if (count($parts) !== count(VoicePart::CODES)) {
+            return false;
+        }
+
+        foreach (VoicePart::CODES as $code) {
+            if (!in_array($code, $parts, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
