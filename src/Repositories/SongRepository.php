@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Domain\MaterialType;
+use App\Domain\VoicePart;
 use App\Support\SqlPagination;
 
 final class SongRepository
@@ -195,5 +196,80 @@ final class SongRepository
                 'has_translit' => (int) $row['has_translit'],
             ];
         }, $rows);
+    }
+
+    /**
+     * @return array{
+     *     notes_count: int,
+     *     has_translit: bool,
+     *     recordings_total: int,
+     *     recordings_for_part: int
+     * }
+     */
+    public function materialsSummary(int $songId, ?string $voicePart = null): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT
+                (SELECT COUNT(*) FROM materials m
+                    WHERE m.song_id = ? AND m.type = ? AND m.is_current = 1) AS notes_count,
+                EXISTS(
+                    SELECT 1 FROM materials m
+                    WHERE m.song_id = ? AND m.type = ? AND m.is_current = 1
+                      AND (
+                        (m.text_content IS NOT NULL AND TRIM(m.text_content) <> \'\')
+                        OR (m.telegram_file_id IS NOT NULL AND TRIM(m.telegram_file_id) <> \'\')
+                      )
+                ) AS has_translit,
+                (
+                    SELECT COUNT(DISTINCT m.id) FROM materials m
+                    WHERE m.song_id = ? AND m.type = ? AND m.is_current = 1
+                ) AS recordings_total'
+        );
+        $stmt->execute([
+            $songId,
+            MaterialType::NOTES,
+            $songId,
+            MaterialType::TRANSLIT,
+            $songId,
+            MaterialType::RECORDING,
+        ]);
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return [
+                'notes_count' => 0,
+                'has_translit' => false,
+                'recordings_total' => 0,
+                'recordings_for_part' => 0,
+            ];
+        }
+
+        $recordingsForPart = 0;
+        if ($voicePart !== null && $voicePart !== '' && VoicePart::isValid($voicePart)) {
+            $tuttiPartCount = count(VoicePart::CODES);
+            $partStmt = $this->pdo->prepare(
+                'SELECT COUNT(DISTINCT m.id) FROM materials m
+                 WHERE m.song_id = ? AND m.type = ? AND m.is_current = 1
+                   AND (
+                     EXISTS (
+                         SELECT 1 FROM material_voice_parts mvp
+                         WHERE mvp.material_id = m.id AND mvp.voice_part = ?
+                     )
+                     OR (
+                         (SELECT COUNT(DISTINCT mvp2.voice_part)
+                          FROM material_voice_parts mvp2
+                          WHERE mvp2.material_id = m.id) >= ?
+                     )
+                   )'
+            );
+            $partStmt->execute([$songId, MaterialType::RECORDING, $voicePart, $tuttiPartCount]);
+            $recordingsForPart = (int) $partStmt->fetchColumn();
+        }
+
+        return [
+            'notes_count' => (int) $row['notes_count'],
+            'has_translit' => (bool) $row['has_translit'],
+            'recordings_total' => (int) $row['recordings_total'],
+            'recordings_for_part' => $recordingsForPart,
+        ];
     }
 }

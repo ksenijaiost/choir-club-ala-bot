@@ -47,6 +47,14 @@ final class VoicePartRules
     /**
      * @param array<string, mixed> $user
      */
+    public static function seesAnyRecordingsOnSongMenu(array $user): bool
+    {
+        return self::isConductor($user) || !self::hasAssignedVoicePart($user);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
     public static function partLabelForDisplay(TextRepository $texts, array $user): ?string
     {
         if (self::isConductor($user)) {

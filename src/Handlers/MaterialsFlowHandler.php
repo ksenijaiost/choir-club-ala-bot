@@ -7,7 +7,9 @@ namespace App\Handlers;
 use App\Domain\MaterialType;
 use App\Domain\VoicePart;
 use App\Support\SqlPagination;
+use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -15,6 +17,126 @@ use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
 final class MaterialsFlowHandler
 {
+    public static function isAdminUploadWizard(MaterialsDeps $deps, int $telegramId): bool
+    {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+            return false;
+        }
+
+        return (int) ($state['context']['admin_chat_id'] ?? 0) !== 0;
+    }
+
+    public static function isUploadSaveLocked(MaterialsDeps $deps, int $telegramId): bool
+    {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+            return false;
+        }
+
+        $ctx = $state['context'];
+
+        return ($ctx['step'] ?? '') === 'save'
+            || !empty($ctx['save_in_progress'])
+            || !empty($ctx['material_saved']);
+    }
+
+    public static function presentUploadStep(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        string $text,
+        InlineKeyboardMarkup $keyboard,
+        ?int $chatId = null,
+    ): ?Message {
+        $target = self::wizardTarget($bot, $deps, $telegramId, $chatId);
+        if ($target === null) {
+            return InlineMenuHelper::sendInteractiveMenu(
+                $bot,
+                $deps->interactiveMenus,
+                $telegramId,
+                $text,
+                $keyboard,
+                $chatId ?? $bot->chatId() ?? $telegramId,
+            );
+        }
+
+        if ($target['message_id'] === 0) {
+            $message = SafeTelegram::sendMessage($bot, $text, $target['chat_id'], $keyboard);
+            if ($message !== null) {
+                self::persistWizardMessageId($deps, $telegramId, (int) $message->message_id, (int) $message->chat->id);
+
+                return $message;
+            }
+
+            return null;
+        }
+
+        SafeTelegram::editMessageText(
+            $bot,
+            $target['chat_id'],
+            $target['message_id'],
+            $text,
+            $keyboard,
+        );
+
+        return null;
+    }
+
+    /**
+     * @return array{chat_id: int, message_id: int}|null
+     */
+    private static function wizardTarget(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        ?int $chatId = null,
+    ): ?array {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+            return null;
+        }
+
+        $ctx = $state['context'];
+        $wizardChatId = (int) ($ctx['admin_chat_id'] ?? 0);
+        if ($wizardChatId === 0) {
+            return null;
+        }
+
+        $messageId = (int) ($ctx['wizard_message_id'] ?? 0);
+        if ($messageId === 0) {
+            $callbackMessage = CallbackUi::callbackMessage($bot);
+            if ($callbackMessage !== null && (int) $callbackMessage->chat->id === $wizardChatId) {
+                $messageId = (int) $callbackMessage->message_id;
+                self::persistWizardMessageId($deps, $telegramId, $messageId, $wizardChatId);
+            }
+        }
+
+        return [
+            'chat_id' => $chatId ?? $wizardChatId,
+            'message_id' => $messageId,
+        ];
+    }
+
+    private static function persistWizardMessageId(
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $messageId,
+        int $chatId,
+    ): void {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
+            return;
+        }
+
+        $ctx = $state['context'];
+        $ctx['wizard_message_id'] = $messageId;
+        $ctx['admin_chat_id'] = $chatId;
+        $ctx['part_picker_message_id'] = $messageId;
+        $ctx['part_picker_chat_id'] = $chatId;
+        $deps->flows->set($telegramId, 'material_upload', $ctx);
+    }
+
     public static function sendSongPicker(Nutgram $bot, MaterialsDeps $deps, int $page = 0, ?int $chatId = null): void
     {
         $page = SqlPagination::clampPage($page);
@@ -55,17 +177,10 @@ final class MaterialsFlowHandler
 
         $ownerTelegramId = (int) ($bot->userId() ?? 0);
         $targetChatId = $chatId ?? $bot->chatId() ?? $ownerTelegramId;
-        InlineMenuHelper::sendInteractiveMenu(
-            $bot,
-            $deps->interactiveMenus,
-            $ownerTelegramId,
-            $text,
-            $keyboard,
-            $targetChatId,
-        );
+        self::presentUploadStep($bot, $deps, $ownerTelegramId, $text, $keyboard, $targetChatId);
     }
 
-    public static function sendTypePicker(Nutgram $bot, MaterialsDeps $deps): void
+    public static function sendTypePicker(Nutgram $bot, MaterialsDeps $deps, ?int $telegramId = null): void
     {
         $keyboard = InlineKeyboardMarkup::make()
             ->addRow(
@@ -81,10 +196,10 @@ final class MaterialsFlowHandler
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:sn');
 
-        $ownerTelegramId = (int) ($bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu(
+        $ownerTelegramId = $telegramId ?? (int) ($bot->userId() ?? 0);
+        self::presentUploadStep(
             $bot,
-            $deps->interactiveMenus,
+            $deps,
             $ownerTelegramId,
             $deps->texts->get('materials.ask_type'),
             $keyboard,
@@ -136,9 +251,9 @@ final class MaterialsFlowHandler
     public static function sendRecordingPartPicker(Nutgram $bot, MaterialsDeps $deps, int $telegramId): void
     {
         $keyboard = self::buildRecordingPartKeyboard($deps, []);
-        $message = InlineMenuHelper::sendInteractiveMenu(
+        $message = self::presentUploadStep(
             $bot,
-            $deps->interactiveMenus,
+            $deps,
             $telegramId,
             $deps->texts->get('materials.ask_part_multi'),
             $keyboard,
@@ -152,6 +267,14 @@ final class MaterialsFlowHandler
                 $ctx['selected_parts'] = [];
                 $ctx['part_picker_message_id'] = (int) $message->message_id;
                 $ctx['part_picker_chat_id'] = (int) $message->chat->id;
+                $ctx['wizard_message_id'] = (int) $message->message_id;
+                $deps->flows->set($telegramId, 'material_upload', $ctx);
+            }
+        } elseif (self::isAdminUploadWizard($deps, $telegramId)) {
+            $state = $deps->flows->get($telegramId);
+            if ($state !== null) {
+                $ctx = $state['context'];
+                $ctx['selected_parts'] = [];
                 $deps->flows->set($telegramId, 'material_upload', $ctx);
             }
         }
@@ -167,14 +290,12 @@ final class MaterialsFlowHandler
         int $messageId,
         array $selected,
     ): void {
-        try {
-            $bot->editMessageReplyMarkup(
-                chat_id: $chatId,
-                message_id: $messageId,
-                reply_markup: self::buildRecordingPartKeyboard($deps, $selected),
-            );
-        } catch (\Throwable) {
-        }
+        SafeTelegram::editMessageReplyMarkup(
+            $bot,
+            $chatId,
+            $messageId,
+            self::buildRecordingPartKeyboard($deps, $selected),
+        );
     }
 
     public static function sendReplaceConfirm(Nutgram $bot, MaterialsDeps $deps, int $songId, string $type): void
@@ -205,9 +326,9 @@ final class MaterialsFlowHandler
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:up:back:tp');
 
         $ownerTelegramId = (int) ($bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu(
+        self::presentUploadStep(
             $bot,
-            $deps->interactiveMenus,
+            $deps,
             $ownerTelegramId,
             $deps->texts->get('materials.replace_confirm_text_notes_file', ['title' => (string) $song['title']]),
             $keyboard,
@@ -312,9 +433,9 @@ final class MaterialsFlowHandler
         ?int $chatId = null,
     ): void {
         $ownerTelegramId = (int) ($bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu(
+        self::presentUploadStep(
             $bot,
-            $deps->interactiveMenus,
+            $deps,
             $ownerTelegramId,
             $text,
             $keyboard,
@@ -465,6 +586,17 @@ final class MaterialsFlowHandler
         }
 
         $ctx = $state['context'];
+        if (!empty($ctx['material_saved'])) {
+            return;
+        }
+        if (!empty($ctx['save_in_progress'])) {
+            return;
+        }
+        if (($ctx['step'] ?? '') === 'save') {
+            $ctx['save_in_progress'] = true;
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
+        }
+
         $songId = (int) ($ctx['song_id'] ?? 0);
         $type = (string) ($ctx['type'] ?? '');
         $voiceParts = null;
@@ -502,6 +634,7 @@ final class MaterialsFlowHandler
                 );
             }
         } catch (\InvalidArgumentException $e) {
+            $ctx['save_in_progress'] = false;
             if ($e->getMessage() === 'replace_confirm_required') {
                 $ctx['step'] = 'replace_confirm';
                 $deps->flows->set($telegramId, 'material_upload', $ctx);
@@ -552,13 +685,11 @@ final class MaterialsFlowHandler
                 return;
             }
 
-            $bot->sendMessage($deps->texts->get('errors.generic'));
+            SafeTelegram::sendMessage($bot, $deps->texts->get('errors.generic'));
             $deps->flows->clear($telegramId);
 
             return;
         }
-
-        $deps->flows->clear($telegramId);
 
         $chatId = (int) ($ctx['admin_chat_id'] ?? 0);
         $partList = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
@@ -572,10 +703,25 @@ final class MaterialsFlowHandler
         }
 
         $text = implode("\n", $lines);
+        $wizardMessageId = (int) ($ctx['wizard_message_id'] ?? 0);
+        $deps->flows->clear($telegramId);
+
+        if ($chatId !== 0 && $wizardMessageId !== 0) {
+            SafeTelegram::editMessageText(
+                $bot,
+                $chatId,
+                $wizardMessageId,
+                $text,
+                InlineKeyboardMarkup::make(),
+            );
+
+            return;
+        }
+
         if ($chatId !== 0) {
-            $bot->sendMessage(chat_id: $chatId, text: $text);
+            SafeTelegram::sendMessage($bot, $text, $chatId);
         } else {
-            $bot->sendMessage($text);
+            SafeTelegram::sendMessage($bot, $text);
         }
     }
 }

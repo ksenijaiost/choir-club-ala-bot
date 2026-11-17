@@ -28,12 +28,12 @@ final class CallbackUi
         }
 
         try {
-            $bot->editMessageText(
+            SafeTelegram::call(static fn (): mixed => $bot->editMessageText(
                 text: $text,
                 chat_id: $message->chat->id,
                 message_id: $message->message_id,
                 reply_markup: $replyMarkup,
-            );
+            ));
             if ($menus !== null && $ownerTelegramId !== null) {
                 InlineMenuHelper::trackEditedMenu(
                     $menus,
@@ -62,11 +62,12 @@ final class CallbackUi
 
         try {
             if ($text !== '') {
-                $bot->editMessageText(
-                    text: $text,
-                    chat_id: $message->chat->id,
-                    message_id: $message->message_id,
-                    reply_markup: InlineKeyboardMarkup::make(),
+                SafeTelegram::editMessageText(
+                    $bot,
+                    (int) $message->chat->id,
+                    (int) $message->message_id,
+                    $text,
+                    InlineKeyboardMarkup::make(),
                 );
             } else {
                 self::clearKeyboard($bot, $message);
@@ -84,13 +85,14 @@ final class CallbackUi
         }
 
         try {
-            $bot->editMessageReplyMarkup(
-                chat_id: $message->chat->id,
-                message_id: $message->message_id,
-                reply_markup: InlineKeyboardMarkup::make(),
+            SafeTelegram::editMessageReplyMarkup(
+                $bot,
+                (int) $message->chat->id,
+                (int) $message->message_id,
+                InlineKeyboardMarkup::make(),
             );
-        } catch (\Throwable) {
-            // повторное нажатие или уже снятая клавиатура
+        } catch (\Throwable $e) {
+            error_log('[telegram] clearKeyboard warning: ' . $e->getMessage());
         }
     }
 }

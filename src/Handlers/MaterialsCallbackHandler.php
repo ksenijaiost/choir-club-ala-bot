@@ -9,7 +9,9 @@ use App\Domain\VoicePart;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class MaterialsCallbackHandler
 {
@@ -25,40 +27,47 @@ final class MaterialsCallbackHandler
         }
 
         if (!$access->canUploadMaterials($actor)) {
-            $bot->answerCallbackQuery(text: $deps->texts->get('materials.upload_forbidden'), show_alert: true);
+            SafeTelegram::answerCallbackQuery($bot, [
+                'text' => $deps->texts->get('materials.upload_forbidden'),
+                'show_alert' => true,
+            ]);
 
             return true;
         }
 
         if (preg_match('/^mat:up:sn:pg:(\d+)$/', $data, $m) === 1) {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
             MaterialsFlowHandler::sendSongPicker($bot, $deps, (int) $m[1]);
 
             return true;
         }
 
         if ($data === 'mat:up:back:sn') {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
             MaterialsFlowHandler::sendSongPicker($bot, $deps, 0);
 
             return true;
         }
 
         if ($data === 'mat:up:back:tp') {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
-            MaterialsFlowHandler::sendTypePicker($bot, $deps);
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
+            MaterialsFlowHandler::sendTypePicker($bot, $deps, $telegramId);
 
             return true;
         }
 
         if (preg_match('/^mat:up:sn:(new|\d+)$/', $data, $m) === 1) {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
-            $state = $deps->flows->get((int) $actor['telegram_id']);
+            $state = $deps->flows->get($telegramId);
             if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
                 return true;
             }
@@ -67,8 +76,22 @@ final class MaterialsCallbackHandler
             if ($m[1] === 'new') {
                 $ctx['step'] = 'new_song_title';
                 $ctx['awaiting_title'] = true;
-                $deps->flows->set((int) $actor['telegram_id'], 'material_upload', $ctx);
-                $bot->sendMessage($deps->texts->get('materials.new_song_prompt'));
+                $deps->flows->set($telegramId, 'material_upload', $ctx);
+                if (MaterialsFlowHandler::isAdminUploadWizard($deps, $telegramId)) {
+                    MaterialsFlowHandler::presentUploadStep(
+                        $bot,
+                        $deps,
+                        $telegramId,
+                        $deps->texts->get('materials.new_song_prompt'),
+                        InlineMenuHelper::appendFooter(
+                            \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make(),
+                            $deps->texts,
+                            'mat:up:back:sn',
+                        ),
+                    );
+                } else {
+                    SafeTelegram::sendMessage($bot, $deps->texts->get('materials.new_song_prompt'));
+                }
 
                 return true;
             }
@@ -85,24 +108,39 @@ final class MaterialsCallbackHandler
             }
 
             $ctx['step'] = 'type';
-            $deps->flows->set((int) $actor['telegram_id'], 'material_upload', $ctx);
-            MaterialsFlowHandler::sendTypePicker($bot, $deps);
+            $deps->flows->set($telegramId, 'material_upload', $ctx);
+            MaterialsFlowHandler::sendTypePicker($bot, $deps, $telegramId);
 
             return true;
         }
 
         if (preg_match('/^mat:up:tp:(notes|translit|recording)$/', $data, $m) === 1) {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             if ($m[1] === MaterialType::TRANSLIT) {
-                $bot->sendMessage($deps->texts->get('materials.translit_upload_hint'));
+                if (MaterialsFlowHandler::isAdminUploadWizard($deps, $telegramId)) {
+                    MaterialsFlowHandler::presentUploadStep(
+                        $bot,
+                        $deps,
+                        $telegramId,
+                        $deps->texts->get('materials.translit_upload_hint'),
+                        InlineMenuHelper::appendFooter(
+                            \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make(),
+                            $deps->texts,
+                            'mat:up:back:tp',
+                        ),
+                    );
+                } else {
+                    SafeTelegram::sendMessage($bot, $deps->texts->get('materials.translit_upload_hint'));
+                }
 
                 return true;
             }
 
             $type = $m[1];
-            $state = $deps->flows->get((int) $actor['telegram_id']);
+            $state = $deps->flows->get($telegramId);
             if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
                 return true;
             }
@@ -167,42 +205,88 @@ final class MaterialsCallbackHandler
             $telegramId = (int) $actor['telegram_id'];
             $state = $deps->flows->get($telegramId);
             if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
-                $bot->answerCallbackQuery();
+                SafeTelegram::answerCallbackQuery($bot);
 
                 return true;
             }
 
             $ctx = $state['context'];
-            $selected = $deps->service->normalizeVoiceParts($ctx['selected_parts'] ?? []);
-            if ($selected === []) {
-                $bot->answerCallbackQuery(text: $deps->texts->get('materials.pick_parts_none'), show_alert: true);
+            if (MaterialsFlowHandler::isUploadSaveLocked($deps, $telegramId)) {
+                SafeTelegram::answerCallbackQuery($bot, [
+                    'text' => $deps->texts->get('materials.already_saving'),
+                ]);
 
                 return true;
             }
 
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            $selected = $deps->service->normalizeVoiceParts($ctx['selected_parts'] ?? []);
+            if ($selected === []) {
+                SafeTelegram::answerCallbackQuery($bot, [
+                    'text' => $deps->texts->get('materials.pick_parts_none'),
+                    'show_alert' => true,
+                ]);
+
+                return true;
+            }
+
             $ctx['selected_parts'] = $selected;
             $ctx['step'] = 'save';
             $deps->flows->set($telegramId, 'material_upload', $ctx);
             MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
         }
 
         if ($data === 'mat:up:rp:y') {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            $telegramId = (int) $actor['telegram_id'];
+            if (MaterialsFlowHandler::isUploadSaveLocked($deps, $telegramId)) {
+                SafeTelegram::answerCallbackQuery($bot, [
+                    'text' => $deps->texts->get('materials.already_saving'),
+                ]);
+
+                return true;
+            }
+
+            $state = $deps->flows->get($telegramId);
+            if ($state !== null && ($state['flow'] ?? '') === 'material_upload') {
+                $ctx = $state['context'];
+                $ctx['step'] = 'save';
+                $deps->flows->set($telegramId, 'material_upload', $ctx);
+            }
+
             MaterialsFlowHandler::completeUpload($bot, $deps, $actor, true);
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
         }
 
         if ($data === 'mat:up:rp:n') {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
-            $deps->flows->clear((int) $actor['telegram_id']);
-            $bot->sendMessage($deps->texts->get('materials.cancelled'));
+            $telegramId = (int) $actor['telegram_id'];
+            $state = $deps->flows->get($telegramId);
+            $wizardMessageId = 0;
+            $adminChatId = 0;
+            if ($state !== null && ($state['flow'] ?? '') === 'material_upload') {
+                $wizardMessageId = (int) ($state['context']['wizard_message_id'] ?? 0);
+                $adminChatId = (int) ($state['context']['admin_chat_id'] ?? 0);
+            }
+
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
+            $deps->flows->clear($telegramId);
+            if ($wizardMessageId !== 0 && $adminChatId !== 0) {
+                SafeTelegram::editMessageText(
+                    $bot,
+                    $adminChatId,
+                    $wizardMessageId,
+                    $deps->texts->get('materials.cancelled'),
+                    InlineKeyboardMarkup::make(),
+                );
+            } else {
+                SafeTelegram::sendMessage($bot, $deps->texts->get('materials.cancelled'));
+            }
 
             return true;
         }
@@ -211,13 +295,19 @@ final class MaterialsCallbackHandler
             $telegramId = (int) $actor['telegram_id'];
             $state = $deps->flows->get($telegramId);
             if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
-                $bot->answerCallbackQuery();
+                SafeTelegram::answerCallbackQuery($bot);
 
                 return true;
             }
 
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            if (MaterialsFlowHandler::isUploadSaveLocked($deps, $telegramId)) {
+                SafeTelegram::answerCallbackQuery($bot, [
+                    'text' => $deps->texts->get('materials.already_saving'),
+                ]);
+
+                return true;
+            }
+
             $ctx = $state['context'];
             $ctx['text_notes_mode'] = match ($m[1]) {
                 'end' => 'append_end',
@@ -227,6 +317,8 @@ final class MaterialsCallbackHandler
             $ctx['step'] = 'save';
             $deps->flows->set($telegramId, 'material_upload', $ctx);
             MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
         }
@@ -235,18 +327,26 @@ final class MaterialsCallbackHandler
             $telegramId = (int) $actor['telegram_id'];
             $state = $deps->flows->get($telegramId);
             if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
-                $bot->answerCallbackQuery();
+                SafeTelegram::answerCallbackQuery($bot);
 
                 return true;
             }
 
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
+            if (MaterialsFlowHandler::isUploadSaveLocked($deps, $telegramId)) {
+                SafeTelegram::answerCallbackQuery($bot, [
+                    'text' => $deps->texts->get('materials.already_saving'),
+                ]);
+
+                return true;
+            }
+
             $ctx = $state['context'];
             $ctx['notes_mode'] = $data === 'mat:up:nt:add' ? 'add' : 'replace_all';
             $ctx['step'] = 'save';
             $deps->flows->set($telegramId, 'material_upload', $ctx);
             MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+            SafeTelegram::answerCallbackQuery($bot);
+            self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
         }
@@ -361,6 +461,13 @@ final class MaterialsCallbackHandler
         }
 
         return false;
+    }
+
+    private static function clearKeyboardUnlessAdminWizard(Nutgram $bot, MaterialsDeps $deps, int $telegramId): void
+    {
+        if (!MaterialsFlowHandler::isAdminUploadWizard($deps, $telegramId)) {
+            CallbackUi::clearKeyboard($bot);
+        }
     }
 
     public static function openManagementHome(Nutgram $bot, MaterialsDeps $deps, int $page = 0): void

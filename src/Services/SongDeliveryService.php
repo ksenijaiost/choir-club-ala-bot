@@ -6,11 +6,14 @@ namespace App\Services;
 
 use App\Domain\MaterialType;
 use App\Repositories\MaterialRepository;
+use App\Repositories\SongRepository;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\TelegramMessageChunker;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Input\InputMediaDocument;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class SongDeliveryService
 {
@@ -18,6 +21,7 @@ final class SongDeliveryService
 
     public function __construct(
         private readonly MaterialRepository $materials,
+        private readonly SongRepository $songs,
         private readonly TextRepository $texts,
         private readonly MaterialsService $materialsService,
     ) {
@@ -25,34 +29,94 @@ final class SongDeliveryService
 
     /**
      * @param array<string, mixed> $song
+     * @param array<string, mixed>|null $viewer
      */
-    public function sendSongCard(Nutgram $bot, array $song): void
+    public function sendSongCard(Nutgram $bot, array $song, ?array $viewer = null): void
     {
         $title = (string) ($song['title'] ?? '');
-        $keyboard = \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup::make()
-            ->addRow(
-                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
-                    $this->texts->get('buttons.notes'),
-                    callback_data: 'snd:nt:' . (int) $song['id'],
-                ),
-                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
-                    $this->texts->get('buttons.translit'),
-                    callback_data: 'snd:tr:' . (int) $song['id'],
-                ),
-            )
-            ->addRow(
-                \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
+        $songId = (int) $song['id'];
+
+        $voicePart = null;
+        $anyRecordings = true;
+        if ($viewer !== null) {
+            $anyRecordings = VoicePartRules::seesAnyRecordingsOnSongMenu($viewer);
+            if (VoicePartRules::hasAssignedVoicePart($viewer)) {
+                $voicePart = (string) $viewer['voice_part'];
+            }
+        }
+
+        $summary = $this->songs->materialsSummary($songId, $voicePart);
+        $keyboard = $this->buildSongCardKeyboard($songId, $summary, $anyRecordings);
+        $text = $this->texts->get('songs.card_header', ['title' => $title]);
+        if ($this->songCardHasNoMaterials($summary, $anyRecordings)) {
+            $text .= "\n\n" . $this->texts->get('songs.card_no_materials');
+        }
+
+        $bot->sendMessage($text, reply_markup: $keyboard);
+    }
+
+    /**
+     * @param array{
+     *     notes_count: int,
+     *     has_translit: bool,
+     *     recordings_total: int,
+     *     recordings_for_part: int
+     * } $summary
+     */
+    public function buildSongCardKeyboard(int $songId, array $summary, bool $anyRecordings): InlineKeyboardMarkup
+    {
+        $showNotes = $summary['notes_count'] > 0;
+        $showTranslit = $summary['has_translit'];
+        $showRecordings = $anyRecordings
+            ? $summary['recordings_total'] > 0
+            : $summary['recordings_for_part'] > 0;
+
+        $keyboard = InlineKeyboardMarkup::make();
+        $row = [];
+        if ($showNotes) {
+            $row[] = InlineKeyboardButton::make(
+                $this->texts->get('buttons.notes'),
+                callback_data: 'snd:nt:' . $songId,
+            );
+        }
+        if ($showTranslit) {
+            $row[] = InlineKeyboardButton::make(
+                $this->texts->get('buttons.translit'),
+                callback_data: 'snd:tr:' . $songId,
+            );
+        }
+        if ($row !== []) {
+            $keyboard = $keyboard->addRow(...$row);
+        }
+        if ($showRecordings) {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make(
                     $this->texts->get('buttons.party_recordings'),
-                    callback_data: 'snd:pr:' . (int) $song['id'],
+                    callback_data: 'snd:pr:' . $songId,
                 ),
             );
+        }
 
-        $keyboard = InlineMenuHelper::appendFooter($keyboard, $this->texts);
+        return InlineMenuHelper::appendFooter($keyboard, $this->texts);
+    }
 
-        $bot->sendMessage(
-            $this->texts->get('songs.card_header', ['title' => $title]),
-            reply_markup: $keyboard,
-        );
+    /**
+     * @param array{
+     *     notes_count: int,
+     *     has_translit: bool,
+     *     recordings_total: int,
+     *     recordings_for_part: int
+     * } $summary
+     */
+    private function songCardHasNoMaterials(array $summary, bool $anyRecordings): bool
+    {
+        $showRecordings = $anyRecordings
+            ? $summary['recordings_total'] > 0
+            : $summary['recordings_for_part'] > 0;
+
+        return $summary['notes_count'] === 0
+            && !$summary['has_translit']
+            && !$showRecordings;
     }
 
     public function sendSingletonFile(Nutgram $bot, int $songId, string $type): void

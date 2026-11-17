@@ -194,7 +194,8 @@ final class SongMemberHandler
 
         if (count($matches) === 1) {
             $deps->flows->clear($telegramId);
-            $delivery->sendSongCard($bot, $matches[0]);
+            $viewer = $deps->users->findByTelegramId($telegramId);
+            $delivery->sendSongCard($bot, $matches[0], $viewer);
 
             return true;
         }

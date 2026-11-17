@@ -17,7 +17,7 @@ date_default_timezone_set($config->timezone);
 $runner = new CronJobRunner();
 $bot = $config->botToken !== '' ? Bootstrap::bot() : null;
 if ($bot !== null) {
-    NutgramErrorHooks::register($bot, $config, Bootstrap::texts());
+    NutgramErrorHooks::register($bot, $config, Bootstrap::texts(), Bootstrap::errorReportService());
 }
 
 try {

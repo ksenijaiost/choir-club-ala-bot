@@ -11,6 +11,7 @@ use App\Repositories\BlockEventRepository;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\MaterialRepository;
 use App\Repositories\PaymentRecordRepository;
+use App\Repositories\ErrorReportRepository;
 use App\Repositories\RegistrationRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\RehearsalRepository;
@@ -20,6 +21,7 @@ use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AdminChatResolver;
+use App\Services\ErrorReportService;
 use App\Services\UserRolePresenter;
 use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceDiscipline;
@@ -43,8 +45,13 @@ use SergiX44\Nutgram\Nutgram;
 
 final class HandlerRegistry
 {
-    public static function register(Nutgram $bot, TextRepository $texts, Config $config, \PDO $pdo): void
-    {
+    public static function register(
+        Nutgram $bot,
+        TextRepository $texts,
+        Config $config,
+        \PDO $pdo,
+        ?ErrorReportService $errorReports = null,
+    ): void {
         $users = new UserRepository($pdo);
         $registrations = new RegistrationRepository($pdo);
         $blockEvents = new BlockEventRepository($pdo);
@@ -57,6 +64,13 @@ final class HandlerRegistry
         $rehearsals = new RehearsalRepository($pdo);
         $flows = new UserFlowRepository($pdo);
         $interactiveMenus = new InteractiveMenuService(new UserOpenMenuRepository($pdo));
+        $errorReports ??= new ErrorReportService(
+            new ErrorReportRepository($pdo),
+            $users,
+            $texts,
+            $config,
+            $adminChatResolver,
+        );
         $generator = new ScheduleGenerator($templates, $rehearsals, $settings);
         $presenter = new SchedulePresenter($rehearsals, $texts);
         $broadcast = new ScheduleBroadcastService($users, $texts);
@@ -107,7 +121,7 @@ final class HandlerRegistry
             $songRepo,
             $materialRepo,
             new MaterialsService($materialRepo, $songRepo, $texts),
-            new SongDeliveryService($materialRepo, $texts, new MaterialsService($materialRepo, $songRepo, $texts)),
+            new SongDeliveryService($materialRepo, $songRepo, $texts, new MaterialsService($materialRepo, $songRepo, $texts)),
             $texts,
             $interactiveMenus,
         );
@@ -158,13 +172,15 @@ final class HandlerRegistry
             $adminHistory,
             $adminChat,
             $interactiveMenus,
+            $errorReports,
         );
         MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
         AdminChatCommandHandler::register($bot, $texts, $access, $users, $songRepo, $materialRepo);
+        ErrorReportHandler::register($bot, $texts, $users, $access, $flows, $errorReports);
         StartHandler::register($bot, $texts, $users, $access, $interactiveMenus);
         ConductorAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);
         HelpersAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService, $interactiveMenus);
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat, $errorReports);
     }
 }

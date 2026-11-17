@@ -264,7 +264,7 @@ final class MenuFlowInterruptTest extends TestCase
             $songRepo,
             $materialRepo,
             $materialsService,
-            new SongDeliveryService($materialRepo, $texts, $materialsService),
+            new SongDeliveryService($materialRepo, $songRepo, $texts, $materialsService),
             $texts,
                     new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );

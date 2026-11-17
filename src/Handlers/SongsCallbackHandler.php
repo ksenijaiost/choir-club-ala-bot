@@ -78,7 +78,12 @@ final class SongsCallbackHandler
                 return true;
             }
 
-            $delivery->sendSongCard($bot, $song);
+            $viewer = null;
+            $telegramId = $bot->userId();
+            if ($telegramId !== null) {
+                $viewer = $deps->users->findByTelegramId($telegramId);
+            }
+            $delivery->sendSongCard($bot, $song, $viewer);
 
             return true;
         }
