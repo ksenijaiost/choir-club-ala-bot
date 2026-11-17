@@ -39,7 +39,7 @@ final class AdminChatSongListRecordingsTest extends TestCase
         $body = implode("\n", $deps['presenter']->buildMessageChunks());
 
         self::assertStringContainsString(
-            $texts->get('admin_chat.songs_recordings', ['items' => 'тутти']),
+            $texts->get('admin_chat.songs_block_recordings', ['detail' => 'тутти']),
             $body,
         );
     }
@@ -59,7 +59,7 @@ final class AdminChatSongListRecordingsTest extends TestCase
             'Альт 1',
             'Тенор',
         ]);
-        $expected = $texts->get('admin_chat.songs_recordings', ['items' => $items]);
+        $expected = $texts->get('admin_chat.songs_block_recordings', ['detail' => $items]);
         $body = implode("\n", $deps['presenter']->buildMessageChunks());
 
         self::assertStringContainsString($expected, $body);
@@ -76,7 +76,7 @@ final class AdminChatSongListRecordingsTest extends TestCase
         $deps['materials']->insertRecording($songId, ['soprano_1'], 'r3', 'u3', $deps['uploaderId'], null);
 
         $items = implode('; ', ['тутти', 'Сопрано 1', 'Бас']);
-        $expected = $texts->get('admin_chat.songs_recordings', ['items' => $items]);
+        $expected = $texts->get('admin_chat.songs_block_recordings', ['detail' => $items]);
         $body = implode("\n", $deps['presenter']->buildMessageChunks());
 
         self::assertStringContainsString($expected, $body);
@@ -90,7 +90,10 @@ final class AdminChatSongListRecordingsTest extends TestCase
 
         $body = implode("\n", $deps['presenter']->buildMessageChunks());
 
-        self::assertStringContainsString($texts->get('admin_chat.songs_recordings_none'), $body);
+        self::assertStringContainsString(
+            $texts->get('admin_chat.songs_block_recordings', ['detail' => $texts->get('admin_chat.word_no')]),
+            $body,
+        );
     }
 
     /**

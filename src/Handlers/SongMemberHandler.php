@@ -8,7 +8,9 @@ use App\Domain\VoicePart;
 use App\Services\VoicePartRules;
 use App\Support\SqlPagination;
 use App\Services\SongDeliveryService;
+use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -19,16 +21,52 @@ final class SongMemberHandler
     {
         $deps->flows->set($telegramId, 'song_search', []);
         self::sendMaterialCatalog($bot, $deps, 0);
-        $bot->sendMessage($deps->texts->get('songs.ask_title'));
     }
 
     public static function sendMaterialCatalog(Nutgram $bot, MaterialsDeps $deps, int $page): void
     {
-        $total = $deps->songs->countWithCurrentMaterials();
-        if ($total === 0) {
+        $built = self::buildMaterialCatalog($bot, $deps, $page);
+        if ($built === null) {
             $bot->sendMessage($deps->texts->get('songs.catalog_empty'));
 
             return;
+        }
+
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $built['text'],
+            $built['keyboard'],
+        );
+    }
+
+    public static function editMaterialCatalog(Nutgram $bot, MaterialsDeps $deps, int $page): void
+    {
+        $built = self::buildMaterialCatalog($bot, $deps, $page);
+        if ($built === null) {
+            return;
+        }
+
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $built['text'],
+            $built['keyboard'],
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+        );
+    }
+
+    /**
+     * @return array{text: string, keyboard: InlineKeyboardMarkup}|null
+     */
+    private static function buildMaterialCatalog(Nutgram $bot, MaterialsDeps $deps, int $page): ?array
+    {
+        $total = $deps->songs->countWithCurrentMaterials();
+        if ($total === 0) {
+            return null;
         }
 
         $page = SqlPagination::clampPage($page);
@@ -55,17 +93,13 @@ final class SongMemberHandler
             'snd:cat:pg:',
         );
 
-        $ownerTelegramId = (int) ($bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu(
-            $bot,
-            $deps->interactiveMenus,
-            $ownerTelegramId,
-            $deps->texts->get('songs.catalog_header', [
+        return [
+            'text' => $deps->texts->get('songs.catalog_header', [
                 'page' => (string) ($page + 1),
                 'pages' => (string) InlineMenuHelper::totalPages($total),
             ]),
-            $keyboard,
-        );
+            'keyboard' => $keyboard,
+        ];
     }
 
     public static function sendSearchResults(
@@ -113,6 +147,7 @@ final class SongMemberHandler
     public static function sendMyRecordingsPage(
         Nutgram $bot,
         MaterialsDeps $deps,
+        SongDeliveryService $delivery,
         string $partCode,
         int $page,
     ): void {
@@ -126,44 +161,39 @@ final class SongMemberHandler
         $total = count($songs);
 
         if ($total === 0) {
-            if ($allParts) {
-                $bot->sendMessage($deps->texts->get('songs.my_recordings_empty', ['part' => $partLabel]));
-            } else {
-                $bot->sendMessage($deps->texts->get('songs.my_recordings_empty', ['part' => $partLabel]));
-            }
+            SafeTelegram::sendMessage($bot, $deps->texts->get('songs.my_recordings_empty', ['part' => $partLabel]));
 
             return;
         }
 
-        $keyboard = InlineKeyboardMarkup::make();
-        foreach (InlineMenuHelper::pageSlice($songs, $page) as $song) {
-            $id = (int) $song['id'];
-            $title = (string) ($song['title'] ?? '');
-            $count = (int) ($song['recording_count'] ?? 0);
-            $label = $title . ' (' . $count . ')';
-            if (mb_strlen($label) > 48) {
-                $label = mb_substr($title, 0, 35) . '… (' . $count . ')';
-            }
-            $keyboard = $keyboard->addRow(
-                InlineKeyboardButton::make($label, callback_data: 'snd:my:' . $id . ':' . $partCode),
-            );
+        $pageSongs = InlineMenuHelper::pageSlice($songs, $page);
+        if ($page === 0) {
+            $headerKey = $allParts ? 'songs.my_recordings_header_all' : 'songs.my_recordings_header';
+            $header = $allParts
+                ? $deps->texts->get($headerKey)
+                : $deps->texts->get($headerKey, ['part' => $partLabel]);
+            SafeTelegram::sendMessage($bot, $header);
         }
 
-        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
-            $keyboard,
-            $deps->texts,
-            $page,
-            $total,
-            'snd:my:pg:' . $partCode . ':',
-        );
+        $delivery->sendMyRecordingsGrouped($bot, $pageSongs, $partCode, $allParts);
 
-        $headerKey = $allParts ? 'songs.my_recordings_header_all' : 'songs.my_recordings_header';
-        $header = $allParts
-            ? $deps->texts->get($headerKey)
-            : $deps->texts->get($headerKey, ['part' => $partLabel]);
-
-        $ownerTelegramId = (int) ($bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu($bot, $deps->interactiveMenus, $ownerTelegramId, $header, $keyboard);
+        if ($total > InlineMenuHelper::PAGE_SIZE) {
+            $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+                InlineKeyboardMarkup::make(),
+                $deps->texts,
+                $page,
+                $total,
+                'snd:my:pg:' . $partCode . ':',
+            );
+            $ownerTelegramId = (int) ($bot->userId() ?? 0);
+            InlineMenuHelper::sendInteractiveMenu(
+                $bot,
+                $deps->interactiveMenus,
+                $ownerTelegramId,
+                $deps->texts->get('songs.my_recordings_more_pages'),
+                $keyboard,
+            );
+        }
     }
 
     public static function handleFlowMessage(
@@ -216,18 +246,18 @@ final class SongMemberHandler
         array $user,
     ): void {
         if (VoicePartRules::isConductor($user)) {
-            self::sendMyRecordingsPage($bot, $deps, VoicePartRules::RECORDINGS_ALL_PARTS, 0);
+            self::sendMyRecordingsPage($bot, $deps, $delivery, VoicePartRules::RECORDINGS_ALL_PARTS, 0);
 
             return;
         }
 
         $partCode = (string) ($user['voice_part'] ?? '');
         if ($partCode === '' || !VoicePart::isValid($partCode)) {
-            $bot->sendMessage($deps->texts->get('songs.my_recordings_need_part'));
+            SafeTelegram::sendMessage($bot, $deps->texts->get('songs.my_recordings_need_part'));
 
             return;
         }
 
-        self::sendMyRecordingsPage($bot, $deps, $partCode, 0);
+        self::sendMyRecordingsPage($bot, $deps, $delivery, $partCode, 0);
     }
 }

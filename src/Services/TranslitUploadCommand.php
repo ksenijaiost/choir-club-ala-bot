@@ -8,7 +8,9 @@ use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
 final class TranslitUploadCommand
 {
-    public const COMMAND = '/translit';
+    public const COMMAND = '/notes';
+
+    public const LEGACY_COMMAND = '/translit';
 
     public static function isInvoked(?string $text): bool
     {
@@ -18,7 +20,7 @@ final class TranslitUploadCommand
 
         $firstLine = explode("\n", str_replace(["\r\n", "\r"], "\n", $text), 2)[0];
 
-        return preg_match('/^\/translit(?:@[\w_]+)?(?:\s|$)/u', trim($firstLine)) === 1;
+        return preg_match('/^\/(?:notes|translit)(?:@[\w_]+)?(?:\s|$)/u', trim($firstLine)) === 1;
     }
 
     public static function extractText(Message $message): ?string

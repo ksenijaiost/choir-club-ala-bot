@@ -68,12 +68,13 @@ final class AdminChatCommandsTest extends TestCase
         $body = implode("\n", $chunks);
 
         self::assertStringContainsString('Аве Мария', $body);
-        self::assertStringContainsString('ноты ✅', $body);
-        self::assertStringContainsString('заметки ✅', $body);
-        self::assertStringContainsString('записи: Сопрано 1 + Бас; Тенор', $body);
-        self::assertStringContainsString('Благослови', $body);
-        self::assertStringContainsString('заметки ❌', $body);
-        self::assertStringContainsString('записей нет', $body);
+        self::assertStringContainsString('<b>Аве Мария</b>', $body);
+        self::assertStringContainsString('• ноты: 1', $body);
+        self::assertStringContainsString('• заметки: есть', $body);
+        self::assertStringContainsString('• записи: Сопрано 1 + Бас; Тенор', $body);
+        self::assertStringContainsString('<b>Благослови</b>', $body);
+        self::assertStringContainsString('• заметки: нет', $body);
+        self::assertStringContainsString('• записи: нет', $body);
         self::assertStringContainsString('Гимн', $body);
     }
 
@@ -97,7 +98,7 @@ final class AdminChatCommandsTest extends TestCase
         $body = implode("\n", $presenter->buildMessageChunks());
 
         self::assertStringContainsString('Две страницы', $body);
-        self::assertStringContainsString('ноты 2 шт.', $body);
+        self::assertStringContainsString('• ноты: 2', $body);
     }
 
     public function testSongsEmptyList(): void

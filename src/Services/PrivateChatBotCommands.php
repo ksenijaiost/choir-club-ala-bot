@@ -19,6 +19,7 @@ final class PrivateChatBotCommands
         ];
 
         $scope = new BotCommandScopeAllPrivateChats();
+        $bot->setMyCommands($commands, $scope);
         $bot->setMyCommands($commands, $scope, 'ru');
     }
 }

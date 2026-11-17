@@ -37,7 +37,7 @@ final class AdminChatCommandHandler
             }
 
             $chatId = (int) $bot->chatId();
-            AdminChatCommandMessenger::sendChunks($bot, $chatId, $songPresenter->buildMessageChunks());
+            AdminChatCommandMessenger::sendHtmlChunks($bot, $chatId, $songPresenter->buildMessageChunks());
         });
     }
 

@@ -28,8 +28,7 @@ final class SongsCallbackHandler
 
         if (preg_match('/^snd:cat:pg:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
-            SongMemberHandler::sendMaterialCatalog($bot, $deps, (int) $m[1]);
+            SongMemberHandler::editMaterialCatalog($bot, $deps, (int) $m[1]);
 
             return true;
         }
@@ -63,7 +62,7 @@ final class SongsCallbackHandler
 
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            SongMemberHandler::sendMyRecordingsPage($bot, $deps, $part, (int) $m[2]);
+            SongMemberHandler::sendMyRecordingsPage($bot, $deps, $delivery, $part, (int) $m[2]);
 
             return true;
         }
