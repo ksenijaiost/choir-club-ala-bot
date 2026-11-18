@@ -78,6 +78,62 @@ final class MyRecordingsDeliveryTest extends TestCase
         );
         $callbacks = $this->callbackDataFromLastMessage($bot);
         self::assertContains('snd:my:' . $songId . ':soprano_1', $callbacks);
+        self::assertNotContains('snd:my:all:soprano_1', $callbacks);
+    }
+
+    public function testAllRecordingsButtonAppearsWhenTwoOrMoreRecordings(): void
+    {
+        $deps = $this->deps();
+        $admin = $this->seedAdmin($deps);
+        $member = $deps->users->findByTelegramId(self::MEMBER_TG);
+        self::assertNotNull($member);
+
+        $idA = $deps->songs->create('Альфа');
+        $idB = $deps->songs->create('Бета');
+        $deps->materials->insertRecording($idA, ['soprano_1'], 'a1', 'u1', (int) $admin['id'], null);
+        $deps->materials->insertRecording($idB, ['soprano_1'], 'b1', 'ub', (int) $admin['id'], null);
+
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->user(self::MEMBER_TG));
+        SongMemberHandler::openMyRecordings($bot, $deps, $deps->delivery, $member);
+
+        $callbacks = $this->callbackDataFromLastMessage($bot);
+        self::assertContains('snd:my:all:soprano_1', $callbacks);
+    }
+
+    public function testAllRecordingsCallbackSendsEveryFileWithCaptionWithoutNotesPreview(): void
+    {
+        $deps = $this->deps();
+        $admin = $this->seedAdmin($deps);
+
+        $idA = $deps->songs->create('Альфа');
+        $idB = $deps->songs->create('Бета');
+        $deps->materials->insertRecording($idA, ['soprano_1'], 'a1', 'u1', (int) $admin['id'], null);
+        $deps->materials->insertRecording($idB, ['soprano_1'], 'b1', 'ub', (int) $admin['id'], null);
+        $deps->service->saveTextUpload($admin, $idA, MaterialType::TRANSLIT, 'Заметка альфа', null);
+
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->user(self::MEMBER_TG));
+        SongsCallbackHandler::handle($bot, $deps, $deps->delivery, 'snd:my:all:soprano_1');
+
+        $bot->assertCalled('sendAudio', 2);
+        $captions = [];
+        foreach ($bot->getRequestHistory() as $entry) {
+            if (!str_contains($entry['request']->getUri()->getPath(), 'sendAudio')) {
+                continue;
+            }
+            $data = FakeNutgram::getActualData($entry['request']);
+            $captions[] = (string) ($data['caption'] ?? '');
+        }
+        self::assertCount(2, $captions);
+        self::assertTrue(
+            str_contains($captions[0], 'Альфа') && str_contains($captions[1], 'Бета')
+            || str_contains($captions[0], 'Бета') && str_contains($captions[1], 'Альфа'),
+        );
+
+        foreach ($this->bodiesForMethod($bot->getRequestHistory(), 'sendMessage') as $body) {
+            self::assertStringNotContainsString('Заметка альфа', (string) ($body['text'] ?? ''));
+        }
     }
 
     public function testSongSelectionSendsAudioWithCaptionAndNotesPreview(): void

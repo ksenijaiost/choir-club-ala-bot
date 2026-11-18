@@ -285,6 +285,8 @@
     "my_recordings_empty": "Для твоей партии пока нет записей.",
     "my_recordings_empty_all": "Пока нет записей.",
     "my_recordings_need_part": "Сначала укажи партию в профиле (или попроси дирижёра обновить данные).",
+    "my_recordings_all_button": "📦 Все записи",
+    "my_recordings_sending_all": "Отправляю {count} записей…",
     "pick_part_for_recordings": "Записи партий — «{title}». Выбери партию:",
     "pick_part_for_recordings_others": "Записи партий — «{title}». Другие партии:",
     "recordings_your_part_button": "⭐ {part} ({count})",

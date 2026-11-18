@@ -219,6 +219,15 @@ final class SongMemberHandler
             );
         }
 
+        if (self::totalRecordingCount($songs) > 1) {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('songs.my_recordings_all_button'),
+                    callback_data: 'snd:my:all:' . $partCode,
+                ),
+            );
+        }
+
         $keyboard = InlineMenuHelper::appendPaginationAndFooter(
             $keyboard,
             $deps->texts,
@@ -245,6 +254,19 @@ final class SongMemberHandler
             'text' => $text,
             'keyboard' => $keyboard,
         ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $songs
+     */
+    private static function totalRecordingCount(array $songs): int
+    {
+        $sum = 0;
+        foreach ($songs as $song) {
+            $sum += (int) ($song['recording_count'] ?? 0);
+        }
+
+        return $sum;
     }
 
     public static function handleFlowMessage(

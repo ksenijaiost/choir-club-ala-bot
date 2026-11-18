@@ -140,6 +140,25 @@ final class SongsCallbackHandler
             return true;
         }
 
+        if (preg_match('/^snd:my:all:([a-z0-9_]+)$/', $data, $m) === 1) {
+            $part = $m[1];
+            if ($part !== VoicePartRules::RECORDINGS_ALL_PARTS && !VoicePart::isValid($part)) {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $allParts = $part === VoicePartRules::RECORDINGS_ALL_PARTS;
+            $songs = $allParts
+                ? $deps->materials->listSongsWithRecordingsAnyPart()
+                : $deps->materials->listSongsWithRecordingsForPart($part);
+            $delivery->sendAllMyRecordingsForSongs($bot, $songs, $part, $allParts);
+
+            return true;
+        }
+
         if (preg_match('/^snd:my:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
             $part = $m[2];
             if ($part === VoicePartRules::RECORDINGS_ALL_PARTS) {
