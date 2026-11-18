@@ -338,7 +338,18 @@
     "recording_list_header": "Записи: {title} — {part}",
     "recording_list_empty": "Для этой партии записей пока нет.",
     "recording_deleted": "Запись отправлена в архив.",
-    "replace_upload_hint": "Отправь новый файл записи в админ-чат — он заменит выбранную версию."
+    "replace_upload_hint": "Отправь новый файл записи в админ-чат — он заменит выбранную версию.",
+    "edit_recordings_button": "✏️ Редактировать записи",
+    "edit_recordings_list_header": "Выбери запись для смены партии — «{title}»:",
+    "edit_recordings_empty": "У этой песни записей пока нет.",
+    "recording_edit_current": "Сейчас: {part}",
+    "recordings_have_line": "Есть записи: {parts}",
+    "recordings_missing_line": "Нет записей: {parts}",
+    "recordings_upload_hint": "Уже есть записи: {parts}",
+    "recordings_upload_none": "Записей пока нет.",
+    "recording_part_unchanged": "Партия не изменилась.",
+    "recording_part_updated": "Готово: запись теперь у {part}",
+    "recording_edit_back": "⬅️ Назад"
   },
   "attendance": {
     "history_header": "Посещаемость: {name}",
