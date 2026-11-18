@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\MaterialsTestDeps;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -177,17 +178,12 @@ final class SongCatalogAndCardNotesTest extends TestCase
 
         $songRepo = new SongRepository($pdo);
         $materialRepo = new MaterialRepository($pdo);
-        $service = new MaterialsService($materialRepo, $songRepo, $texts);
-        $delivery = new SongDeliveryService($materialRepo, $songRepo, $texts, $service);
-
-        return new MaterialsDeps(
+        return MaterialsTestDeps::build(
             $config,
             $users,
             new UserFlowRepository($pdo),
             $songRepo,
             $materialRepo,
-            $service,
-            $delivery,
             $texts,
             new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );

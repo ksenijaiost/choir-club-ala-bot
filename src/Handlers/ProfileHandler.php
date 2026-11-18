@@ -50,6 +50,16 @@ final class ProfileHandler
             );
         }
 
+        $notifyOn = $users->materialNotificationsEnabled($fresh);
+        $keyboard = $keyboard->addRow(
+            InlineKeyboardButton::make(
+                $notifyOn
+                    ? $texts->get('profile.material_notify_on')
+                    : $texts->get('profile.material_notify_off'),
+                callback_data: 'prf:matn:t',
+            ),
+        );
+
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
         if ($isConductor) {
@@ -240,6 +250,18 @@ final class ProfileHandler
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
             self::sendPartPicker($bot, $texts, $user, $interactiveMenus);
+
+            return true;
+        }
+
+        if ($data === 'prf:matn:t') {
+            $next = $users->toggleMaterialNotifications((int) $user['id']);
+            $bot->answerCallbackQuery(text: $next
+                ? $texts->get('profile.material_notify_turned_on')
+                : $texts->get('profile.material_notify_turned_off'));
+            CallbackUi::clearKeyboard($bot);
+            $fresh = $users->findById((int) $user['id']) ?? $user;
+            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus);
 
             return true;
         }

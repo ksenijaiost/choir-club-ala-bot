@@ -411,6 +411,12 @@
     "role_badge_conductor": "дирижёр",
     "role_badge_helper": "помощник"
   },
+  "notifications": {
+    "material_notes": "🎵 Новые ноты: «{title}»",
+    "material_recording": "🎵 Новая запись: «{title}», {part}",
+    "material_translit": "🎵 Заметки обновлены: «{title}»",
+    "open_song": "Открыть песню"
+  },
   "profile": {
     "card": "Мой профиль\nИмя: {name}\nПартия: {part}",
     "card_conductor": "Мой профиль\nИмя: {name}\nРоль: дирижёр (ведёт все партии)",
@@ -426,7 +432,11 @@
     "part_saved": "Партия сохранена",
     "part_updated": "Твоя партия: {part}",
     "owner_ask_part": "Укажи свою партию в хоре — выбери одну из списка.",
-    "ask_part_required": "Укажи свою партию в хоре — выбери одну из списка."
+    "ask_part_required": "Укажи свою партию в хоре — выбери одну из списка.",
+    "material_notify_on": "🔔 Уведомления о материалах: вкл",
+    "material_notify_off": "🔔 Уведомления о материалах: выкл",
+    "material_notify_turned_on": "Уведомления о материалах включены.",
+    "material_notify_turned_off": "Уведомления о материалах выключены."
   },
   "history": {
     "pick_member": "История участника — выбери человека:",

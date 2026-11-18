@@ -20,9 +20,8 @@ use App\Repositories\UserFlowRepository;
 use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
-use App\Services\MaterialsService;
-use App\Services\SongDeliveryService;
 use App\Services\SongRecordingAvailability;
+use App\Tests\Support\MaterialsTestDeps;
 use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
@@ -198,16 +197,12 @@ final class RecordingEditTest extends TestCase
         $songs = new SongRepository($pdo);
         $flows = new UserFlowRepository($pdo);
         $menus = new InteractiveMenuService(new UserOpenMenuRepository($pdo));
-        $service = new MaterialsService($materials, $songs, $texts);
-        $delivery = new SongDeliveryService($materials, $songs, $texts, $service);
-        $handlerDeps = new MaterialsDeps(
+        $handlerDeps = MaterialsTestDeps::build(
             $config,
             $users,
             $flows,
             $songs,
             $materials,
-            $service,
-            $delivery,
             $texts,
             $menus,
         );

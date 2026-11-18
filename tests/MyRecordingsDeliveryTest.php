@@ -20,7 +20,7 @@ use App\Repositories\UserFlowRepository;
 use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
 use App\Services\MaterialsService;
-use App\Services\SongDeliveryService;
+use App\Tests\Support\MaterialsTestDeps;
 use App\Telegram\InteractiveMenuService;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
@@ -308,16 +308,12 @@ final class MyRecordingsDeliveryTest extends TestCase
 
         $songRepo = new SongRepository($pdo);
         $materialRepo = new MaterialRepository($pdo);
-        $service = new MaterialsService($materialRepo, $songRepo, $texts);
-
-        return new MaterialsDeps(
+        return MaterialsTestDeps::build(
             $this->testConfig(),
             $users,
             new UserFlowRepository($pdo),
             $songRepo,
             $materialRepo,
-            $service,
-            new SongDeliveryService($materialRepo, $songRepo, $texts, $service),
             $texts,
             new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );

@@ -140,6 +140,12 @@ final class MaterialsRecordingEditHandler
 
         $deps->materials->setVoiceParts($materialId, $newParts);
         $material = $deps->materials->findById($materialId) ?? $material;
+        $song = $deps->songs->findById($songId);
+        if ($song !== null) {
+            $actor = $deps->users->findByTelegramId($telegramId);
+            $actorUserId = $actor !== null ? (int) $actor['id'] : 0;
+            $deps->materialNotifications->afterRecordingReassigned($song, $newParts, $actorUserId);
+        }
         $partLabel = $deps->service->formatRecordingPartsLabel($newParts);
 
         SafeTelegram::answerCallbackQuery($bot, [

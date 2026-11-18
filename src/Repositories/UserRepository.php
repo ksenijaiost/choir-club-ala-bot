@@ -39,12 +39,43 @@ final class UserRepository
 
     public function create(int $telegramId, string $displayName, ?string $voicePart, string $role, string $status): int
     {
+        $notifications = $role === UserRole::CONDUCTOR ? 0 : 1;
         $stmt = $this->pdo->prepare(
-            'INSERT INTO users (telegram_id, display_name, voice_part, role, status) VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO users (telegram_id, display_name, voice_part, role, status, material_notifications_enabled)
+             VALUES (?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$telegramId, $displayName, $voicePart, $role, $status]);
+        $stmt->execute([$telegramId, $displayName, $voicePart, $role, $status, $notifications]);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public function materialNotificationsEnabled(array $user): bool
+    {
+        return ((int) ($user['material_notifications_enabled'] ?? 1)) === 1;
+    }
+
+    public function setMaterialNotificationsEnabled(int $userId, bool $enabled): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE users SET material_notifications_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        );
+        $stmt->execute([$enabled ? 1 : 0, $userId]);
+    }
+
+    public function toggleMaterialNotifications(int $userId): bool
+    {
+        $user = $this->findById($userId);
+        if ($user === null) {
+            return true;
+        }
+
+        $next = !$this->materialNotificationsEnabled($user);
+        $this->setMaterialNotificationsEnabled($userId, $next);
+
+        return $next;
     }
 
     public function updateDisplayName(int $userId, string $displayName): void

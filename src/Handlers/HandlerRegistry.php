@@ -29,6 +29,7 @@ use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\MaterialNotificationService;
 use App\Services\MaterialsService;
 use App\Services\SongDeliveryService;
 use App\Services\MemberBlockService;
@@ -114,14 +115,16 @@ final class HandlerRegistry
 
         $songRepo = new SongRepository($pdo);
         $materialRepo = new MaterialRepository($pdo);
+        $materialsService = new MaterialsService($materialRepo, $songRepo, $texts);
         $materials = new MaterialsDeps(
             $config,
             $users,
             $flows,
             $songRepo,
             $materialRepo,
-            new MaterialsService($materialRepo, $songRepo, $texts),
-            new SongDeliveryService($materialRepo, $songRepo, $texts, new MaterialsService($materialRepo, $songRepo, $texts)),
+            $materialsService,
+            new SongDeliveryService($materialRepo, $songRepo, $texts, $materialsService),
+            new MaterialNotificationService($users, $texts, $materialsService, $outbound),
             $texts,
             $interactiveMenus,
         );

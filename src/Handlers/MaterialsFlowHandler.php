@@ -714,6 +714,8 @@ final class MaterialsFlowHandler
             $lines[] = $deps->texts->get('materials.archived_notice');
         }
 
+        $deps->materialNotifications->afterMaterialSaved($user, $result);
+
         $text = implode("\n", $lines);
         $wizardMessageId = (int) ($ctx['wizard_message_id'] ?? 0);
         $deps->flows->clear($telegramId);
