@@ -37,6 +37,7 @@ final class BotCommandsRegistrationTest extends TestCase
 
         $commandsJson = $this->firstSetMyCommandsPayload($bot)['commands'] ?? '[]';
         self::assertStringContainsString('"command":"notes"', $commandsJson);
+        self::assertStringContainsString('"command":"edit"', $commandsJson);
         self::assertStringNotContainsString('"command":"translit"', $commandsJson);
     }
 

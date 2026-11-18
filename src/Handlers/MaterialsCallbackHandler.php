@@ -35,6 +35,55 @@ final class MaterialsCallbackHandler
             return true;
         }
 
+        $telegramId = (int) $actor['telegram_id'];
+        $adminChatId = (int) ($bot->chatId() ?? 0);
+        $isAdminChat = $adminChatId !== 0 && $access->isAdminChatId($adminChatId);
+
+        if ($isAdminChat && str_starts_with($data, 'mat:ac:ed:')) {
+            if (!MaterialsRecordingEditHandler::assertAdminChatMenuActor($bot, $deps, $access, $actor)) {
+                return true;
+            }
+
+            if (preg_match('/^' . preg_quote(MaterialsRecordingEditHandler::ADMIN_SONG_PAGE_PREFIX, '/') . '(\d+)$/', $data, $m) === 1) {
+                SafeTelegram::answerCallbackQuery($bot);
+                $state = $deps->flows->get($telegramId);
+                $query = is_array($state['context'] ?? null)
+                    ? (string) ($state['context']['search_query'] ?? '')
+                    : '';
+                MaterialsRecordingEditHandler::sendAdminSongPicker(
+                    $bot,
+                    $deps,
+                    $telegramId,
+                    $adminChatId,
+                    (int) $m[1],
+                    $query,
+                );
+
+                return true;
+            }
+
+            if (preg_match('/^' . preg_quote(MaterialsRecordingEditHandler::ADMIN_SONG_PICK_PREFIX, '/') . '(\d+)$/', $data, $m) === 1) {
+                SafeTelegram::answerCallbackQuery($bot);
+                MaterialsRecordingEditHandler::onAdminSongPicked(
+                    $bot,
+                    $deps,
+                    $telegramId,
+                    (int) $m[1],
+                    $adminChatId,
+                );
+
+                return true;
+            }
+
+            return true;
+        }
+
+        if ($isAdminChat && str_starts_with($data, 'mat:mg:erec:')) {
+            if (!MaterialsRecordingEditHandler::assertAdminChatMenuActor($bot, $deps, $access, $actor)) {
+                return true;
+            }
+        }
+
         if (preg_match('/^mat:up:sn:pg:(\d+)$/', $data, $m) === 1) {
             $telegramId = (int) $actor['telegram_id'];
             SafeTelegram::answerCallbackQuery($bot);

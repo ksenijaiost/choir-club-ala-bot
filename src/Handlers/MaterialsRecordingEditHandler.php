@@ -6,7 +6,9 @@ namespace App\Handlers;
 
 use App\Domain\MaterialType;
 use App\Domain\VoicePart;
+use App\Services\AccessControl;
 use App\Services\SongRecordingAvailability;
+use App\Support\SqlPagination;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
@@ -17,6 +19,10 @@ use SergiX44\Nutgram\Telegram\Types\Message\Message;
 final class MaterialsRecordingEditHandler
 {
     public const FLOW = 'material_recording_edit';
+
+    public const ADMIN_SONG_PAGE_PREFIX = 'mat:ac:ed:pg:';
+
+    public const ADMIN_SONG_PICK_PREFIX = 'mat:ac:ed:sn:';
 
     public static function availability(MaterialsDeps $deps): SongRecordingAvailability
     {
@@ -38,7 +44,7 @@ final class MaterialsRecordingEditHandler
             $keyboard = InlineMenuHelper::appendFooter(
                 InlineKeyboardMarkup::make(),
                 $deps->texts,
-                'mat:mg:sn:' . $songId,
+                self::listFooterBackCallback($deps, $telegramId, $songId),
             );
             self::presentStep($bot, $deps, $telegramId, $songId, null, $text, $keyboard, $chatId);
 
@@ -66,7 +72,11 @@ final class MaterialsRecordingEditHandler
             );
         }
 
-        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:mg:sn:' . $songId);
+        $keyboard = InlineMenuHelper::appendFooter(
+            $keyboard,
+            $deps->texts,
+            self::listFooterBackCallback($deps, $telegramId, $songId),
+        );
         self::presentStep(
             $bot,
             $deps,
@@ -77,6 +87,185 @@ final class MaterialsRecordingEditHandler
             $keyboard,
             $chatId,
         );
+    }
+
+    public static function startAdminChat(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $adminChatId,
+    ): void {
+        $deps->flows->set($telegramId, self::FLOW, [
+            'step' => 'pick_song',
+            'admin_chat_edit' => true,
+            'admin_chat_id' => $adminChatId,
+            'menu_owner_telegram_id' => $telegramId,
+            'search_query' => '',
+            'song_page' => 0,
+            'wizard_chat_id' => 0,
+            'wizard_message_id' => 0,
+        ]);
+        self::sendAdminSongPicker($bot, $deps, $telegramId, $adminChatId, 0, '');
+    }
+
+    public static function sendAdminSongPicker(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $adminChatId,
+        int $page,
+        string $query,
+    ): void {
+        $page = SqlPagination::clampPage($page);
+        $query = trim($query);
+        $keyboard = InlineKeyboardMarkup::make();
+        $total = 0;
+
+        if ($query !== '') {
+            $all = $deps->songs->searchByTitleFragment($query, 80);
+            $total = count($all);
+            $text = $deps->texts->get('materials.admin_edit_pick_song_search', ['query' => $query]);
+            if ($total === 0) {
+                $text .= "\n\n" . $deps->texts->get('songs.not_found');
+            } else {
+                foreach (InlineMenuHelper::pageSlice($all, $page) as $song) {
+                    $id = (int) $song['id'];
+                    $title = (string) ($song['title'] ?? '');
+                    $label = mb_strlen($title) > 40 ? mb_substr($title, 0, 37) . '…' : $title;
+                    $keyboard = $keyboard->addRow(
+                        InlineKeyboardButton::make($label, callback_data: self::ADMIN_SONG_PICK_PREFIX . $id),
+                    );
+                }
+            }
+        } else {
+            $total = $deps->songs->countAll();
+            $songs = $deps->songs->listAlphabetical(
+                SqlPagination::offsetForPage($page, InlineMenuHelper::PAGE_SIZE),
+                InlineMenuHelper::PAGE_SIZE,
+            );
+            $text = $deps->texts->get('materials.admin_edit_pick_song');
+            $text .= "\n\n" . $deps->texts->get('materials.admin_edit_search_hint');
+            if ($total === 0) {
+                $text .= "\n\n" . $deps->texts->get('materials.pick_song_empty');
+            }
+
+            foreach ($songs as $song) {
+                $id = (int) $song['id'];
+                $title = (string) ($song['title'] ?? '');
+                $label = mb_strlen($title) > 40 ? mb_substr($title, 0, 37) . '…' : $title;
+                $keyboard = $keyboard->addRow(
+                    InlineKeyboardButton::make($label, callback_data: self::ADMIN_SONG_PICK_PREFIX . $id),
+                );
+            }
+        }
+
+        if ($total > 0) {
+            $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+                $keyboard,
+                $deps->texts,
+                $page,
+                $total,
+                self::ADMIN_SONG_PAGE_PREFIX,
+            );
+        } else {
+            $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts);
+        }
+
+        $state = $deps->flows->get($telegramId);
+        $ctx = $state !== null && ($state['flow'] ?? '') === self::FLOW ? $state['context'] : [];
+        $ctx['step'] = 'pick_song';
+        $ctx['admin_chat_edit'] = true;
+        $ctx['admin_chat_id'] = $adminChatId;
+        $ctx['menu_owner_telegram_id'] = $telegramId;
+        $ctx['search_query'] = $query;
+        $ctx['song_page'] = $page;
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
+
+        self::presentStep($bot, $deps, $telegramId, 0, null, $text, $keyboard, $adminChatId);
+    }
+
+    public static function handleAdminChatSearchText(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $adminChatId,
+        string $text,
+    ): bool {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== self::FLOW) {
+            return false;
+        }
+
+        $ctx = $state['context'];
+        if (!($ctx['admin_chat_edit'] ?? false) || ($ctx['step'] ?? '') !== 'pick_song') {
+            return false;
+        }
+
+        if (mb_strlen(trim($text)) < 2) {
+            SafeTelegram::sendMessage($bot, $deps->texts->get('songs.query_too_short'), $adminChatId);
+
+            return true;
+        }
+
+        self::sendAdminSongPicker($bot, $deps, $telegramId, $adminChatId, 0, trim($text));
+
+        return true;
+    }
+
+    /**
+     * @param array<string, mixed> $actor
+     */
+    public static function assertAdminChatMenuActor(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        AccessControl $access,
+        array $actor,
+    ): bool {
+        $chatId = $bot->chatId();
+        if ($chatId === null || !$access->isAdminChatId($chatId)) {
+            return true;
+        }
+
+        $telegramId = (int) ($actor['telegram_id'] ?? 0);
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== self::FLOW) {
+            SafeTelegram::answerCallbackQuery($bot, [
+                'text' => $deps->texts->get('admin_chat.menu_other_user'),
+                'show_alert' => true,
+            ]);
+
+            return false;
+        }
+
+        $owner = (int) ($state['context']['menu_owner_telegram_id'] ?? $telegramId);
+        if ($owner !== $telegramId) {
+            SafeTelegram::answerCallbackQuery($bot, [
+                'text' => $deps->texts->get('admin_chat.menu_other_user'),
+                'show_alert' => true,
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function onAdminSongPicked(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $songId,
+        int $adminChatId,
+    ): void {
+        $state = $deps->flows->get($telegramId);
+        $ctx = $state !== null && ($state['flow'] ?? '') === self::FLOW ? $state['context'] : [];
+        $ctx['step'] = 'pick_recording';
+        $ctx['admin_chat_edit'] = true;
+        $ctx['admin_chat_id'] = $adminChatId;
+        $ctx['menu_owner_telegram_id'] = $telegramId;
+        $ctx['song_id'] = $songId;
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
+        self::openList($bot, $deps, $telegramId, $songId, $adminChatId);
     }
 
     public static function openEditor(Nutgram $bot, MaterialsDeps $deps, int $telegramId, int $materialId, ?int $chatId = null): void
@@ -90,7 +279,7 @@ final class MaterialsRecordingEditHandler
 
         $songId = (int) $material['song_id'];
         $text = self::buildEditorText($deps, $songId, $material);
-        $keyboard = self::buildEditorKeyboard($deps, $songId, $materialId);
+        $keyboard = self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId);
         self::presentStep($bot, $deps, $telegramId, $songId, $materialId, $text, $keyboard, $chatId);
     }
 
@@ -133,7 +322,7 @@ final class MaterialsRecordingEditHandler
             ]);
             $material = $deps->materials->findById($materialId) ?? $material;
             $text = self::buildEditorText($deps, $songId, $material, false);
-            self::refreshStep($bot, $deps, $telegramId, $text, self::buildEditorKeyboard($deps, $songId, $materialId));
+            self::refreshStep($bot, $deps, $telegramId, $text, self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId));
 
             return;
         }
@@ -153,7 +342,7 @@ final class MaterialsRecordingEditHandler
         ]);
 
         $text = self::buildEditorText($deps, $songId, $material, true);
-        self::refreshStep($bot, $deps, $telegramId, $text, self::buildEditorKeyboard($deps, $songId, $materialId));
+        self::refreshStep($bot, $deps, $telegramId, $text, self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId));
     }
 
     /**
@@ -184,7 +373,7 @@ final class MaterialsRecordingEditHandler
         return implode("\n", $lines);
     }
 
-    private static function buildEditorKeyboard(MaterialsDeps $deps, int $songId, int $materialId): InlineKeyboardMarkup
+    private static function buildEditorKeyboard(MaterialsDeps $deps, int $telegramId, int $songId, int $materialId): InlineKeyboardMarkup
     {
         $keyboard = InlineKeyboardMarkup::make();
         $row = [];
@@ -218,7 +407,30 @@ final class MaterialsRecordingEditHandler
             ),
         );
 
-        return InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:mg:sn:' . $songId);
+        return InlineMenuHelper::appendFooter(
+            $keyboard,
+            $deps->texts,
+            self::listFooterBackCallback($deps, $telegramId, $songId),
+        );
+    }
+
+    private static function listFooterBackCallback(MaterialsDeps $deps, int $telegramId, int $songId): string
+    {
+        if (self::isAdminChatEditFlow($deps, $telegramId)) {
+            return self::ADMIN_SONG_PAGE_PREFIX . '0';
+        }
+
+        return 'mat:mg:sn:' . $songId;
+    }
+
+    private static function isAdminChatEditFlow(MaterialsDeps $deps, int $telegramId): bool
+    {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== self::FLOW) {
+            return false;
+        }
+
+        return (bool) ($state['context']['admin_chat_edit'] ?? false);
     }
 
     private static function presentStep(
@@ -329,12 +541,17 @@ final class MaterialsRecordingEditHandler
         int $chatId,
         int $messageId,
     ): void {
-        $deps->flows->set($telegramId, self::FLOW, [
-            'song_id' => $songId,
-            'material_id' => $materialId,
-            'wizard_chat_id' => $chatId,
-            'wizard_message_id' => $messageId,
-        ]);
+        $state = $deps->flows->get($telegramId);
+        $ctx = $state !== null && ($state['flow'] ?? '') === self::FLOW
+            ? $state['context']
+            : [];
+        if ($songId > 0) {
+            $ctx['song_id'] = $songId;
+        }
+        $ctx['material_id'] = $materialId;
+        $ctx['wizard_chat_id'] = $chatId;
+        $ctx['wizard_message_id'] = $messageId;
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
     }
 
     /**

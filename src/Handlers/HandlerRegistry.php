@@ -178,7 +178,7 @@ final class HandlerRegistry
             $errorReports,
         );
         MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
-        AdminChatCommandHandler::register($bot, $texts, $access, $users, $songRepo, $materialRepo);
+        AdminChatCommandHandler::register($bot, $texts, $access, $users, $songRepo, $materialRepo, $materials);
         ErrorReportHandler::register($bot, $texts, $users, $access, $flows, $errorReports);
         StartHandler::register($bot, $texts, $users, $access, $interactiveMenus);
         ConductorAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);

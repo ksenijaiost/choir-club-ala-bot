@@ -72,6 +72,10 @@ final class MaterialsAdminChatHandler
 
             $text = trim($rawText ?? '');
             if ($text !== '' && !str_starts_with($text, '/')) {
+                if (MaterialsRecordingEditHandler::handleAdminChatSearchText($bot, $deps, $telegramId, (int) $chat->id, $text)) {
+                    return;
+                }
+
                 MaterialsFlowHandler::handleAdminChatText($bot, $deps, $telegramId, $text);
             }
         });
