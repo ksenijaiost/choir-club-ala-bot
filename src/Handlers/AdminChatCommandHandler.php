@@ -23,6 +23,7 @@ final class AdminChatCommandHandler
         UserRepository $users,
         SongRepository $songs,
         MaterialRepository $materials,
+        MaterialsDeps $materialsDeps,
     ): void {
         $songPresenter = new AdminChatSongListPresenter($songs, $materials, $texts);
 
@@ -38,6 +39,41 @@ final class AdminChatCommandHandler
 
             $chatId = (int) $bot->chatId();
             AdminChatCommandMessenger::sendHtmlChunks($bot, $chatId, $songPresenter->buildMessageChunks());
+        });
+
+        $bot->onCommand('edit', function (Nutgram $bot) use ($texts, $access, $users, $materialsDeps): void {
+            if (!self::isAdminChatMessage($bot, $access)) {
+                return;
+            }
+
+            $user = self::resolveActor($bot, $access, $users);
+            if ($user === null) {
+                return;
+            }
+
+            if (!$access->canUploadMaterials($user)) {
+                $bot->sendMessage(
+                    chat_id: (int) $bot->chatId(),
+                    text: $texts->get('materials.upload_forbidden'),
+                );
+
+                return;
+            }
+
+            $chatId = (int) $bot->chatId();
+            $telegramId = (int) $user['telegram_id'];
+            MaterialsRecordingEditHandler::startAdminChat($bot, $materialsDeps, $telegramId, $chatId);
+        });
+
+        $bot->onCommand('help', function (Nutgram $bot) use ($texts, $access): void {
+            if (!self::isAdminChatMessage($bot, $access)) {
+                return;
+            }
+
+            $bot->sendMessage(
+                chat_id: (int) $bot->chatId(),
+                text: $texts->get('admin_chat.help'),
+            );
         });
     }
 

@@ -51,6 +51,9 @@ final class ProfileHandler
         }
 
         $notifyOn = $users->materialNotificationsEnabled($fresh);
+        $notifyLine = $notifyOn
+            ? $texts->get('profile.notify_line_on')
+            : $texts->get('profile.notify_line_off');
         $keyboard = $keyboard->addRow(
             InlineKeyboardButton::make(
                 $notifyOn
@@ -65,12 +68,14 @@ final class ProfileHandler
         if ($isConductor) {
             $body = $texts->get('profile.card_conductor', [
                 'name' => (string) ($fresh['display_name'] ?? ''),
+                'notify_line' => $notifyLine,
             ]);
         } else {
             $partLabel = VoicePartRules::partLabelForDisplay($texts, $fresh) ?? $texts->get('profile.part_none');
             $body = $texts->get('profile.card', [
                 'name' => (string) ($fresh['display_name'] ?? ''),
                 'part' => $partLabel,
+                'notify_line' => $notifyLine,
             ]);
         }
 

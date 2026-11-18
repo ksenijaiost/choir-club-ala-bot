@@ -47,9 +47,13 @@
     "cmd_notes": "notes",
     "cmd_songs": "songs",
     "cmd_members": "members",
+    "cmd_edit": "edit",
     "cmd_desc_notes": "Заметки к песне (транслит и пр.)",
     "cmd_desc_songs": "Список песен и материалов",
     "cmd_desc_members": "Участники по партиям",
+    "cmd_desc_edit": "Редактировать записи (сменить партию)",
+    "help": "Команды админ-чата:\n/songs — список песен и материалов\n/notes — заметки к песне (транслит и пр.)\n/members — участники по партиям\n/edit — редактирование записей (смена партии)\n\nВо время /edit можно написать часть названия песни для поиска.",
+    "menu_other_user": "Это меню открыл другой участник.",
     "songs_header": "Песни и материалы:",
     "songs_empty": "Пока нет песен в каталоге.",
     "songs_block_notes": "• ноты: {count}",
@@ -276,6 +280,7 @@
   "songs": {
     "ask_title": "Напиши часть названия песни — найду без учёта регистра.",
     "not_found": "Ничего не нашёл. Попробуй другое написание.",
+    "query_too_short": "Введи хотя бы 2 символа для поиска.",
     "pick_from_list": "Нашёл несколько — выбери:",
     "card_header": "🎵 {title}",
     "card_no_materials": "Материалы к этой песне пока не загружены.",
@@ -349,7 +354,10 @@
     "recordings_upload_none": "Записей пока нет.",
     "recording_part_unchanged": "Партия не изменилась.",
     "recording_part_updated": "Готово: запись теперь у {part}",
-    "recording_edit_back": "⬅️ Назад"
+    "recording_edit_back": "⬅️ Назад",
+    "admin_edit_pick_song": "Редактирование записей — выбери песню:",
+    "admin_edit_pick_song_search": "Редактирование записей — поиск «{query}»:",
+    "admin_edit_search_hint": "Или напиши часть названия песни в чат для поиска."
   },
   "attendance": {
     "history_header": "Посещаемость: {name}",
@@ -418,8 +426,8 @@
     "open_song": "Открыть песню"
   },
   "profile": {
-    "card": "Мой профиль\nИмя: {name}\nПартия: {part}",
-    "card_conductor": "Мой профиль\nИмя: {name}\nРоль: дирижёр (ведёт все партии)",
+    "card": "Мой профиль\nИмя: {name}\nПартия: {part}\n{notify_line}",
+    "card_conductor": "Мой профиль\nИмя: {name}\nРоль: дирижёр (ведёт все партии)\n{notify_line}",
     "conductor_no_part": "У дирижёра нет отдельной партии — ты ведёшь весь хор.",
     "change_part": "Сменить партию",
     "change_name": "Сменить имя",
@@ -434,7 +442,9 @@
     "owner_ask_part": "Укажи свою партию в хоре — выбери одну из списка.",
     "ask_part_required": "Укажи свою партию в хоре — выбери одну из списка.",
     "material_notify_on": "🔔 Уведомления о материалах: вкл",
-    "material_notify_off": "🔔 Уведомления о материалах: выкл",
+    "material_notify_off": "🔕 Уведомления о материалах: выкл",
+    "notify_line_on": "🔔 Уведомления о материалах: вкл",
+    "notify_line_off": "🔕 Уведомления о материалах: выкл",
     "material_notify_turned_on": "Уведомления о материалах включены.",
     "material_notify_turned_off": "Уведомления о материалах выключены."
   },

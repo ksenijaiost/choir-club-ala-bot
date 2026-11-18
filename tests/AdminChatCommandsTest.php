@@ -307,7 +307,16 @@ final class AdminChatCommandsTest extends TestCase
         MaterialRepository $materials,
         \PDO $pdo,
     ): void {
-        AdminChatCommandHandler::register($bot, $texts, $access, $users, $songs, $materials);
+        $handlerDeps = \App\Tests\Support\MaterialsTestDeps::build(
+            $this->testConfig(),
+            $users,
+            new \App\Repositories\UserFlowRepository($pdo),
+            $songs,
+            $materials,
+            $texts,
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+        );
+        AdminChatCommandHandler::register($bot, $texts, $access, $users, $songs, $materials, $handlerDeps);
         MembersAdminHandler::register(
             $bot,
             $texts,
