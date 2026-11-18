@@ -280,12 +280,19 @@
     "card_header": "🎵 {title}",
     "card_no_materials": "Материалы к этой песне пока не загружены.",
     "no_material": "Для этой песни материал пока не загружен.",
-    "my_recordings_header": "Записи для твоей партии ({part}):",
-    "my_recordings_header_all": "Записи всех партий:",
-    "my_recordings_empty": "Пока нет записей для партии {part}.",
+    "my_recordings_pick_header": "Выбери песню (записи для партии {part}, стр. {page}/{pages}):",
+    "my_recordings_pick_header_all": "Выбери песню (записи всех партий, стр. {page}/{pages}):",
+    "my_recordings_empty": "Для твоей партии пока нет записей.",
+    "my_recordings_empty_all": "Пока нет записей.",
     "my_recordings_need_part": "Сначала укажи партию в профиле (или попроси дирижёра обновить данные).",
-    "my_recordings_more_pages": "Ещё песни — перелистай:",
+    "my_recordings_all_button": "📦 Все записи",
+    "my_recordings_sending_all": "Отправляю {count} записей…",
     "pick_part_for_recordings": "Записи партий — «{title}». Выбери партию:",
+    "pick_part_for_recordings_others": "Записи партий — «{title}». Другие партии:",
+    "recordings_your_part_button": "⭐ {part} ({count})",
+    "recordings_tutti_button": "Тутти ({count})",
+    "recordings_other_parts_button": "Другие партии",
+    "recordings_no_for_your_part": "Для твоей партии записей пока нет",
     "catalog_header": "Выбери песню из списка или напиши часть названия (стр. {page}/{pages}):",
     "catalog_empty": "Пока нет песен с загруженными материалами.",
     "recording_caption": "Партии: {parts}"
@@ -331,7 +338,18 @@
     "recording_list_header": "Записи: {title} — {part}",
     "recording_list_empty": "Для этой партии записей пока нет.",
     "recording_deleted": "Запись отправлена в архив.",
-    "replace_upload_hint": "Отправь новый файл записи в админ-чат — он заменит выбранную версию."
+    "replace_upload_hint": "Отправь новый файл записи в админ-чат — он заменит выбранную версию.",
+    "edit_recordings_button": "✏️ Редактировать записи",
+    "edit_recordings_list_header": "Выбери запись для смены партии — «{title}»:",
+    "edit_recordings_empty": "У этой песни записей пока нет.",
+    "recording_edit_current": "Сейчас: {part}",
+    "recordings_have_line": "Есть записи: {parts}",
+    "recordings_missing_line": "Нет записей: {parts}",
+    "recordings_upload_hint": "Уже есть записи: {parts}",
+    "recordings_upload_none": "Записей пока нет.",
+    "recording_part_unchanged": "Партия не изменилась.",
+    "recording_part_updated": "Готово: запись теперь у {part}",
+    "recording_edit_back": "⬅️ Назад"
   },
   "attendance": {
     "history_header": "Посещаемость: {name}",
@@ -393,6 +411,12 @@
     "role_badge_conductor": "дирижёр",
     "role_badge_helper": "помощник"
   },
+  "notifications": {
+    "material_notes": "🎵 Новые ноты: «{title}»",
+    "material_recording": "🎵 Новая запись: «{title}», {part}",
+    "material_translit": "🎵 Заметки обновлены: «{title}»",
+    "open_song": "Открыть песню"
+  },
   "profile": {
     "card": "Мой профиль\nИмя: {name}\nПартия: {part}",
     "card_conductor": "Мой профиль\nИмя: {name}\nРоль: дирижёр (ведёт все партии)",
@@ -408,7 +432,11 @@
     "part_saved": "Партия сохранена",
     "part_updated": "Твоя партия: {part}",
     "owner_ask_part": "Укажи свою партию в хоре — выбери одну из списка.",
-    "ask_part_required": "Укажи свою партию в хоре — выбери одну из списка."
+    "ask_part_required": "Укажи свою партию в хоре — выбери одну из списка.",
+    "material_notify_on": "🔔 Уведомления о материалах: вкл",
+    "material_notify_off": "🔔 Уведомления о материалах: выкл",
+    "material_notify_turned_on": "Уведомления о материалах включены.",
+    "material_notify_turned_off": "Уведомления о материалах выключены."
   },
   "history": {
     "pick_member": "История участника — выбери человека:",

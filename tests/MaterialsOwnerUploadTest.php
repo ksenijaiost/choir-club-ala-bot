@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\MaterialsTestDeps;
 use App\Repositories\UserOpenMenuRepository;
 use App\Telegram\InteractiveMenuService;
 use App\Config;
@@ -102,16 +103,14 @@ final class MaterialsOwnerUploadTest extends TestCase
         $songRepo = new SongRepository($pdo);
         $materialRepo = new MaterialRepository($pdo);
 
-        return new MaterialsDeps(
+        return MaterialsTestDeps::build(
             $config,
             $users,
             $flows,
             $songRepo,
             $materialRepo,
-            new MaterialsService($materialRepo, $songRepo, $texts),
-            new SongDeliveryService($materialRepo, $songRepo, $texts, new MaterialsService($materialRepo, $songRepo, $texts)),
             $texts,
-                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 

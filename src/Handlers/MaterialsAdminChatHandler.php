@@ -160,6 +160,9 @@ final class MaterialsAdminChatHandler
             $deps->flows->clear((int) $user['telegram_id']);
             $song = $deps->songs->findById((int) $target['song_id']);
             if ($song !== null) {
+                if ($type === MaterialType::NOTES) {
+                    $deps->materialNotifications->afterNotesReplaced($song, (int) $user['id']);
+                }
                 $bot->sendMessage($deps->service->uploadSuccessText(
                     $song,
                     $type,

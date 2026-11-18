@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\MaterialsTestDeps;
 use App\Repositories\UserOpenMenuRepository;
 use App\Telegram\InteractiveMenuService;
 use App\Config;
@@ -256,17 +257,14 @@ final class MenuFlowInterruptTest extends TestCase
 
         $songRepo = new SongRepository($pdo);
         $materialRepo = new MaterialRepository($pdo);
-        $materialsService = new MaterialsService($materialRepo, $songRepo, $texts);
-        $materials = new MaterialsDeps(
+        $materials = MaterialsTestDeps::build(
             $config,
             $users,
             $flows,
             $songRepo,
             $materialRepo,
-            $materialsService,
-            new SongDeliveryService($materialRepo, $songRepo, $texts, $materialsService),
             $texts,
-                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
         $adminHistory = new AdminHistoryContext(

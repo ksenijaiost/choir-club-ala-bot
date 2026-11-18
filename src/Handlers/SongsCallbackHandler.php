@@ -8,10 +8,10 @@ use App\Domain\MaterialType;
 use App\Domain\VoicePart;
 use App\Services\VoicePartRules;
 use App\Services\SongDeliveryService;
+use App\Services\SongRecordingPartPicker;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
-use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class SongsCallbackHandler
@@ -61,8 +61,7 @@ final class SongsCallbackHandler
             }
 
             $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
-            SongMemberHandler::sendMyRecordingsPage($bot, $deps, $delivery, $part, (int) $m[2]);
+            SongMemberHandler::editMyRecordingsPage($bot, $deps, $part, (int) $m[2]);
 
             return true;
         }
@@ -103,14 +102,28 @@ final class SongsCallbackHandler
 
         if (preg_match('/^snd:pr:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
-            self::sendPartPicker($bot, $deps, (int) $m[1]);
+            self::sendPartPicker($bot, $deps, (int) $m[1], SongRecordingPartPicker::VIEW_HOME);
+
+            return true;
+        }
+
+        if (preg_match('/^snd:pr:oth:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            self::editPartPicker($bot, $deps, (int) $m[1], SongRecordingPartPicker::VIEW_OTHERS);
+
+            return true;
+        }
+
+        if (preg_match('/^snd:pr:hom:(\d+)$/', $data, $m) === 1) {
+            $bot->answerCallbackQuery();
+            self::editPartPicker($bot, $deps, (int) $m[1], SongRecordingPartPicker::VIEW_HOME);
 
             return true;
         }
 
         if (preg_match('/^snd:rp:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
             $part = $m[2];
-            if (!VoicePart::isValid($part)) {
+            if ($part !== 'tutti' && !VoicePart::isValid($part)) {
                 $bot->answerCallbackQuery();
 
                 return true;
@@ -118,8 +131,30 @@ final class SongsCallbackHandler
 
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
-            $rows = $deps->materials->listCurrentRecordings((int) $m[1], $part);
+            $songId = (int) $m[1];
+            $rows = $part === 'tutti'
+                ? $deps->materials->listTuttiRecordings($songId)
+                : $deps->materials->listCurrentRecordings($songId, $part);
             $delivery->sendRecordingFiles($bot, $rows);
+
+            return true;
+        }
+
+        if (preg_match('/^snd:my:all:([a-z0-9_]+)$/', $data, $m) === 1) {
+            $part = $m[1];
+            if ($part !== VoicePartRules::RECORDINGS_ALL_PARTS && !VoicePart::isValid($part)) {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $allParts = $part === VoicePartRules::RECORDINGS_ALL_PARTS;
+            $songs = $allParts
+                ? $deps->materials->listSongsWithRecordingsAnyPart()
+                : $deps->materials->listSongsWithRecordingsForPart($part);
+            $delivery->sendAllMyRecordingsForSongs($bot, $songs, $part, $allParts);
 
             return true;
         }
@@ -152,41 +187,65 @@ final class SongsCallbackHandler
         return false;
     }
 
-    private static function sendPartPicker(Nutgram $bot, MaterialsDeps $deps, int $songId): void
+    private static function sendPartPicker(Nutgram $bot, MaterialsDeps $deps, int $songId, string $view): void
     {
-        $song = $deps->songs->findById($songId);
-        if ($song === null) {
-            $bot->sendMessage($deps->texts->get('songs.not_found'));
-
-            return;
-        }
-
-        $keyboard = InlineKeyboardMarkup::make();
-        $hasRows = false;
-        foreach ($deps->materials->listPartsWithRecordingsForSong($songId) as $code) {
-            $hasRows = true;
-            $count = $deps->materials->countRecordingsForPart($songId, $code);
-            $label = $deps->texts->get('parts.' . $code) . ' (' . $count . ')';
-            $keyboard = $keyboard->addRow(
-                InlineKeyboardButton::make($label, callback_data: 'snd:rp:' . $songId . ':' . $code),
-            );
-        }
-
-        if (!$hasRows) {
+        $built = self::buildPartPicker($bot, $deps, $songId, $view);
+        if ($built === null) {
             $bot->sendMessage($deps->texts->get('songs.no_material'));
 
             return;
         }
-
-        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'snd:pk:' . $songId);
 
         $ownerTelegramId = (int) ($bot->userId() ?? 0);
         InlineMenuHelper::sendInteractiveMenu(
             $bot,
             $deps->interactiveMenus,
             $ownerTelegramId,
-            $deps->texts->get('songs.pick_part_for_recordings', ['title' => (string) $song['title']]),
-            $keyboard,
+            $built['text'],
+            $built['keyboard'],
+        );
+    }
+
+    private static function editPartPicker(Nutgram $bot, MaterialsDeps $deps, int $songId, string $view): void
+    {
+        $built = self::buildPartPicker($bot, $deps, $songId, $view);
+        if ($built === null) {
+            return;
+        }
+
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $built['text'],
+            $built['keyboard'],
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+        );
+    }
+
+    /**
+     * @return array{text: string, keyboard: InlineKeyboardMarkup}|null
+     */
+    private static function buildPartPicker(Nutgram $bot, MaterialsDeps $deps, int $songId, string $view): ?array
+    {
+        $song = $deps->songs->findById($songId);
+        if ($song === null) {
+            return null;
+        }
+
+        $viewer = null;
+        $telegramId = $bot->userId();
+        if ($telegramId !== null) {
+            $viewer = $deps->users->findByTelegramId($telegramId);
+        }
+
+        $picker = new SongRecordingPartPicker($deps->materials, $deps->texts);
+
+        return $picker->build(
+            $songId,
+            (string) ($song['title'] ?? ''),
+            $viewer,
+            $view,
         );
     }
 }

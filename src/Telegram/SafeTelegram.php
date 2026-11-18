@@ -11,6 +11,10 @@ use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
 final class SafeTelegram
 {
+    private static function isBenignTelegramError(\Throwable $e): bool
+    {
+        return str_contains($e->getMessage(), 'message is not modified');
+    }
     /**
      * @template T
      *
@@ -86,7 +90,9 @@ final class SafeTelegram
                 parse_mode: $parseMode,
             ));
         } catch (\Throwable $e) {
-            error_log('[telegram] editMessageText warning: ' . $e->getMessage());
+            if (!self::isBenignTelegramError($e)) {
+                error_log('[telegram] editMessageText warning: ' . $e->getMessage());
+            }
         }
     }
 
@@ -103,7 +109,9 @@ final class SafeTelegram
                 reply_markup: $replyMarkup,
             ));
         } catch (\Throwable $e) {
-            error_log('[telegram] editMessageReplyMarkup warning: ' . $e->getMessage());
+            if (!self::isBenignTelegramError($e)) {
+                error_log('[telegram] editMessageReplyMarkup warning: ' . $e->getMessage());
+            }
         }
     }
 

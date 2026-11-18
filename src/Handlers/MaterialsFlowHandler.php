@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Domain\MaterialType;
 use App\Domain\VoicePart;
+use App\Services\SongRecordingAvailability;
 use App\Support\SqlPagination;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
@@ -251,11 +252,22 @@ final class MaterialsFlowHandler
     public static function sendRecordingPartPicker(Nutgram $bot, MaterialsDeps $deps, int $telegramId): void
     {
         $keyboard = self::buildRecordingPartKeyboard($deps, []);
+        $text = $deps->texts->get('materials.ask_part_multi');
+        $state = $deps->flows->get($telegramId);
+        $songId = 0;
+        if ($state !== null && ($state['flow'] ?? '') === 'material_upload') {
+            $songId = (int) ($state['context']['song_id'] ?? 0);
+        }
+        if ($songId > 0) {
+            $hint = (new SongRecordingAvailability($deps->materials, $deps->texts))->formatUploadHint($songId);
+            $text .= "\n\n" . $hint;
+        }
+
         $message = self::presentUploadStep(
             $bot,
             $deps,
             $telegramId,
-            $deps->texts->get('materials.ask_part_multi'),
+            $text,
             $keyboard,
             $bot->chatId() ?? $telegramId,
         );
@@ -701,6 +713,8 @@ final class MaterialsFlowHandler
         if ($result['archived_previous'] !== null) {
             $lines[] = $deps->texts->get('materials.archived_notice');
         }
+
+        $deps->materialNotifications->afterMaterialSaved($user, $result);
 
         $text = implode("\n", $lines);
         $wizardMessageId = (int) ($ctx['wizard_message_id'] ?? 0);

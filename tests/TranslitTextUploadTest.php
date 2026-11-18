@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\MaterialsTestDeps;
 use App\Repositories\UserOpenMenuRepository;
 use App\Telegram\InteractiveMenuService;
 use App\Config;
@@ -435,18 +436,14 @@ final class TranslitTextUploadTest extends TestCase
         $flows = new UserFlowRepository($pdo);
         $songRepo = new SongRepository($pdo);
         $materialRepo = new MaterialRepository($pdo);
-        $materialsService = new MaterialsService($materialRepo, $songRepo, $texts);
-
-        return new MaterialsDeps(
+        return MaterialsTestDeps::build(
             $this->testConfig(),
             $users,
             $flows,
             $songRepo,
             $materialRepo,
-            $materialsService,
-            new SongDeliveryService($materialRepo, $songRepo, $texts, $materialsService),
             $texts,
-                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
     }
 

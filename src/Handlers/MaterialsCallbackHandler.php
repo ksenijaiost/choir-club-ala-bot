@@ -351,6 +351,46 @@ final class MaterialsCallbackHandler
             return true;
         }
 
+        if (preg_match('/^mat:mg:erec:(\d+)$/', $data, $m) === 1) {
+            $songId = (int) $m[1];
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            CallbackUi::clearKeyboard($bot);
+            $deps->flows->clear($telegramId);
+            MaterialsRecordingEditHandler::openList($bot, $deps, $telegramId, $songId);
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:erec:p:(\d+)$/', $data, $m) === 1) {
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            MaterialsRecordingEditHandler::openEditor($bot, $deps, $telegramId, (int) $m[1]);
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:erec:lb:(\d+)$/', $data, $m) === 1) {
+            $telegramId = (int) $actor['telegram_id'];
+            SafeTelegram::answerCallbackQuery($bot);
+            MaterialsRecordingEditHandler::openList($bot, $deps, $telegramId, (int) $m[1]);
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:erec:s:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
+            $telegramId = (int) $actor['telegram_id'];
+            MaterialsRecordingEditHandler::applyPartChoice(
+                $bot,
+                $deps,
+                $telegramId,
+                (int) $m[1],
+                $m[2],
+            );
+
+            return true;
+        }
+
         if (preg_match('/^mat:mg:pg:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
@@ -557,6 +597,13 @@ final class MaterialsCallbackHandler
                 ),
             );
         }
+
+        $keyboard = $keyboard->addRow(
+            \SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton::make(
+                $deps->texts->get('materials.edit_recordings_button'),
+                callback_data: 'mat:mg:erec:' . $songId,
+            ),
+        );
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, 'mat:mg:pg:0');
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Domain\MaterialType;
+use App\Domain\VoicePart;
 
 final class MaterialRepository
 {
@@ -225,19 +226,46 @@ final class MaterialRepository
      */
     public function listPartsWithRecordingsForSong(int $songId): array
     {
+        return $this->listPartsWithRecordingsForSongOrdered($songId);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listTuttiRecordings(int $songId): array
+    {
         $stmt = $this->pdo->prepare(
-            'SELECT DISTINCT mvp.voice_part FROM material_voice_parts mvp
-             INNER JOIN materials m ON m.id = mvp.material_id
-             WHERE m.song_id = ? AND m.type = ? AND m.is_current = 1
-             ORDER BY mvp.voice_part ASC'
+            'SELECT * FROM materials WHERE song_id = ? AND type = ? AND is_current = 1 ORDER BY uploaded_at DESC'
         );
         $stmt->execute([$songId, MaterialType::RECORDING]);
-        $parts = [];
-        foreach ($stmt->fetchAll() ?: [] as $row) {
-            $parts[] = (string) $row['voice_part'];
+        $rows = $this->attachVoiceParts($stmt->fetchAll() ?: []);
+
+        return array_values(array_filter(
+            $rows,
+            static fn (array $row): bool => VoicePart::isTuttiParts(
+                is_array($row['voice_parts'] ?? null) ? $row['voice_parts'] : [],
+            ),
+        ));
+    }
+
+    public function countTuttiRecordings(int $songId): int
+    {
+        return count($this->listTuttiRecordings($songId));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listPartsWithRecordingsForSongOrdered(int $songId): array
+    {
+        $codes = [];
+        foreach (VoicePart::CODES as $code) {
+            if ($this->countRecordingsForPart($songId, $code) > 0) {
+                $codes[] = $code;
+            }
         }
 
-        return $parts;
+        return $codes;
     }
 
     public function countRecordingsForPart(int $songId, string $voicePart): int

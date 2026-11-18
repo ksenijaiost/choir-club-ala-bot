@@ -22,6 +22,10 @@ final class SongDeliveryService
 {
     private const MEDIA_GROUP_SIZE = 10;
 
+    private const BULK_RECORDINGS_PROGRESS_THRESHOLD = 4;
+
+    private const BULK_RECORDINGS_PAUSE_MICROSECONDS = 400_000;
+
     public function __construct(
         private readonly MaterialRepository $materials,
         private readonly SongRepository $songs,
@@ -320,26 +324,51 @@ final class SongDeliveryService
     }
 
     /**
-     * @param list<array{id: int, title: string}> $songs
+     * @param list<array{id: int, title: string, recording_count?: int}> $songs
      */
-    public function sendMyRecordingsGrouped(
+    public function sendAllMyRecordingsForSongs(
         Nutgram $bot,
         array $songs,
         string $partCode,
         bool $allParts,
     ): void {
+        $entries = [];
         foreach ($songs as $song) {
             $songId = (int) ($song['id'] ?? 0);
             if ($songId <= 0) {
                 continue;
             }
-
             $title = (string) ($song['title'] ?? '');
             $rows = $allParts
                 ? $this->materials->listCurrentRecordingsAllParts($songId)
                 : $this->materials->listCurrentRecordings($songId, $partCode);
+            foreach ($rows as $row) {
+                $entries[] = [
+                    'title' => $title,
+                    'row' => $row,
+                ];
+            }
+        }
 
-            $this->sendSongRecordingsBlock($bot, $songId, $title, $rows);
+        if ($entries === []) {
+            SafeTelegram::sendMessage($bot, $this->texts->get('songs.no_material'));
+
+            return;
+        }
+
+        $count = count($entries);
+        if ($count >= self::BULK_RECORDINGS_PROGRESS_THRESHOLD) {
+            SafeTelegram::sendMessage(
+                $bot,
+                $this->texts->get('songs.my_recordings_sending_all', ['count' => (string) $count]),
+            );
+        }
+
+        foreach ($entries as $index => $entry) {
+            if ($index > 0) {
+                usleep(self::BULK_RECORDINGS_PAUSE_MICROSECONDS);
+            }
+            $this->sendRecordingAudio($bot, $entry['row'], $entry['title']);
         }
     }
 
