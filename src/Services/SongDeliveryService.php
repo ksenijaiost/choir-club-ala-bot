@@ -364,12 +364,14 @@ final class SongDeliveryService
             );
         }
 
+        $reporter = new VoiceRecordingDeliveryReporter();
         foreach ($entries as $index => $entry) {
             if ($index > 0) {
                 usleep(self::BULK_RECORDINGS_PAUSE_MICROSECONDS);
             }
-            $this->sendRecordingAudio($bot, $entry['row'], $entry['title']);
+            $this->sendRecordingAudio($bot, $entry['row'], $entry['title'], $reporter);
         }
+        $reporter->flush($bot, $this->texts, $bot->chatId());
     }
 
     /**
@@ -390,7 +392,9 @@ final class SongDeliveryService
             $title = $song !== null ? (string) ($song['title'] ?? '') : '';
         }
 
-        $this->sendSongRecordingsBlock($bot, $songId, $title, $rows);
+        $reporter = new VoiceRecordingDeliveryReporter();
+        $this->sendSongRecordingsBlock($bot, $songId, $title, $rows, $reporter);
+        $reporter->flush($bot, $this->texts, $bot->chatId());
     }
 
     /**
@@ -401,13 +405,15 @@ final class SongDeliveryService
         int $songId,
         string $songTitle,
         array $rows,
+        ?VoiceRecordingDeliveryReporter $reporter = null,
     ): void {
         if ($rows === []) {
             return;
         }
 
+        $reporter ??= new VoiceRecordingDeliveryReporter();
         foreach ($rows as $row) {
-            $this->sendRecordingAudio($bot, $row, $songTitle);
+            $this->sendRecordingAudio($bot, $row, $songTitle, $reporter);
         }
 
         $this->sendTranslitPreviewAfterRecordings($bot, $songId);
@@ -452,20 +458,30 @@ final class SongDeliveryService
     /**
      * @param array<string, mixed> $material
      */
-    private function sendRecordingAudio(Nutgram $bot, array $material, string $songTitle): void
-    {
+    private function sendRecordingAudio(
+        Nutgram $bot,
+        array $material,
+        string $songTitle,
+        VoiceRecordingDeliveryReporter $reporter,
+    ): void {
         $fileId = (string) ($material['telegram_file_id'] ?? '');
         if ($fileId === '') {
             return;
         }
 
         $caption = $this->materialsService->recordingCaption($songTitle, $material);
-        SafeTelegram::sendAudio(
+        $chatId = $bot->chatId();
+        $status = SafeTelegram::sendAudio(
             $bot,
             $fileId,
             $caption,
-            parseMode: ParseMode::HTML,
+            $chatId,
+            ParseMode::HTML,
         );
+
+        if ($status === 'voice_forbidden') {
+            $reporter->track($songTitle, $material, $this->materialsService);
+        }
     }
 
     /**
@@ -487,7 +503,9 @@ final class SongDeliveryService
                 $title = $song !== null ? (string) ($song['title'] ?? '') : '';
             }
 
-            $this->sendRecordingAudio($bot, $material, $title);
+            $reporter = new VoiceRecordingDeliveryReporter();
+            $this->sendRecordingAudio($bot, $material, $title, $reporter);
+            $reporter->flush($bot, $this->texts, $bot->chatId());
 
             return;
         }

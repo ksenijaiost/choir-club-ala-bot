@@ -167,16 +167,30 @@ final class RecordingEditTest extends TestCase
             'wizard_message_id' => 42,
         ]);
 
-        MaterialsRecordingEditHandler::applyPartChoice(
+        MaterialsRecordingEditHandler::openEditor($bot, $deps['handlerDeps'], self::UPLOADER_TG, $materialId);
+        MaterialsRecordingEditHandler::toggleDraftPart(
+            $bot,
+            $deps['handlerDeps'],
+            self::UPLOADER_TG,
+            $materialId,
+            'tenor',
+        );
+        MaterialsRecordingEditHandler::toggleDraftPart(
             $bot,
             $deps['handlerDeps'],
             self::UPLOADER_TG,
             $materialId,
             'baritone',
         );
+        MaterialsRecordingEditHandler::saveDraftParts(
+            $bot,
+            $deps['handlerDeps'],
+            self::UPLOADER_TG,
+            $materialId,
+        );
 
         self::assertSame(['baritone'], $deps['materials']->listVoiceParts($materialId));
-        $bot->assertCalled('editMessageText');
+        self::assertGreaterThanOrEqual(1, $this->countMethodCalls($bot, 'editMessageText'));
     }
 
     /**

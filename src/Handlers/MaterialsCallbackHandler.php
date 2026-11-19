@@ -411,10 +411,45 @@ final class MaterialsCallbackHandler
             return true;
         }
 
+        if (preg_match('/^mat:mg:erec:src:set:(\d+)$/', $data, $m) === 1) {
+            $telegramId = (int) $actor['telegram_id'];
+            $chatId = $isAdminChat ? $adminChatId : $bot->chatId();
+            MaterialsRecordingEditHandler::beginSourceUrlEdit(
+                $bot,
+                $deps,
+                $telegramId,
+                (int) $m[1],
+                $chatId !== null && $chatId !== 0 ? $chatId : null,
+            );
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:erec:src:clr:(\d+)$/', $data, $m) === 1) {
+            $telegramId = (int) $actor['telegram_id'];
+            $chatId = $isAdminChat ? $adminChatId : $bot->chatId();
+            MaterialsRecordingEditHandler::clearSourceUrl(
+                $bot,
+                $deps,
+                $telegramId,
+                (int) $m[1],
+                $chatId !== null && $chatId !== 0 ? $chatId : null,
+            );
+
+            return true;
+        }
+
         if (preg_match('/^mat:mg:erec:p:(\d+)$/', $data, $m) === 1) {
             $telegramId = (int) $actor['telegram_id'];
             SafeTelegram::answerCallbackQuery($bot);
-            MaterialsRecordingEditHandler::openEditor($bot, $deps, $telegramId, (int) $m[1]);
+            $chatId = $isAdminChat ? $adminChatId : $bot->chatId();
+            MaterialsRecordingEditHandler::openEditor(
+                $bot,
+                $deps,
+                $telegramId,
+                (int) $m[1],
+                $chatId !== null && $chatId !== 0 ? $chatId : null,
+            );
 
             return true;
         }
@@ -427,14 +462,34 @@ final class MaterialsCallbackHandler
             return true;
         }
 
-        if (preg_match('/^mat:mg:erec:s:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
+        if (preg_match('/^mat:mg:erec:tk:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
+            if ($isAdminChat && !MaterialsRecordingEditHandler::assertAdminChatMenuActor($bot, $deps, $access, $actor)) {
+                return true;
+            }
+
             $telegramId = (int) $actor['telegram_id'];
-            MaterialsRecordingEditHandler::applyPartChoice(
+            MaterialsRecordingEditHandler::toggleDraftPart(
                 $bot,
                 $deps,
                 $telegramId,
                 (int) $m[1],
                 $m[2],
+            );
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:erec:sv:(\d+)$/', $data, $m) === 1) {
+            if ($isAdminChat && !MaterialsRecordingEditHandler::assertAdminChatMenuActor($bot, $deps, $access, $actor)) {
+                return true;
+            }
+
+            $telegramId = (int) $actor['telegram_id'];
+            MaterialsRecordingEditHandler::saveDraftParts(
+                $bot,
+                $deps,
+                $telegramId,
+                (int) $m[1],
             );
 
             return true;

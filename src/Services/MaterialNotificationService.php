@@ -8,6 +8,7 @@ use App\Domain\MaterialType;
 use App\Domain\UserRole;
 use App\Domain\VoicePart;
 use App\Repositories\UserRepository;
+use App\Telegram\TelegramApiErrors;
 use App\Telegram\TelegramApiRetry;
 use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
@@ -195,6 +196,10 @@ final class MaterialNotificationService
                 $this->outbound->sendMessage($telegramId, $text, $keyboard);
             });
         } catch (TelegramException $e) {
+            if (TelegramApiErrors::isVoiceMessagesForbidden($e)) {
+                return;
+            }
+
             if (self::isBlockedOrUnreachable($e)) {
                 error_log('[material-notify] blocked or unreachable chat_id=' . $telegramId . ': ' . $e->getMessage());
 
@@ -203,6 +208,10 @@ final class MaterialNotificationService
 
             error_log('[material-notify] send failed chat_id=' . $telegramId . ': ' . $e->getMessage());
         } catch (\Throwable $e) {
+            if (TelegramApiErrors::isVoiceMessagesForbidden($e)) {
+                return;
+            }
+
             if (self::isBlockedOrUnreachable($e)) {
                 error_log('[material-notify] blocked or unreachable chat_id=' . $telegramId . ': ' . $e->getMessage());
 

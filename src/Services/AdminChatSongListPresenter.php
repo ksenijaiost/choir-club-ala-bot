@@ -13,11 +13,14 @@ use App\Text\TextRepository;
 
 final class AdminChatSongListPresenter
 {
+    private readonly SongRecordingAvailability $availability;
+
     public function __construct(
         private readonly SongRepository $songs,
         private readonly MaterialRepository $materials,
         private readonly TextRepository $texts,
     ) {
+        $this->availability = new SongRecordingAvailability($materials, $texts);
     }
 
     /**
@@ -38,15 +41,25 @@ final class AdminChatSongListPresenter
             $hasTranslit = ((int) ($row['has_translit'] ?? 0)) > 0;
             $recordingSets = $recordings[$songId] ?? [];
             $recordingDetail = $this->formatRecordingsDetail($recordingSets);
+            $buckets = $this->availability->partBuckets($songId);
+            $hasRecordings = $recordingSets !== [];
+            $title = (string) $row['title'];
+            if ($hasRecordings && $buckets['missing'] !== []) {
+                $title = '⚠️ ' . $title;
+            }
 
             $lines = [
-                '<b>' . TelegramHtml::escape((string) $row['title']) . '</b>',
+                '<b>' . TelegramHtml::escape($title) . '</b>',
                 $this->texts->get('admin_chat.songs_block_notes', ['count' => (string) $notesCount]),
                 $hasTranslit
                     ? $this->texts->get('admin_chat.songs_block_translit_yes')
                     : $this->texts->get('admin_chat.songs_block_translit_no'),
                 $this->texts->get('admin_chat.songs_block_recordings', ['detail' => $recordingDetail]),
             ];
+
+            if ($hasRecordings && $buckets['missing'] !== []) {
+                $lines[] = $this->availability->formatMissingLine($songId);
+            }
             $blocks[] = implode("\n", $lines);
         }
 

@@ -92,7 +92,7 @@ final class CallbackUi
                 InlineKeyboardMarkup::make(),
             );
         } catch (\Throwable $e) {
-            error_log('[telegram] clearKeyboard warning: ' . $e->getMessage());
+            TelegramApiErrors::logTelegramIssue('clearKeyboard', $e);
         }
     }
 }
