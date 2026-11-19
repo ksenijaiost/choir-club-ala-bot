@@ -23,6 +23,7 @@ final class Config
         public readonly string $webhookUrl,
         public readonly ?string $fakeNow,
         public readonly string $adminChatLink = '',
+        public readonly string $botUsername = 'CHOIR_CLUB_ALA_bot',
     ) {
     }
 
@@ -45,7 +46,13 @@ final class Config
             webhookUrl: self::envString('WEBHOOK_URL'),
             fakeNow: self::envOptional('FAKE_NOW'),
             adminChatLink: self::envString('ADMIN_CHAT_LINK'),
+            botUsername: self::normalizeBotUsername(self::envString('BOT_USERNAME', 'CHOIR_CLUB_ALA_bot')),
         );
+    }
+
+    private static function normalizeBotUsername(string $value): string
+    {
+        return ltrim(trim($value), '@');
     }
 
     public function isSqlite(): bool

@@ -68,6 +68,10 @@ final class TranslitTextUploadTest extends TestCase
         self::assertSame("Привет\nМир", TranslitUploadCommand::extractText($message));
         self::assertTrue(TranslitUploadCommand::isInvoked("/notes\nx"));
         self::assertTrue(TranslitUploadCommand::isInvoked('/translit'));
+        self::assertTrue(TranslitUploadCommand::isInvoked("/notes@CHOIR_CLUB_ALA_bot\nx"));
+        self::assertTrue(TranslitUploadCommand::isInvoked('/translit@choir_club_ala_bot'));
+        self::assertFalse(TranslitUploadCommand::isInvoked('/notes@other_bot'));
+        self::assertFalse(TranslitUploadCommand::isInvoked('/translit@other_bot'));
     }
 
     public function testNotesAndTranslitStartSameUploadFlowInAdminChat(): void

@@ -12,6 +12,7 @@ use App\Repositories\UserRepository;
 use App\Services\AdminChatResolver;
 use App\Services\ErrorReportService;
 use App\Telegram\NutgramErrorHooks;
+use App\Telegram\NutgramFactory;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 
@@ -54,7 +55,7 @@ final class Bootstrap
 
         date_default_timezone_set($config->timezone);
 
-        return new Nutgram($config->botToken);
+        return NutgramFactory::make($config);
     }
 
     public static function errorReportService(): ErrorReportService
