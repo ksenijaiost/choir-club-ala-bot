@@ -7,14 +7,11 @@ namespace App\Telegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
+use SergiX44\Nutgram\Telegram\Types\Message\LinkPreviewOptions;
 use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
 final class SafeTelegram
 {
-    private static function isBenignTelegramError(\Throwable $e): bool
-    {
-        return str_contains($e->getMessage(), 'message is not modified');
-    }
     /**
      * @template T
      *
@@ -38,7 +35,7 @@ final class SafeTelegram
                 self::call(static fn (): mixed => $bot->answerCallbackQuery(...$options));
             }
         } catch (\Throwable $e) {
-            error_log('[telegram] answerCallbackQuery warning: ' . $e->getMessage());
+            TelegramApiErrors::logTelegramIssue('answerCallbackQuery', $e);
         }
     }
 
@@ -48,15 +45,19 @@ final class SafeTelegram
         ?int $chatId = null,
         ?InlineKeyboardMarkup $replyMarkup = null,
         ?ParseMode $parseMode = null,
+        bool $disableLinkPreview = false,
     ): ?Message {
         try {
-            return self::call(static function () use ($bot, $text, $chatId, $replyMarkup, $parseMode): ?Message {
+            $linkPreview = $disableLinkPreview ? LinkPreviewOptions::make(is_disabled: true) : null;
+
+            return self::call(static function () use ($bot, $text, $chatId, $replyMarkup, $parseMode, $linkPreview): ?Message {
                 if ($chatId !== null) {
                     return $bot->sendMessage(
                         text: $text,
                         chat_id: $chatId,
                         reply_markup: $replyMarkup,
                         parse_mode: $parseMode,
+                        link_preview_options: $linkPreview,
                     );
                 }
 
@@ -64,10 +65,11 @@ final class SafeTelegram
                     text: $text,
                     reply_markup: $replyMarkup,
                     parse_mode: $parseMode,
+                    link_preview_options: $linkPreview,
                 );
             });
         } catch (\Throwable $e) {
-            error_log('[telegram] sendMessage warning: ' . $e->getMessage());
+            TelegramApiErrors::logTelegramIssue('sendMessage', $e);
 
             return null;
         }
@@ -90,9 +92,7 @@ final class SafeTelegram
                 parse_mode: $parseMode,
             ));
         } catch (\Throwable $e) {
-            if (!self::isBenignTelegramError($e)) {
-                error_log('[telegram] editMessageText warning: ' . $e->getMessage());
-            }
+            TelegramApiErrors::logTelegramIssue('editMessageText', $e);
         }
     }
 
@@ -109,9 +109,7 @@ final class SafeTelegram
                 reply_markup: $replyMarkup,
             ));
         } catch (\Throwable $e) {
-            if (!self::isBenignTelegramError($e)) {
-                error_log('[telegram] editMessageReplyMarkup warning: ' . $e->getMessage());
-            }
+            TelegramApiErrors::logTelegramIssue('editMessageReplyMarkup', $e);
         }
     }
 
@@ -120,7 +118,7 @@ final class SafeTelegram
         try {
             self::call(static fn (): mixed => $bot->deleteMessage(chat_id: $chatId, message_id: $messageId));
         } catch (\Throwable $e) {
-            error_log('[telegram] deleteMessage warning: ' . $e->getMessage());
+            TelegramApiErrors::logTelegramIssue('deleteMessage', $e);
         }
     }
 
@@ -130,7 +128,7 @@ final class SafeTelegram
         ?string $caption = null,
         ?int $chatId = null,
         ?ParseMode $parseMode = null,
-    ): void {
+    ): string {
         try {
             self::call(static function () use ($bot, $audio, $caption, $chatId, $parseMode): mixed {
                 if ($chatId !== null) {
@@ -148,8 +146,18 @@ final class SafeTelegram
                     parse_mode: $parseMode,
                 );
             });
+
+            return 'ok';
         } catch (\Throwable $e) {
-            error_log('[telegram] sendAudio warning: ' . $e->getMessage());
+            if (TelegramApiErrors::isVoiceMessagesForbidden($e)) {
+                TelegramApiErrors::logTelegramIssue('sendAudio', $e);
+
+                return 'voice_forbidden';
+            }
+
+            TelegramApiErrors::logTelegramIssue('sendAudio', $e);
+
+            return 'failed';
         }
     }
 }

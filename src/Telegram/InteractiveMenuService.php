@@ -52,7 +52,7 @@ final class InteractiveMenuService
         try {
             SafeTelegram::call(static fn (): mixed => $bot->deleteMessage(chat_id: $chatId, message_id: $messageId));
         } catch (\Throwable $e) {
-            error_log(self::LOG_PREFIX . ' delete failed chat=' . $chatId . ' message=' . $messageId . ': ' . $e->getMessage());
+            TelegramApiErrors::logTelegramIssue(self::LOG_PREFIX . ' delete', $e);
             SafeTelegram::editMessageReplyMarkup($bot, $chatId, $messageId, InlineKeyboardMarkup::make());
         }
     }

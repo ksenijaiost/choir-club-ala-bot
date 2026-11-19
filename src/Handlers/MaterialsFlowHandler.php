@@ -480,6 +480,10 @@ final class MaterialsFlowHandler
             return self::handleRenameTitle($bot, $deps, $telegramId, $text, $state['context'] ?? []);
         }
 
+        if ($flow === MaterialsRecordingEditHandler::FLOW) {
+            return MaterialsRecordingEditHandler::handleSourceUrlMessage($bot, $deps, $telegramId, $text);
+        }
+
         if ($flow === 'material_upload' && ($state['context']['step'] ?? '') === 'new_song_title') {
             return self::handleNewSongTitle($bot, $deps, $telegramId, $text);
         }

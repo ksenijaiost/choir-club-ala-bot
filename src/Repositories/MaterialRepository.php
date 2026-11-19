@@ -161,6 +161,14 @@ final class MaterialRepository
         $stmt->execute([$id]);
     }
 
+    public function setSourceMessageUrl(int $materialId, ?string $url): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE materials SET source_message_url = ? WHERE id = ?'
+        );
+        $stmt->execute([$url, $materialId]);
+    }
+
     public function insert(
         int $songId,
         string $type,

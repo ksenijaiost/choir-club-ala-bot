@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Domain\MaterialType;
 use App\Domain\VoicePart;
 use App\Services\AccessControl;
+use App\Services\RecordingSourceUrl;
 use App\Services\SongRecordingAvailability;
 use App\Support\SqlPagination;
 use App\Telegram\InlineMenuHelper;
@@ -283,6 +284,102 @@ final class MaterialsRecordingEditHandler
         self::presentStep($bot, $deps, $telegramId, $songId, $materialId, $text, $keyboard, $chatId);
     }
 
+    public static function beginSourceUrlEdit(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $materialId,
+        ?int $chatId = null,
+    ): void {
+        $material = $deps->materials->findById($materialId);
+        if ($material === null || ($material['type'] ?? '') !== MaterialType::RECORDING) {
+            SafeTelegram::answerCallbackQuery($bot, [
+                'text' => $deps->texts->get('errors.generic'),
+                'show_alert' => true,
+            ]);
+
+            return;
+        }
+
+        $state = $deps->flows->get($telegramId);
+        $ctx = $state !== null && ($state['flow'] ?? '') === self::FLOW ? $state['context'] : [];
+        $songId = (int) ($material['song_id'] ?? ($ctx['song_id'] ?? 0));
+        $ctx['step'] = 'await_source_url';
+        $ctx['material_id'] = $materialId;
+        $ctx['song_id'] = $songId;
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
+
+        SafeTelegram::answerCallbackQuery($bot);
+        $targetChatId = $chatId ?? $bot->chatId() ?? $telegramId;
+        SafeTelegram::sendMessage($bot, $deps->texts->get('materials.recording_source_url_prompt'), $targetChatId);
+    }
+
+    public static function clearSourceUrl(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $materialId,
+        ?int $chatId = null,
+    ): void {
+        $material = $deps->materials->findById($materialId);
+        if ($material === null || ($material['type'] ?? '') !== MaterialType::RECORDING) {
+            SafeTelegram::answerCallbackQuery($bot, [
+                'text' => $deps->texts->get('errors.generic'),
+                'show_alert' => true,
+            ]);
+
+            return;
+        }
+
+        $deps->materials->setSourceMessageUrl($materialId, null);
+        SafeTelegram::answerCallbackQuery($bot, [
+            'text' => $deps->texts->get('materials.recording_source_url_cleared'),
+        ]);
+        self::openEditor($bot, $deps, $telegramId, $materialId, $chatId);
+    }
+
+    public static function handleSourceUrlMessage(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        string $text,
+        ?int $chatId = null,
+    ): bool {
+        $state = $deps->flows->get($telegramId);
+        if ($state === null || ($state['flow'] ?? '') !== self::FLOW) {
+            return false;
+        }
+
+        if (($state['context']['step'] ?? '') !== 'await_source_url') {
+            return false;
+        }
+
+        $materialId = (int) ($state['context']['material_id'] ?? 0);
+        if ($materialId <= 0) {
+            return false;
+        }
+
+        $url = RecordingSourceUrl::normalize($text);
+        if (!RecordingSourceUrl::isValid($url)) {
+            $targetChatId = $chatId ?? $bot->chatId() ?? $telegramId;
+            SafeTelegram::sendMessage($bot, $deps->texts->get('materials.recording_source_url_invalid'), $targetChatId);
+
+            return true;
+        }
+
+        $deps->materials->setSourceMessageUrl($materialId, $url);
+        $ctx = $state['context'];
+        $ctx['step'] = 'pick_recording';
+        unset($ctx['await_source_url']);
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
+
+        $targetChatId = $chatId ?? $bot->chatId() ?? $telegramId;
+        SafeTelegram::sendMessage($bot, $deps->texts->get('materials.recording_source_url_saved'), $targetChatId);
+        self::openEditor($bot, $deps, $telegramId, $materialId, $chatId);
+
+        return true;
+    }
+
     public static function applyPartChoice(
         Nutgram $bot,
         MaterialsDeps $deps,
@@ -370,6 +467,11 @@ final class MaterialsRecordingEditHandler
             $lines[] = $deps->texts->get('materials.recording_part_updated', ['part' => $current]);
         }
 
+        $sourceUrl = trim((string) ($material['source_message_url'] ?? ''));
+        $lines[] = $sourceUrl !== ''
+            ? $deps->texts->get('materials.recording_source_line_set', ['url' => $sourceUrl])
+            : $deps->texts->get('materials.recording_source_line_empty');
+
         return implode("\n", $lines);
     }
 
@@ -399,6 +501,22 @@ final class MaterialsRecordingEditHandler
                 callback_data: 'mat:mg:erec:s:' . $materialId . ':tutti',
             ),
         );
+
+        $sourceUrl = trim((string) ($deps->materials->findById($materialId)['source_message_url'] ?? ''));
+        $keyboard = $keyboard->addRow(
+            InlineKeyboardButton::make(
+                $deps->texts->get('materials.recording_source_set_button'),
+                callback_data: 'mat:mg:erec:src:set:' . $materialId,
+            ),
+        );
+        if ($sourceUrl !== '') {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('materials.recording_source_clear_button'),
+                    callback_data: 'mat:mg:erec:src:clr:' . $materialId,
+                ),
+            );
+        }
 
         $keyboard = $keyboard->addRow(
             InlineKeyboardButton::make(

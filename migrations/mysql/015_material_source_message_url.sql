@@ -1,0 +1,1 @@
+ALTER TABLE materials ADD COLUMN source_message_url VARCHAR(512) NULL;

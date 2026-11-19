@@ -206,7 +206,7 @@ final class InlineMenuHelper
             $bot->deleteMessage(chat_id: $chatId, message_id: $messageId);
             $menus->clearOpen($telegramId, $chatId);
         } catch (\Throwable $e) {
-            error_log('[interactive-menu] close delete failed: ' . $e->getMessage());
+            TelegramApiErrors::logTelegramIssue('interactive-menu close', $e);
             CallbackUi::clearKeyboard($bot, $message);
             $menus->clearOpen($telegramId, $chatId);
         }
