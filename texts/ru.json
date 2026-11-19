@@ -349,6 +349,7 @@
     "edit_recordings_empty": "У этой песни записей пока нет.",
     "recording_edit_current": "Сейчас: {part}",
     "recordings_have_line": "Есть записи: {parts}",
+    "recordings_tutti_all_parts": "тутти (все партии)",
     "recordings_missing_line": "Нет записей: {parts}",
     "recordings_upload_hint": "Уже есть записи: {parts}",
     "recordings_upload_none": "Записей пока нет.",

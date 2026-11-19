@@ -42,6 +42,8 @@ final class AdminChatSongListRecordingsTest extends TestCase
             $texts->get('admin_chat.songs_block_recordings', ['detail' => 'тутти']),
             $body,
         );
+        self::assertStringNotContainsString('<b>⚠️ Sweet dreams</b>', $body);
+        self::assertStringNotContainsString('Нет записей', $body);
     }
 
     public function testMultipleRecordingsListedSeparately(): void

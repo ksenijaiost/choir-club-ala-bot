@@ -48,7 +48,7 @@ final class SongRecordingAvailability
             $label = $this->texts->get('parts.' . $code);
             if (isset($haveCodes[$code])) {
                 $have[] = $label;
-            } else {
+            } elseif (!$hasTutti) {
                 $missing[] = $label;
             }
         }
@@ -66,9 +66,12 @@ final class SongRecordingAvailability
     public function presentHaveLabels(int $songId): array
     {
         $buckets = $this->partBuckets($songId);
-        $labels = $buckets['have'];
+        $labels = [];
         if ($buckets['has_tutti']) {
-            $labels[] = $this->texts->get('admin_chat.recording_tutti');
+            $labels[] = $this->texts->get('materials.recordings_tutti_all_parts');
+        }
+        foreach ($buckets['have'] as $label) {
+            $labels[] = $label;
         }
 
         return $labels;
