@@ -53,24 +53,16 @@ final class RecordingEditTest extends TestCase
         self::assertSame(
             $texts->get('materials.recordings_have_line', [
                 'parts' => implode(', ', [
+                    $texts->get('materials.recordings_tutti_all_parts'),
                     $texts->get('parts.soprano_1'),
                     $texts->get('parts.bass'),
-                    $texts->get('admin_chat.recording_tutti'),
                 ]),
             ]),
             $haveLine,
         );
 
-        $expectedMissing = [];
-        foreach (VoicePart::CODES as $code) {
-            if (in_array($code, ['soprano_1', 'bass'], true)) {
-                continue;
-            }
-            $expectedMissing[] = $texts->get('parts.' . $code);
-        }
-
         self::assertSame(
-            $texts->get('materials.recordings_missing_line', ['parts' => implode(', ', $expectedMissing)]),
+            $texts->get('materials.recordings_missing_line', ['parts' => '—']),
             $missingLine,
         );
     }
