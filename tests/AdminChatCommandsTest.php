@@ -23,6 +23,7 @@ use App\Services\MemberBlockService;
 use App\Services\AdminChatMemberListPresenter;
 use App\Services\AdminChatSongListPresenter;
 use App\Services\AccessControl;
+use App\Services\SongRecordingAvailability;
 use App\Services\UserRolePresenter;
 use App\Text\TextRepository;
 use App\Telegram\TelegramMessageChunker;
@@ -68,7 +69,11 @@ final class AdminChatCommandsTest extends TestCase
         $body = implode("\n", $chunks);
 
         self::assertStringContainsString('Аве Мария', $body);
-        self::assertStringContainsString('<b>Аве Мария</b>', $body);
+        self::assertStringContainsString('<b>⚠️ Аве Мария</b>', $body);
+        $missingLine = (new SongRecordingAvailability($materials, $texts))->formatMissingLine($idA);
+        self::assertStringContainsString($missingLine, $body);
+        self::assertStringContainsString('<b>Благослови</b>', $body);
+        self::assertStringNotContainsString('<b>⚠️ Благослови</b>', $body);
         self::assertStringContainsString('• ноты: 1', $body);
         self::assertStringContainsString('• заметки: есть', $body);
         self::assertStringContainsString('• записи: Сопрано 1 + Бас; Тенор', $body);

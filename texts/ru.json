@@ -354,6 +354,8 @@
     "recordings_upload_none": "Записей пока нет.",
     "recording_part_unchanged": "Партия не изменилась.",
     "recording_part_updated": "Готово: запись теперь у {part}",
+    "recording_edit_save": "💾 Сохранить",
+    "recording_edit_pick_one": "Выбери хотя бы одну партию",
     "recording_edit_back": "⬅️ Назад",
     "recording_source_line_set": "Ссылка на оригинал: {url}",
     "recording_source_line_empty": "Ссылка на оригинал: нет",

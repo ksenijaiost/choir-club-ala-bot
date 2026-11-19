@@ -462,16 +462,34 @@ final class MaterialsCallbackHandler
             return true;
         }
 
-        if (preg_match('/^mat:mg:erec:s:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
+        if (preg_match('/^mat:mg:erec:tk:(\d+):([a-z0-9_]+)$/', $data, $m) === 1) {
+            if ($isAdminChat && !MaterialsRecordingEditHandler::assertAdminChatMenuActor($bot, $deps, $access, $actor)) {
+                return true;
+            }
+
             $telegramId = (int) $actor['telegram_id'];
-            $chatId = $isAdminChat ? $adminChatId : $bot->chatId();
-            MaterialsRecordingEditHandler::applyPartChoice(
+            MaterialsRecordingEditHandler::toggleDraftPart(
                 $bot,
                 $deps,
                 $telegramId,
                 (int) $m[1],
                 $m[2],
-                $chatId !== null && $chatId !== 0 ? $chatId : null,
+            );
+
+            return true;
+        }
+
+        if (preg_match('/^mat:mg:erec:sv:(\d+)$/', $data, $m) === 1) {
+            if ($isAdminChat && !MaterialsRecordingEditHandler::assertAdminChatMenuActor($bot, $deps, $access, $actor)) {
+                return true;
+            }
+
+            $telegramId = (int) $actor['telegram_id'];
+            MaterialsRecordingEditHandler::saveDraftParts(
+                $bot,
+                $deps,
+                $telegramId,
+                (int) $m[1],
             );
 
             return true;

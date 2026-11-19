@@ -97,12 +97,9 @@ final class AdminChatRecordingEditTest extends TestCase
 
         $this->handleAdminChatCallback($bot, $deps, $uploader, 'mat:mg:erec:p:' . $materialId);
 
-        $this->handleAdminChatCallback(
-            $bot,
-            $deps,
-            $uploader,
-            'mat:mg:erec:s:' . $materialId . ':baritone',
-        );
+        $this->handleAdminChatCallback($bot, $deps, $uploader, 'mat:mg:erec:tk:' . $materialId . ':tenor');
+        $this->handleAdminChatCallback($bot, $deps, $uploader, 'mat:mg:erec:tk:' . $materialId . ':baritone');
+        $this->handleAdminChatCallback($bot, $deps, $uploader, 'mat:mg:erec:sv:' . $materialId);
 
         self::assertSame(['baritone'], $deps['materials']->listVoiceParts($materialId));
         self::assertGreaterThanOrEqual(1, $this->countMethodCalls($bot, 'editMessageText'));

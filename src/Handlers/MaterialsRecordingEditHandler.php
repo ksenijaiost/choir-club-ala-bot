@@ -279,6 +279,7 @@ final class MaterialsRecordingEditHandler
         }
 
         $songId = (int) $material['song_id'];
+        self::resetDraftParts($deps, $telegramId, $materialId, $material);
         $text = self::buildEditorText($deps, $songId, $material);
         $keyboard = self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId);
         self::presentStep($bot, $deps, $telegramId, $songId, $materialId, $text, $keyboard, $chatId);
@@ -380,13 +381,12 @@ final class MaterialsRecordingEditHandler
         return true;
     }
 
-    public static function applyPartChoice(
+    public static function toggleDraftPart(
         Nutgram $bot,
         MaterialsDeps $deps,
         int $telegramId,
         int $materialId,
         string $choice,
-        ?int $chatId = null,
     ): void {
         $material = $deps->materials->findById($materialId);
         if ($material === null || ($material['type'] ?? '') !== MaterialType::RECORDING) {
@@ -398,8 +398,21 @@ final class MaterialsRecordingEditHandler
             return;
         }
 
-        $newParts = self::partsForChoice($choice);
-        if ($newParts === []) {
+        $songId = (int) $material['song_id'];
+        $draft = self::draftParts($deps, $telegramId, $materialId);
+
+        if ($choice === 'tutti') {
+            $draft = count($draft) === count(VoicePart::CODES) ? [] : VoicePart::CODES;
+        } elseif (VoicePart::isValid($choice)) {
+            if (in_array($choice, $draft, true)) {
+                $draft = array_values(array_filter(
+                    $draft,
+                    static fn (string $code): bool => $code !== $choice,
+                ));
+            } else {
+                $draft[] = $choice;
+            }
+        } else {
             SafeTelegram::answerCallbackQuery($bot, [
                 'text' => $deps->texts->get('errors.generic'),
                 'show_alert' => true,
@@ -408,38 +421,76 @@ final class MaterialsRecordingEditHandler
             return;
         }
 
-        $current = $deps->service->normalizeVoiceParts(
-            is_array($material['voice_parts'] ?? null) ? $material['voice_parts'] : $deps->materials->listVoiceParts($materialId),
-        );
-        $songId = (int) $material['song_id'];
+        self::persistDraftParts($deps, $telegramId, $materialId, $deps->service->normalizeVoiceParts($draft));
+        SafeTelegram::answerCallbackQuery($bot);
+        self::refreshEditorKeyboard($bot, $deps, $telegramId, $songId, $materialId);
+    }
 
-        if ($current === $deps->service->normalizeVoiceParts($newParts)) {
+    public static function saveDraftParts(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $materialId,
+    ): void {
+        $material = $deps->materials->findById($materialId);
+        if ($material === null || ($material['type'] ?? '') !== MaterialType::RECORDING) {
             SafeTelegram::answerCallbackQuery($bot, [
-                'text' => $deps->texts->get('materials.recording_part_unchanged'),
+                'text' => $deps->texts->get('errors.generic'),
+                'show_alert' => true,
             ]);
-            $material = $deps->materials->findById($materialId) ?? $material;
-            $text = self::buildEditorText($deps, $songId, $material, false);
-            self::refreshStep($bot, $deps, $telegramId, $text, self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId));
 
             return;
         }
 
+        $songId = (int) $material['song_id'];
+        $newParts = self::draftParts($deps, $telegramId, $materialId);
+        if ($newParts === []) {
+            SafeTelegram::answerCallbackQuery($bot, [
+                'text' => $deps->texts->get('materials.recording_edit_pick_one'),
+                'show_alert' => true,
+            ]);
+
+            return;
+        }
+
+        $current = $deps->service->normalizeVoiceParts(
+            is_array($material['voice_parts'] ?? null)
+                ? $material['voice_parts']
+                : $deps->materials->listVoiceParts($materialId),
+        );
+
+        if ($current === $newParts) {
+            SafeTelegram::answerCallbackQuery($bot, [
+                'text' => $deps->texts->get('materials.recording_part_unchanged'),
+            ]);
+
+            return;
+        }
+
+        $added = array_values(array_diff($newParts, $current));
         $deps->materials->setVoiceParts($materialId, $newParts);
         $material = $deps->materials->findById($materialId) ?? $material;
         $song = $deps->songs->findById($songId);
-        if ($song !== null) {
+        if ($song !== null && $added !== []) {
             $actor = $deps->users->findByTelegramId($telegramId);
             $actorUserId = $actor !== null ? (int) $actor['id'] : 0;
-            $deps->materialNotifications->afterRecordingReassigned($song, $newParts, $actorUserId);
+            $deps->materialNotifications->afterRecordingReassigned($song, $added, $actorUserId);
         }
-        $partLabel = $deps->service->formatRecordingPartsLabel($newParts);
 
+        $partLabel = $deps->service->formatRecordingPartsLabel($newParts);
         SafeTelegram::answerCallbackQuery($bot, [
             'text' => $deps->texts->get('materials.recording_part_updated', ['part' => $partLabel]),
         ]);
 
+        self::persistDraftParts($deps, $telegramId, $materialId, $newParts);
         $text = self::buildEditorText($deps, $songId, $material, true);
-        self::refreshStep($bot, $deps, $telegramId, $text, self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId));
+        self::refreshStep(
+            $bot,
+            $deps,
+            $telegramId,
+            $text,
+            self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId),
+        );
     }
 
     /**
@@ -477,13 +528,15 @@ final class MaterialsRecordingEditHandler
 
     private static function buildEditorKeyboard(MaterialsDeps $deps, int $telegramId, int $songId, int $materialId): InlineKeyboardMarkup
     {
+        $selected = self::draftParts($deps, $telegramId, $materialId);
         $keyboard = InlineKeyboardMarkup::make();
         $row = [];
 
         foreach (VoicePart::CODES as $code) {
+            $mark = in_array($code, $selected, true) ? '✅ ' : '';
             $row[] = InlineKeyboardButton::make(
-                $deps->texts->get('parts.' . $code),
-                callback_data: 'mat:mg:erec:s:' . $materialId . ':' . $code,
+                $mark . $deps->texts->get('parts.' . $code),
+                callback_data: 'mat:mg:erec:tk:' . $materialId . ':' . $code,
             );
             if (count($row) === 2) {
                 $keyboard = $keyboard->addRow(...$row);
@@ -495,10 +548,18 @@ final class MaterialsRecordingEditHandler
             $keyboard = $keyboard->addRow(...$row);
         }
 
+        $tuttiMark = count($selected) === count(VoicePart::CODES) ? '✅ ' : '';
         $keyboard = $keyboard->addRow(
             InlineKeyboardButton::make(
-                $deps->texts->get('admin_chat.recording_tutti'),
-                callback_data: 'mat:mg:erec:s:' . $materialId . ':tutti',
+                $tuttiMark . $deps->texts->get('admin_chat.recording_tutti'),
+                callback_data: 'mat:mg:erec:tk:' . $materialId . ':tutti',
+            ),
+        );
+
+        $keyboard = $keyboard->addRow(
+            InlineKeyboardButton::make(
+                $deps->texts->get('materials.recording_edit_save'),
+                callback_data: 'mat:mg:erec:sv:' . $materialId,
             ),
         );
 
@@ -529,6 +590,83 @@ final class MaterialsRecordingEditHandler
             $keyboard,
             $deps->texts,
             self::listFooterBackCallback($deps, $telegramId, $songId),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $material
+     */
+    private static function resetDraftParts(
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $materialId,
+        array $material,
+    ): void {
+        $parts = is_array($material['voice_parts'] ?? null)
+            ? $material['voice_parts']
+            : $deps->materials->listVoiceParts($materialId);
+        self::persistDraftParts($deps, $telegramId, $materialId, $deps->service->normalizeVoiceParts($parts));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function draftParts(MaterialsDeps $deps, int $telegramId, int $materialId): array
+    {
+        $state = $deps->flows->get($telegramId);
+        if ($state !== null && ($state['flow'] ?? '') === self::FLOW) {
+            $draft = $state['context']['draft_parts'] ?? null;
+            if (is_array($draft)) {
+                return $deps->service->normalizeVoiceParts($draft);
+            }
+        }
+
+        $material = $deps->materials->findById($materialId);
+        if ($material === null) {
+            return [];
+        }
+
+        $parts = is_array($material['voice_parts'] ?? null)
+            ? $material['voice_parts']
+            : $deps->materials->listVoiceParts($materialId);
+
+        return $deps->service->normalizeVoiceParts($parts);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private static function persistDraftParts(
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $materialId,
+        array $parts,
+    ): void {
+        $state = $deps->flows->get($telegramId);
+        $ctx = $state !== null && ($state['flow'] ?? '') === self::FLOW ? $state['context'] : [];
+        $ctx['draft_parts'] = $parts;
+        $ctx['material_id'] = $materialId;
+        $ctx['step'] = 'edit_parts';
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
+    }
+
+    private static function refreshEditorKeyboard(
+        Nutgram $bot,
+        MaterialsDeps $deps,
+        int $telegramId,
+        int $songId,
+        int $materialId,
+    ): void {
+        $target = self::wizardTarget($deps, $telegramId);
+        if ($target === null) {
+            return;
+        }
+
+        SafeTelegram::editMessageReplyMarkup(
+            $bot,
+            $target['chat_id'],
+            $target['message_id'],
+            self::buildEditorKeyboard($deps, $telegramId, $songId, $materialId),
         );
     }
 
@@ -670,22 +808,6 @@ final class MaterialsRecordingEditHandler
         $ctx['wizard_chat_id'] = $chatId;
         $ctx['wizard_message_id'] = $messageId;
         $deps->flows->set($telegramId, self::FLOW, $ctx);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function partsForChoice(string $choice): array
-    {
-        if ($choice === 'tutti') {
-            return VoicePart::CODES;
-        }
-
-        if (VoicePart::isValid($choice)) {
-            return [$choice];
-        }
-
-        return [];
     }
 
     /**
