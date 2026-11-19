@@ -49,7 +49,7 @@ final class MaterialsAdminChatHandler
             }
 
             $rawText = $message->text ?? $message->caption;
-            if ($rawText !== null && TranslitUploadCommand::isInvoked($rawText)) {
+            if ($rawText !== null && TranslitUploadCommand::isInvoked($rawText, $deps->config->botUsername)) {
                 if (!$access->canUploadMaterials($user)) {
                     return;
                 }
@@ -92,7 +92,7 @@ final class MaterialsAdminChatHandler
         int $chatId,
         int $messageId,
     ): void {
-        $text = TranslitUploadCommand::extractText($message);
+        $text = TranslitUploadCommand::extractText($message, $deps->config->botUsername);
         if ($text === null) {
             $bot->sendMessage(
                 chat_id: $chatId,

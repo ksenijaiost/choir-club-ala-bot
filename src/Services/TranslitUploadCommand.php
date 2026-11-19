@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Telegram\BotCommandMention;
 use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
 final class TranslitUploadCommand
@@ -12,21 +13,23 @@ final class TranslitUploadCommand
 
     public const LEGACY_COMMAND = '/translit';
 
-    public static function isInvoked(?string $text): bool
+    public const DEFAULT_BOT_USERNAME = 'CHOIR_CLUB_ALA_bot';
+
+    public static function isInvoked(?string $text, ?string $botUsername = null): bool
     {
         if ($text === null || $text === '') {
             return false;
         }
 
-        $firstLine = explode("\n", str_replace(["\r\n", "\r"], "\n", $text), 2)[0];
+        $botUsername ??= self::DEFAULT_BOT_USERNAME;
 
-        return preg_match('/^\/(?:notes|translit)(?:@[\w_]+)?(?:\s|$)/u', trim($firstLine)) === 1;
+        return BotCommandMention::isNotesOrTranslit($text, $botUsername);
     }
 
-    public static function extractText(Message $message): ?string
+    public static function extractText(Message $message, ?string $botUsername = null): ?string
     {
         $raw = $message->text ?? $message->caption;
-        if ($raw === null || !self::isInvoked($raw)) {
+        if ($raw === null || !self::isInvoked($raw, $botUsername)) {
             return null;
         }
 
