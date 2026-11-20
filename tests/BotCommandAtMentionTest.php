@@ -46,6 +46,7 @@ final class BotCommandAtMentionTest extends TestCase
         $nutgramConfig = NutgramFactory::configuration($config);
 
         self::assertSame('My_Test_Bot', $nutgramConfig->botName);
+        self::assertFalse($nutgramConfig->enableHttp2);
     }
 
     public function testSongsWithBotMentionInAdminChat(): void

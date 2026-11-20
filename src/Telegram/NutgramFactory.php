@@ -14,6 +14,7 @@ final class NutgramFactory
     {
         return new Configuration(
             botName: BotCommandMention::normalizeUsername($config->botUsername),
+            enableHttp2: false,
         );
     }
 
