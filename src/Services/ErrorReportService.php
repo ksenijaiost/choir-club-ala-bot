@@ -8,6 +8,7 @@ use App\Config;
 use App\Repositories\ErrorReportRepository;
 use App\Repositories\UserActionRepository;
 use App\Repositories\UserRepository;
+use App\Support\DbTime;
 use App\Support\ErrorLog;
 use App\Telegram\SafeTelegram;
 use App\Telegram\TelegramHtml;
@@ -304,7 +305,7 @@ final class ErrorReportService
             }
 
             $createdAt = (string) ($row['created_at'] ?? '');
-            $timeLabel = $this->formatActionTime($createdAt, $tz);
+            $timeLabel = DbTime::formatHi($this->config->migrationDriver(), $createdAt, $tz);
             $lines[] = $timeLabel . ' · ' . TelegramHtml::escape($action);
         }
 
@@ -331,32 +332,13 @@ final class ErrorReportService
             $class = TelegramHtml::escape((string) ($row['exception_class'] ?? ''));
             $message = mb_substr((string) ($row['exception_message'] ?? ''), 0, 150);
             $message = TelegramHtml::escape($message);
-            $timeLabel = $this->formatActionTime((string) ($row['created_at'] ?? ''), $tz);
+            $timeLabel = DbTime::formatHi($this->config->migrationDriver(), (string) ($row['created_at'] ?? ''), $tz);
             $lines[] = $timeLabel . ' · ' . $class . ': ' . $message;
         }
 
         return $this->texts->get('errors.report_admin_recent_errors_block', [
             'lines' => implode("\n", $lines),
         ]);
-    }
-
-    private function formatActionTime(string $stored, \DateTimeZone $tz): string
-    {
-        if ($stored === '') {
-            return '—';
-        }
-
-        try {
-            $dt = new \DateTimeImmutable($stored, new \DateTimeZone('UTC'));
-        } catch (\Throwable) {
-            try {
-                $dt = new \DateTimeImmutable($stored, $tz);
-            } catch (\Throwable) {
-                return '—';
-            }
-        }
-
-        return $dt->setTimezone($tz)->format('H:i');
     }
 
     private function isHelpCommandAction(string $action): bool
