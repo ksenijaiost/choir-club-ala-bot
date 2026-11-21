@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Config;
 use App\Repositories\ErrorReportRepository;
+use App\Repositories\UserActionRepository;
 use App\Repositories\UserRepository;
 use App\Support\ErrorLog;
 use App\Telegram\SafeTelegram;
@@ -25,9 +26,14 @@ final class ErrorReportService
     private const ACTION_MAX = 200;
     private const MESSAGE_MAX = 500;
     private const RATE_LIMIT_PER_HOUR = 5;
+    private const TELEGRAM_MESSAGE_MAX = 4096;
+    private const RECENT_ACTIONS_LIMIT = 10;
+    private const RECENT_ERRORS_LIMIT = 3;
+    private const RECENT_ERROR_HOURS = 24;
 
     public function __construct(
         private readonly ErrorReportRepository $reports,
+        private readonly UserActionRepository $userActions,
         private readonly UserRepository $users,
         private readonly TextRepository $texts,
         private readonly Config $config,
@@ -247,7 +253,11 @@ final class ErrorReportService
             ]);
         }
 
-        return $this->texts->get('errors.report_admin_message', [
+        $reportId = (int) ($report['id'] ?? 0);
+        $actionsBlock = $this->buildRecentActionsBlock($telegramId, (string) ($report['action'] ?? ''));
+        $recentErrorsBlock = $this->buildRecentErrorsBlock($telegramId, $reportId);
+
+        $base = [
             'user_line' => $nameLine,
             'telegram_id' => (string) $telegramId,
             'part' => TelegramHtml::escape($part),
@@ -256,7 +266,107 @@ final class ErrorReportService
             'error_block' => $errorBlock,
             'comment_block' => $commentBlock,
             'update_id' => TelegramHtml::escape((string) ($report['update_id'] ?? '—')),
+        ];
+
+        $variants = [
+            ['actions_block' => $actionsBlock, 'recent_errors_block' => $recentErrorsBlock],
+            ['actions_block' => $actionsBlock, 'recent_errors_block' => ''],
+            ['actions_block' => '', 'recent_errors_block' => ''],
+        ];
+
+        $html = '';
+        foreach ($variants as $extra) {
+            $html = $this->texts->get('errors.report_admin_message', array_merge($base, $extra));
+            if (mb_strlen($html) <= self::TELEGRAM_MESSAGE_MAX) {
+                return $html;
+            }
+        }
+
+        return mb_substr($html, 0, self::TELEGRAM_MESSAGE_MAX - 1) . '…';
+    }
+
+    private function buildRecentActionsBlock(int $telegramId, string $currentAction): string
+    {
+        $rows = $this->userActions->recent($telegramId, self::RECENT_ACTIONS_LIMIT);
+        if ($rows === []) {
+            return '';
+        }
+
+        $tz = new \DateTimeZone($this->config->timezone);
+        $lines = [];
+        foreach ($rows as $row) {
+            $action = (string) ($row['action'] ?? '');
+            if ($this->isHelpCommandAction($action)) {
+                continue;
+            }
+            if ($currentAction !== '' && $action === $currentAction && $this->isHelpCommandAction($currentAction)) {
+                continue;
+            }
+
+            $createdAt = (string) ($row['created_at'] ?? '');
+            $timeLabel = $this->formatActionTime($createdAt, $tz);
+            $lines[] = $timeLabel . ' · ' . TelegramHtml::escape($action);
+        }
+
+        if ($lines === []) {
+            return '';
+        }
+
+        return $this->texts->get('errors.report_admin_actions_block', [
+            'lines' => implode("\n", $lines),
         ]);
+    }
+
+    private function buildRecentErrorsBlock(int $telegramId, int $excludeReportId): string
+    {
+        $since = time() - self::RECENT_ERROR_HOURS * 3600;
+        $rows = $this->reports->recentExceptions($telegramId, $since, self::RECENT_ERRORS_LIMIT, $excludeReportId > 0 ? $excludeReportId : null);
+        if ($rows === []) {
+            return '';
+        }
+
+        $tz = new \DateTimeZone($this->config->timezone);
+        $lines = [];
+        foreach ($rows as $row) {
+            $class = TelegramHtml::escape((string) ($row['exception_class'] ?? ''));
+            $message = mb_substr((string) ($row['exception_message'] ?? ''), 0, 150);
+            $message = TelegramHtml::escape($message);
+            $timeLabel = $this->formatActionTime((string) ($row['created_at'] ?? ''), $tz);
+            $lines[] = $timeLabel . ' · ' . $class . ': ' . $message;
+        }
+
+        return $this->texts->get('errors.report_admin_recent_errors_block', [
+            'lines' => implode("\n", $lines),
+        ]);
+    }
+
+    private function formatActionTime(string $stored, \DateTimeZone $tz): string
+    {
+        if ($stored === '') {
+            return '—';
+        }
+
+        try {
+            $dt = new \DateTimeImmutable($stored, new \DateTimeZone('UTC'));
+        } catch (\Throwable) {
+            try {
+                $dt = new \DateTimeImmutable($stored, $tz);
+            } catch (\Throwable) {
+                return '—';
+            }
+        }
+
+        return $dt->setTimezone($tz)->format('H:i');
+    }
+
+    private function isHelpCommandAction(string $action): bool
+    {
+        $trimmed = trim($action);
+        if ($trimmed === '/help') {
+            return true;
+        }
+
+        return str_starts_with($trimmed, '/help@');
     }
 
     private static function truncateExceptionMessage(\Throwable $e, Config $config): string

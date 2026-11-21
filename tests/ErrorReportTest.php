@@ -12,6 +12,7 @@ use App\Domain\UserStatus;
 use App\Handlers\HandlerRegistry;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\ErrorReportRepository;
+use App\Repositories\UserActionRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdminChatResolver;
 use App\Services\ErrorReportService;
@@ -306,6 +307,7 @@ final class ErrorReportTest extends TestCase
     {
         return new ErrorReportService(
             new ErrorReportRepository($pdo),
+            new UserActionRepository($pdo),
             new UserRepository($pdo),
             $texts,
             $config,
