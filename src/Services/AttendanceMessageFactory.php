@@ -31,6 +31,26 @@ final class AttendanceMessageFactory
         );
     }
 
+    public function checkinLateAbsentKeyboard(int $rehearsalId): InlineKeyboardMarkup
+    {
+        return InlineKeyboardMarkup::make()->addRow(
+            InlineKeyboardButton::make($this->texts->get('checkin.button_late'), callback_data: 'chk:late:' . $rehearsalId),
+            InlineKeyboardButton::make($this->texts->get('checkin.button_absent'), callback_data: 'chk:absent:' . $rehearsalId),
+        );
+    }
+
+    public function checkinEditKeyboard(int $rehearsalId): InlineKeyboardMarkup
+    {
+        return InlineKeyboardMarkup::make()->addRow(
+            InlineKeyboardButton::make($this->texts->get('checkin.edit_answer'), callback_data: 'chk:edit:' . $rehearsalId),
+        );
+    }
+
+    public function checkinQuestionText(): string
+    {
+        return $this->texts->get('checkin.question');
+    }
+
     /**
      * @param array<string, mixed> $rehearsal
      */

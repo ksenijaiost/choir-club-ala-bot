@@ -80,4 +80,30 @@ final class AttendanceService
         $this->marks->delete($rehearsalId, $userId);
         $this->users->resetConsecutiveUnexcused($userId);
     }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public function clearCheckinMark(array $user, int $rehearsalId): bool
+    {
+        $userId = (int) $user['id'];
+        $existing = $this->marks->find($rehearsalId, $userId);
+        if ($existing === null) {
+            return true;
+        }
+
+        $source = (string) ($existing['source'] ?? '');
+        if ($source === AttendanceSource::MANUAL) {
+            return false;
+        }
+
+        if ($source !== AttendanceSource::CHECKIN) {
+            return false;
+        }
+
+        $this->marks->delete($rehearsalId, $userId);
+        $this->recalculator->recalculateForUser($userId);
+
+        return true;
+    }
 }

@@ -63,6 +63,29 @@ final class AttendanceConductorNotifier
 
     /**
      * @param array<string, mixed> $user
+     */
+    public function notifyCheckinChangedToAbsent(array $user, string $reason): void
+    {
+        $chatId = $this->recipients->resolveOperationalChatId();
+        if ($chatId === null) {
+            return;
+        }
+
+        $partCode = (string) ($user['voice_part'] ?? '');
+        $part = $partCode !== '' ? $this->texts->get('parts.' . $partCode) : '—';
+
+        $this->outbound->sendMessage(
+            $chatId,
+            $this->texts->get('checkin.changed_to_absent', [
+                'name' => (string) ($user['display_name'] ?? ''),
+                'part' => $part,
+                'reason' => $this->displayReason($reason),
+            ]),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $user
      * @param array<string, mixed> $rehearsal
      */
     public function notifyPlannedAbsence(array $user, array $rehearsal, string $reason, \DateTimeZone $tz): void
