@@ -117,12 +117,15 @@ final class AttendanceAbsenceReasonTest extends TestCase
         $deps = $this->attendanceDeps($config, $this->pdo, $this->texts, $this->users);
         $bot = Nutgram::fake();
 
+        (new CheckInSessionRepository($this->pdo))->ensureOpen($this->rehearsalId);
+
         AttendanceCallbackHandler::handle(
             $bot,
             $deps,
             'att:ci:' . $this->rehearsalId . ':n',
             self::MEMBER_TG,
         );
+        AttendanceCallbackHandler::handle($bot, $deps, 'chk:absent:' . $this->rehearsalId, self::MEMBER_TG);
 
         AttendanceCallbackHandler::handle($bot, $deps, 'att:sk', self::MEMBER_TG);
 

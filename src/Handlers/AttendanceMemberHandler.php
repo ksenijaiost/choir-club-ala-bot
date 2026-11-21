@@ -8,6 +8,7 @@ use App\Clock;
 use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
 use App\Services\ScheduleTime;
+use App\Telegram\CallbackUi;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -74,7 +75,7 @@ final class AttendanceMemberHandler
             return true;
         }
 
-        self::completeAbsenceWithReason($bot, $deps, $telegramId, $user, $rehearsal, $source, $rehearsalId, $reason);
+        self::completeAbsenceWithReason($bot, $deps, $telegramId, $user, $rehearsal, $source, $rehearsalId, $reason, $ctx);
 
         return true;
     }
@@ -92,6 +93,7 @@ final class AttendanceMemberHandler
         string $source,
         int $rehearsalId,
         string $reason,
+        array $flowContext = [],
     ): void {
         $tz = new \DateTimeZone($deps->config->timezone);
         $userId = (int) $user['id'];
@@ -106,6 +108,12 @@ final class AttendanceMemberHandler
             $deps->conductor->forwardDayBeforeReason($user, $rehearsal, $reason, $tz);
         } elseif ($source === AttendanceSource::ABSENCE_BUTTON) {
             $deps->conductor->notifyPlannedAbsence($user, $rehearsal, $reason, $tz);
+        } elseif ($source === AttendanceSource::CHECKIN && self::flowReplacedAttended($flowContext)) {
+            $deps->conductor->notifyCheckinChangedToAbsent($user, $reason);
+        }
+
+        if ($source === AttendanceSource::CHECKIN) {
+            self::finalizeCheckinPromptAfterAbsence($bot, $deps, $flowContext, $rehearsalId, $deps->texts->get('common.inline_answer_no'));
         }
 
         $deps->flows->clear($telegramId);
@@ -127,11 +135,63 @@ final class AttendanceMemberHandler
             return;
         }
 
+        $state = $deps->flows->get($telegramId);
+        $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
+
         $deps->attendance->recordUnexcused($user, $rehearsalId, $source);
+
+        if ($source === AttendanceSource::CHECKIN && self::flowReplacedAttended($ctx)) {
+            $deps->conductor->notifyCheckinChangedToAbsent($user, '');
+        }
+
+        if ($source === AttendanceSource::CHECKIN) {
+            self::finalizeCheckinPromptAfterAbsence(
+                $bot,
+                $deps,
+                $ctx,
+                $rehearsalId,
+                $deps->texts->get('common.inline_answer_no_reason'),
+            );
+        }
+
         $deps->flows->clear($telegramId);
 
         if ($source === AttendanceSource::CHECKIN) {
             $bot->sendMessage($deps->texts->get('checkin.thanks_no'));
         }
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    private static function finalizeCheckinPromptAfterAbsence(
+        Nutgram $bot,
+        AttendanceDeps $deps,
+        array $ctx,
+        int $rehearsalId,
+        string $answerLine,
+    ): void {
+        $chatId = (int) ($ctx['checkin_chat_id'] ?? 0);
+        $messageId = (int) ($ctx['checkin_message_id'] ?? 0);
+        if ($chatId <= 0 || $messageId <= 0) {
+            return;
+        }
+
+        CallbackUi::finalizeCheckinAt(
+            $bot,
+            $chatId,
+            $messageId,
+            $deps->messages->checkinQuestionText(),
+            $answerLine,
+            $deps->messages->checkinEditKeyboard($rehearsalId),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $flowContext
+     */
+    private static function flowReplacedAttended(array $flowContext): bool
+    {
+        return (bool) ($flowContext['replaced_attended'] ?? false);
     }
 }

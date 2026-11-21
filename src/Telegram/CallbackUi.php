@@ -48,6 +48,57 @@ final class CallbackUi
         }
     }
 
+    public static function finalizeCheckinAnswer(
+        Nutgram $bot,
+        string $questionText,
+        string $answerLine,
+        InlineKeyboardMarkup $replyMarkup,
+    ): void
+    {
+        $message = self::callbackMessage($bot);
+        if ($message === null) {
+            return;
+        }
+
+        $text = $questionText;
+        if (!str_contains($text, $answerLine)) {
+            $text .= "\n\n" . $answerLine;
+        }
+
+        self::editMessageAt($bot, (int) $message->chat->id, (int) $message->message_id, $text, $replyMarkup);
+    }
+
+    public static function editCheckinPrompt(
+        Nutgram $bot,
+        string $text,
+        ?InlineKeyboardMarkup $replyMarkup = null,
+    ): void
+    {
+        $message = self::callbackMessage($bot);
+        if ($message === null) {
+            return;
+        }
+
+        self::editMessageAt($bot, (int) $message->chat->id, (int) $message->message_id, $text, $replyMarkup);
+    }
+
+    public static function finalizeCheckinAt(
+        Nutgram $bot,
+        int $chatId,
+        int $messageId,
+        string $questionText,
+        string $answerLine,
+        InlineKeyboardMarkup $replyMarkup,
+    ): void
+    {
+        $text = $questionText;
+        if (!str_contains($text, $answerLine)) {
+            $text .= "\n\n" . $answerLine;
+        }
+
+        self::editMessageAt($bot, $chatId, $messageId, $text, $replyMarkup);
+    }
+
     public static function finalizeWithAnswer(Nutgram $bot, string $answerLine): void
     {
         $message = self::callbackMessage($bot);
@@ -74,6 +125,32 @@ final class CallbackUi
             }
         } catch (\Throwable) {
             self::clearKeyboard($bot, $message);
+        }
+    }
+
+    private static function editMessageAt(
+        Nutgram $bot,
+        int $chatId,
+        int $messageId,
+        string $text,
+        ?InlineKeyboardMarkup $replyMarkup = null,
+    ): void
+    {
+        try {
+            SafeTelegram::editMessageText(
+                $bot,
+                $chatId,
+                $messageId,
+                $text,
+                $replyMarkup,
+            );
+        } catch (\Throwable) {
+            if ($replyMarkup !== null) {
+                try {
+                    SafeTelegram::editMessageReplyMarkup($bot, $chatId, $messageId, $replyMarkup);
+                } catch (\Throwable) {
+                }
+            }
         }
     }
 

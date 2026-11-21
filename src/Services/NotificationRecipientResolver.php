@@ -20,6 +20,16 @@ final class NotificationRecipientResolver
     ) {
     }
 
+    public function resolveOperationalChatId(): ?int
+    {
+        $adminChat = trim($this->config->adminChatId);
+        if ($adminChat !== '') {
+            return (int) $adminChat;
+        }
+
+        return $this->resolveTelegramId();
+    }
+
     public function resolveTelegramId(): ?int
     {
         $conductors = $this->users->listActiveByRole(UserRole::CONDUCTOR);

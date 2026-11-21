@@ -12,6 +12,7 @@ use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class AttendanceCallbackHandler
 {
@@ -33,6 +34,24 @@ final class AttendanceCallbackHandler
 
         if (preg_match('/^att:ci:(\d+):(y|n)$/', $data, $m) === 1) {
             self::handleCheckin($bot, $deps, $actorTelegramId, (int) $m[1], $m[2] === 'y');
+
+            return true;
+        }
+
+        if (preg_match('/^chk:late:(\d+)$/', $data, $m) === 1) {
+            self::handleCheckinLate($bot, $deps, $actorTelegramId, (int) $m[1]);
+
+            return true;
+        }
+
+        if (preg_match('/^chk:absent:(\d+)$/', $data, $m) === 1) {
+            self::handleCheckinAbsent($bot, $deps, $actorTelegramId, (int) $m[1]);
+
+            return true;
+        }
+
+        if (preg_match('/^chk:edit:(\d+)$/', $data, $m) === 1) {
+            self::handleCheckinEdit($bot, $deps, $actorTelegramId, (int) $m[1]);
 
             return true;
         }
@@ -134,25 +153,209 @@ final class AttendanceCallbackHandler
         int $rehearsalId,
         bool $yes,
     ): void {
+        $ctx = self::loadCheckinContext($bot, $deps, $telegramId, $rehearsalId);
+        if ($ctx === null) {
+            return;
+        }
+
+        ['user' => $user, 'rehearsal' => $rehearsal] = $ctx;
+        $userId = (int) $user['id'];
+        $existing = $deps->marks->find($rehearsalId, $userId);
+        if ($existing !== null) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+
+            return;
+        }
+
+        $bot->answerCallbackQuery();
+        $question = $deps->messages->checkinQuestionText();
+
+        if ($yes) {
+            $deps->flows->clear($telegramId);
+            $deps->attendance->recordAttended($user, $rehearsalId);
+            CallbackUi::finalizeCheckinAnswer(
+                $bot,
+                $question,
+                $deps->texts->get('common.inline_answer_yes'),
+                $deps->messages->checkinEditKeyboard($rehearsalId),
+            );
+
+            return;
+        }
+
+        CallbackUi::editCheckinPrompt(
+            $bot,
+            $deps->texts->get('checkin.late_or_absent'),
+            $deps->messages->checkinLateAbsentKeyboard($rehearsalId),
+        );
+    }
+
+    private static function handleCheckinLate(
+        Nutgram $bot,
+        AttendanceDeps $deps,
+        int $telegramId,
+        int $rehearsalId,
+    ): void {
+        $ctx = self::loadCheckinContext($bot, $deps, $telegramId, $rehearsalId);
+        if ($ctx === null) {
+            return;
+        }
+
+        $user = $ctx['user'];
+        $userId = (int) $user['id'];
+        $existing = $deps->marks->find($rehearsalId, $userId);
+        if ($existing !== null) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+
+            return;
+        }
+
+        $bot->answerCallbackQuery();
+        $deps->flows->clear($telegramId);
+        $deps->attendance->recordAttended($user, $rehearsalId);
+        CallbackUi::finalizeCheckinAnswer(
+            $bot,
+            $deps->messages->checkinQuestionText(),
+            $deps->texts->get('checkin.thanks_late'),
+            $deps->messages->checkinEditKeyboard($rehearsalId),
+        );
+    }
+
+    private static function handleCheckinAbsent(
+        Nutgram $bot,
+        AttendanceDeps $deps,
+        int $telegramId,
+        int $rehearsalId,
+    ): void {
+        $ctx = self::loadCheckinContext($bot, $deps, $telegramId, $rehearsalId);
+        if ($ctx === null) {
+            return;
+        }
+
+        $user = $ctx['user'];
+        $userId = (int) $user['id'];
+        $existing = $deps->marks->find($rehearsalId, $userId);
+        if ($existing !== null) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+
+            return;
+        }
+
+        $bot->answerCallbackQuery();
+        $question = $deps->messages->checkinQuestionText();
+        CallbackUi::finalizeCheckinAnswer(
+            $bot,
+            $question,
+            $deps->texts->get('common.inline_answer_no'),
+            InlineKeyboardMarkup::make(),
+        );
+
+        $flowContext = [
+            'rehearsal_id' => $rehearsalId,
+            'source' => AttendanceSource::CHECKIN,
+        ];
+        $message = CallbackUi::callbackMessage($bot);
+        if ($message !== null) {
+            $flowContext['checkin_chat_id'] = (int) $message->chat->id;
+            $flowContext['checkin_message_id'] = (int) $message->message_id;
+        }
+
+        $editState = $deps->flows->get($telegramId);
+        if ($editState !== null && ($editState['flow'] ?? '') === 'checkin_edit') {
+            $flowContext['replaced_attended'] = (bool) ($editState['context']['replaced_attended'] ?? false);
+        }
+
+        $deps->flows->set($telegramId, 'absence_reason', $flowContext);
+
+        $bot->sendMessage(
+            $deps->messages->pollReasonPromptText(),
+            parse_mode: ParseMode::HTML,
+            reply_markup: $deps->messages->reasonOptionalKeyboard(),
+        );
+    }
+
+    private static function handleCheckinEdit(
+        Nutgram $bot,
+        AttendanceDeps $deps,
+        int $telegramId,
+        int $rehearsalId,
+    ): void {
+        $ctx = self::loadCheckinContext($bot, $deps, $telegramId, $rehearsalId);
+        if ($ctx === null) {
+            return;
+        }
+
+        $user = $ctx['user'];
+        $userId = (int) $user['id'];
+        $existing = $deps->marks->find($rehearsalId, $userId);
+
+        $replacedAttended = $existing !== null
+            && ($existing['mark'] ?? '') === AttendanceMark::ATTENDED
+            && ($existing['source'] ?? '') === AttendanceSource::CHECKIN;
+
+        if ($existing !== null) {
+            $source = (string) ($existing['source'] ?? '');
+            if ($source === AttendanceSource::MANUAL) {
+                $bot->answerCallbackQuery(text: $deps->texts->get('checkin.cannot_edit_manual'), show_alert: true);
+
+                return;
+            }
+
+            if (!$deps->attendance->clearCheckinMark($user, $rehearsalId)) {
+                $bot->answerCallbackQuery(text: $deps->texts->get('checkin.cannot_edit_manual'), show_alert: true);
+
+                return;
+            }
+        }
+
+        $deps->flows->clear($telegramId);
+        $bot->answerCallbackQuery();
+
+        if ($replacedAttended) {
+            $deps->flows->set($telegramId, 'checkin_edit', [
+                'rehearsal_id' => $rehearsalId,
+                'replaced_attended' => true,
+            ]);
+        }
+
+        CallbackUi::editCheckinPrompt(
+            $bot,
+            $deps->messages->checkinQuestionText(),
+            $deps->messages->checkinKeyboard($rehearsalId),
+        );
+    }
+
+    /**
+     * @return array{user: array<string, mixed>, rehearsal: array<string, mixed>}|null
+     */
+    private static function loadCheckinContext(
+        Nutgram $bot,
+        AttendanceDeps $deps,
+        int $telegramId,
+        int $rehearsalId,
+    ): ?array {
         $user = $deps->users->findByTelegramId($telegramId);
         if ($user === null || ($user['status'] ?? '') !== UserStatus::ACTIVE) {
             $bot->answerCallbackQuery();
 
-            return;
+            return null;
         }
 
         $rehearsal = $deps->rehearsals->findById($rehearsalId);
         if ($rehearsal === null) {
             $bot->answerCallbackQuery();
 
-            return;
+            return null;
         }
 
         if ($deps->checkInSessions->isClosed($rehearsalId)) {
             $bot->answerCallbackQuery(text: $deps->texts->get('checkin.already_closed'), show_alert: true);
             CallbackUi::clearKeyboard($bot);
 
-            return;
+            return null;
         }
 
         $tz = new \DateTimeZone($deps->config->timezone);
@@ -163,45 +366,17 @@ final class AttendanceCallbackHandler
             $bot->answerCallbackQuery(text: $deps->texts->get('checkin.already_closed'), show_alert: true);
             CallbackUi::clearKeyboard($bot);
 
-            return;
+            return null;
         }
 
         $starts = new \DateTimeImmutable((string) $rehearsal['starts_at'], $tz);
         if ($now < $starts) {
             $bot->answerCallbackQuery();
 
-            return;
+            return null;
         }
 
-        $existing = $deps->marks->find($rehearsalId, (int) $user['id']);
-        if ($existing !== null) {
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
-
-            return;
-        }
-
-        $bot->answerCallbackQuery();
-
-        if ($yes) {
-            $deps->attendance->recordAttended($user, $rehearsalId);
-            CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_yes'));
-
-            return;
-        }
-
-        CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_no'));
-
-        $deps->flows->set($telegramId, 'absence_reason', [
-            'rehearsal_id' => $rehearsalId,
-            'source' => AttendanceSource::CHECKIN,
-        ]);
-
-        $bot->sendMessage(
-            $deps->messages->pollReasonPromptText(),
-            parse_mode: ParseMode::HTML,
-            reply_markup: $deps->messages->reasonOptionalKeyboard(),
-        );
+        return ['user' => $user, 'rehearsal' => $rehearsal];
     }
 
     private static function handleWontComePick(
