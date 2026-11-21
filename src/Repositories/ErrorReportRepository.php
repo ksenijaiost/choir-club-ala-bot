@@ -86,4 +86,51 @@ final class ErrorReportRepository
 
         return (int) $stmt->fetchColumn();
     }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function recentExceptions(int $telegramId, int $sinceUnix, int $limit, ?int $excludeId = null): array
+    {
+        $limit = max(1, min($limit, 10));
+        $driver = $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'sqlite') {
+            $sql = 'SELECT * FROM error_reports
+                    WHERE telegram_id = ? AND exception_class IS NOT NULL
+                      AND created_at >= datetime(?, \'unixepoch\')';
+            $params = [$telegramId, $sinceUnix];
+            if ($excludeId !== null) {
+                $sql .= ' AND id <> ?';
+                $params[] = $excludeId;
+            }
+            $sql .= ' ORDER BY created_at DESC LIMIT ?';
+            $stmt = $this->pdo->prepare($sql);
+            foreach ($params as $i => $value) {
+                $stmt->bindValue($i + 1, $value, \PDO::PARAM_INT);
+            }
+            $stmt->bindValue(count($params) + 1, $limit, \PDO::PARAM_INT);
+            $stmt->execute();
+
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
+
+        $sql = 'SELECT * FROM error_reports
+                WHERE telegram_id = ? AND exception_class IS NOT NULL
+                  AND created_at >= FROM_UNIXTIME(?)';
+        $params = [$telegramId, $sinceUnix];
+        if ($excludeId !== null) {
+            $sql .= ' AND id <> ?';
+            $params[] = $excludeId;
+        }
+        $sql .= ' ORDER BY created_at DESC LIMIT ?';
+        $stmt = $this->pdo->prepare($sql);
+        foreach ($params as $i => $value) {
+            $stmt->bindValue($i + 1, $value, \PDO::PARAM_INT);
+        }
+        $stmt->bindValue(count($params) + 1, $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
 }

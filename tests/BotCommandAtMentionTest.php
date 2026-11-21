@@ -14,6 +14,7 @@ use App\Handlers\HandlerRegistry;
 use App\Handlers\MaterialsRecordingEditHandler;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\ErrorReportRepository;
+use App\Repositories\UserActionRepository;
 use App\Repositories\MaterialRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\UserFlowRepository;
@@ -180,6 +181,7 @@ final class BotCommandAtMentionTest extends TestCase
     {
         return new ErrorReportService(
             new ErrorReportRepository($pdo),
+            new UserActionRepository($pdo),
             new UserRepository($pdo),
             $texts,
             $config,

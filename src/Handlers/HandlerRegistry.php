@@ -16,9 +16,12 @@ use App\Repositories\RegistrationRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
+use App\Repositories\UserActionRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
+use App\Services\UserActionRecorder;
+use App\Telegram\UserActionMiddleware;
 use App\Services\AccessControl;
 use App\Services\AdminChatResolver;
 use App\Services\ErrorReportService;
@@ -65,13 +68,16 @@ final class HandlerRegistry
         $rehearsals = new RehearsalRepository($pdo);
         $flows = new UserFlowRepository($pdo);
         $interactiveMenus = new InteractiveMenuService(new UserOpenMenuRepository($pdo));
+        $userActions = new UserActionRepository($pdo);
         $errorReports ??= new ErrorReportService(
             new ErrorReportRepository($pdo),
+            $userActions,
             $users,
             $texts,
             $config,
             $adminChatResolver,
         );
+        UserActionMiddleware::register($bot, new UserActionRecorder($userActions, $texts, $flows));
         $generator = new ScheduleGenerator($templates, $rehearsals, $settings);
         $presenter = new SchedulePresenter($rehearsals, $texts);
         $broadcast = new ScheduleBroadcastService($users, $texts);
