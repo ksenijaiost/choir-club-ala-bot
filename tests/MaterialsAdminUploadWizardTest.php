@@ -21,6 +21,7 @@ use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Tests\Support\MaterialsTestDeps;
+use App\Tests\Support\ThrowingRecordingTelegramOutbound;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
 use SergiX44\Nutgram\Nutgram;
@@ -74,6 +75,38 @@ final class MaterialsAdminUploadWizardTest extends TestCase
 
         self::assertSame(1, $this->countMethodCalls($bot, 'sendMessage'));
         self::assertGreaterThanOrEqual(1, $this->countMethodCalls($bot, 'editMessageText'));
+    }
+
+    public function testCompleteUploadUpdatesWizardWhenNotifyFailsForBlockedUser(): void
+    {
+        $blockedTg = 1008205296;
+        $outbound = new ThrowingRecordingTelegramOutbound($blockedTg);
+        $deps = $this->deps($outbound);
+        $deps->users->create($blockedTg, 'Blocked', 'soprano_1', UserRole::MEMBER, UserStatus::ACTIVE);
+
+        $songId = $deps->songs->create('Ноты при блоке');
+        $deps->flows->set(self::ADMIN_TG, 'material_upload', [
+            'file_id' => 'f-block',
+            'file_unique_id' => 'uniq-block',
+            'admin_chat_id' => self::ADMIN_CHAT_ID,
+            'wizard_message_id' => 990,
+            'song_id' => $songId,
+            'type' => MaterialType::NOTES,
+            'step' => 'save',
+        ]);
+
+        $actor = $deps->users->findByTelegramId(self::ADMIN_TG);
+        self::assertNotNull($actor);
+
+        $bot = Nutgram::fake();
+        MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+
+        self::assertCount(1, $deps->materials->listCurrentNotes($songId));
+        self::assertGreaterThanOrEqual(
+            1,
+            $this->countMethodCalls($bot, 'editMessageText'),
+            'wizard success screen should be shown before notify errors',
+        );
     }
 
     public function test429OnClearKeyboardDoesNotBlockSave(): void
@@ -174,7 +207,7 @@ final class MaterialsAdminUploadWizardTest extends TestCase
         return $count;
     }
 
-    private function deps(): MaterialsDeps
+    private function deps(?ThrowingRecordingTelegramOutbound $outbound = null): MaterialsDeps
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $config = $this->testConfig();
@@ -183,6 +216,7 @@ final class MaterialsAdminUploadWizardTest extends TestCase
 
         $users = new UserRepository($pdo);
         $users->create(self::ADMIN_TG, 'Админ', 'tenor', UserRole::ADMIN, UserStatus::ACTIVE);
+        $users->create(88002, 'Участник', 'soprano_1', UserRole::MEMBER, UserStatus::ACTIVE);
 
         $songRepo = new SongRepository($pdo);
         $materialRepo = new MaterialRepository($pdo);
@@ -195,6 +229,7 @@ final class MaterialsAdminUploadWizardTest extends TestCase
             $materialRepo,
             $texts,
             new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            $outbound,
         );
     }
 

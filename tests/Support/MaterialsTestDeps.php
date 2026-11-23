@@ -14,6 +14,7 @@ use App\Services\MaterialNotificationService;
 use App\Services\MaterialsService;
 use App\Services\SongDeliveryService;
 use App\Telegram\InteractiveMenuService;
+use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
 
 final class MaterialsTestDeps
@@ -26,7 +27,7 @@ final class MaterialsTestDeps
         MaterialRepository $materials,
         TextRepository $texts,
         InteractiveMenuService $interactiveMenus,
-        ?RecordingTelegramOutbound $outbound = null,
+        ?TelegramOutbound $outbound = null,
     ): MaterialsDeps {
         $outbound ??= new RecordingTelegramOutbound();
         $service = new MaterialsService($materials, $songs, $texts);
