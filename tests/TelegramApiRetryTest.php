@@ -34,19 +34,18 @@ final class TelegramApiRetryTest extends TestCase
         });
     }
 
-    public function testRetriesOnceOnCurlTimeout(): void
+    public function testDoesNotRetryOnReadTimeoutAtSafeTelegramLayer(): void
     {
         $attempts = 0;
-        $result = TelegramApiRetry::run(static function () use (&$attempts): string {
-            $attempts++;
-            if ($attempts === 1) {
-                throw new \RuntimeException('cURL error 28: Operation timed out');
-            }
+        try {
+            TelegramApiRetry::run(static function () use (&$attempts): void {
+                $attempts++;
+                throw new \RuntimeException('cURL error 28: Operation timed out after 5000 milliseconds');
+            });
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException) {
+        }
 
-            return 'ok';
-        });
-
-        self::assertSame('ok', $result);
-        self::assertSame(2, $attempts);
+        self::assertSame(1, $attempts);
     }
 }
