@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Telegram;
 
+use App\Handlers\PaymentMemberHandler;
 use App\Services\AccessControl;
 use App\Text\TextRepository;
 
@@ -25,6 +26,10 @@ final class MenuButtonAccess
             || $label === $texts->get('menu.my_profile')
             || $label === $texts->get('menu.about_bot')) {
             return true;
+        }
+
+        if ($label === $texts->get('menu.payment')) {
+            return PaymentMemberHandler::isActivePayer($user);
         }
 
         if ($label === $texts->get('menu.admin_schedule')) {
@@ -49,6 +54,11 @@ final class MenuButtonAccess
         if ($label === $texts->get('menu.assign_conductor')
             || $label === $texts->get('menu.admin_chat')) {
             return $access->isOwner($user);
+        }
+
+        if ($label === $texts->get('menu.broadcast')
+            || $label === $texts->get('menu.broadcasts_list')) {
+            return $access->canManageBroadcasts($user);
         }
 
         return false;

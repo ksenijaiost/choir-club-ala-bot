@@ -34,10 +34,20 @@ final class MenuKeyboard
             $texts->get('menu.about_bot'),
         ];
 
+        if (in_array($role, [UserRole::MEMBER, UserRole::ADMIN, UserRole::OWNER], true)) {
+            $rows[] = [
+                $texts->get('menu.payment'),
+            ];
+        }
+
         if (in_array($role, [UserRole::ADMIN, UserRole::CONDUCTOR, UserRole::OWNER], true)) {
             $rows[] = [
                 $texts->get('menu.admin_schedule'),
                 $texts->get('menu.admin_materials'),
+            ];
+            $rows[] = [
+                $texts->get('menu.broadcast'),
+                $texts->get('menu.broadcasts_list'),
             ];
         }
 
@@ -104,6 +114,7 @@ final class MenuKeyboard
             $texts->get('menu.my_recordings'),
             $texts->get('menu.my_profile'),
             $texts->get('menu.about_bot'),
+            $texts->get('menu.payment'),
             $texts->get('menu.admin_schedule'),
             $texts->get('menu.admin_attendance'),
             $texts->get('menu.admin_payment'),
@@ -113,6 +124,8 @@ final class MenuKeyboard
             $texts->get('menu.admin_materials'),
             $texts->get('menu.assign_conductor'),
             $texts->get('menu.admin_chat'),
+            $texts->get('menu.broadcast'),
+            $texts->get('menu.broadcasts_list'),
         ];
     }
 }

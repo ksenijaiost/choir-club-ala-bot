@@ -150,8 +150,8 @@ final class AttendanceAbsenceReasonTest extends TestCase
     public function testAboutMemberTextMentionsPaymentReminderDays(): void
     {
         $body = \App\Handlers\AboutBotHandler::sectionText($this->texts, 'member');
-        self::assertStringContainsString('23-го', $body);
-        self::assertStringContainsString('1-го', $body);
+        self::assertStringContainsString('15-го', $body);
+        self::assertStringContainsString('20-го', $body);
     }
 
     private function testConfig(): Config

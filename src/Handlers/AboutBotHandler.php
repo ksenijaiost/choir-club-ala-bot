@@ -127,6 +127,7 @@ final class AboutBotHandler
             'btn_find_song' => $texts->get('menu.find_song'),
             'btn_my_recordings' => $texts->get('menu.my_recordings'),
             'btn_my_profile' => $texts->get('menu.my_profile'),
+            'btn_payment' => $texts->get('menu.payment'),
             'btn_admin_schedule' => $texts->get('menu.admin_schedule'),
             'btn_admin_materials' => $texts->get('menu.admin_materials'),
             'btn_admin_attendance' => $texts->get('menu.admin_attendance'),
@@ -137,6 +138,8 @@ final class AboutBotHandler
             'btn_admin_members' => $texts->get('menu.admin_members'),
             'btn_assign_conductor' => $texts->get('menu.assign_conductor'),
             'btn_admin_chat' => $texts->get('menu.admin_chat'),
+            'btn_broadcast' => $texts->get('menu.broadcast'),
+            'btn_broadcasts_list' => $texts->get('menu.broadcasts_list'),
         ];
     }
 

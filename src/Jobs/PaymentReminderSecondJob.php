@@ -15,6 +15,8 @@ use App\Services\PaymentReminderTextService;
 use App\Services\PaymentTexts;
 use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class PaymentReminderSecondJob
 {
@@ -39,7 +41,7 @@ final class PaymentReminderSecondJob
         $tz = new \DateTimeZone($config->timezone);
         $local = $now->setTimezone($tz);
 
-        $day = $this->settings->getInt('payment_reminder_day_2', 1);
+        $day = $this->settings->getInt('payment_reminder_day_2', 20);
         $hour = $this->settings->getInt('payment_reminder_hour', 12);
 
         if ((int) $local->format('j') !== $day || (int) $local->format('G') !== $hour) {
@@ -79,10 +81,18 @@ final class PaymentReminderSecondJob
                     $this->texts->get('payment.mismatch', $placeholders),
                 );
             } else {
-                $this->outbound->sendMessage(
-                    (int) $user['telegram_id'],
-                    $this->reminderTexts->formatReminder(2, $period['year'], $period['month']),
-                );
+                $message = $this->reminderTexts->formatReminder(2, $period['year'], $period['month']);
+                if ($this->payments->isMemberDeferred($row)) {
+                    $comment = trim((string) ($row['member_comment'] ?? ''));
+                    if ($comment !== '') {
+                        $message .= "\n\n" . $this->texts->get('payment.reminder_second_deferred_note', ['comment' => $comment]);
+                    } else {
+                        $message .= "\n\n" . $this->texts->get('payment.reminder_second_deferred_no_comment');
+                    }
+                }
+
+                $keyboard = $this->paymentActionKeyboard($period['year'], $period['month']);
+                $this->outbound->sendMessage((int) $user['telegram_id'], $message, $keyboard);
             }
 
             $sent++;
@@ -94,5 +104,19 @@ final class PaymentReminderSecondJob
             'skipped_confirmed' => $skippedConfirmed,
             'not_due' => false,
         ];
+    }
+
+    private function paymentActionKeyboard(int $year, int $month): InlineKeyboardMarkup
+    {
+        return InlineKeyboardMarkup::make()->addRow(
+            InlineKeyboardButton::make(
+                $this->texts->get('buttons.i_paid'),
+                callback_data: 'pay:ok:' . $year . ':' . $month,
+            ),
+            InlineKeyboardButton::make(
+                $this->texts->get('buttons.pay_later'),
+                callback_data: 'pay:later:' . $year . ':' . $month,
+            ),
+        );
     }
 }

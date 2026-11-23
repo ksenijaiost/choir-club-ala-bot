@@ -42,10 +42,11 @@ final class CallbackQueryHandler
         MaterialsDeps $materials,
         AdminHistoryContext $adminHistory,
         AdminChatDeps $adminChat,
+        ?BroadcastDeps $broadcast,
         InteractiveMenuService $interactiveMenus,
         ErrorReportService $errorReports,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $interactiveMenus, $errorReports): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $broadcast, $interactiveMenus, $errorReports): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -108,6 +109,27 @@ final class CallbackQueryHandler
                 if ($actorRow !== null && MaterialsCallbackHandler::handle($bot, $materials, $access, $actorRow, $data)) {
                     return;
                 }
+
+                return;
+            }
+
+            if (str_starts_with($data, 'bc:') && $broadcast !== null) {
+                $actorRow = $users->findByTelegramId($actorTelegramId);
+                if ($actorRow === null) {
+                    return;
+                }
+
+                if (str_starts_with($data, 'bc:w:')) {
+                    BroadcastWizardHandler::handleCallback($bot, $broadcast, $access, $actorRow, $data);
+
+                    return;
+                }
+
+                if (BroadcastAdminHandler::handleCallback($bot, $broadcast, $access, $actorRow, $data)) {
+                    return;
+                }
+
+                BroadcastRecipientHandler::handleCallback($bot, $broadcast, $actorRow, $data);
 
                 return;
             }

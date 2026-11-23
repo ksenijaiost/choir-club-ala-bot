@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Handlers;
 
-use App\Domain\UserRole;
-use App\Domain\UserStatus;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
+use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -27,10 +26,25 @@ final class PaymentCallbackHandler
             return true;
         }
 
+        if (preg_match('/^pay:later:(\d{4}):(\d{1,2})$/', $data, $m) === 1) {
+            self::handlePayLater($bot, $deps, $actorTelegramId, (int) $m[1], (int) $m[2]);
+
+            return true;
+        }
+
+        if (preg_match('/^pay:later_skip:(\d{4}):(\d{1,2})$/', $data, $m) === 1) {
+            self::handlePayLaterSkip($bot, $deps, $actorTelegramId, (int) $m[1], (int) $m[2]);
+
+            return true;
+        }
+
         if (preg_match('/^pay:cf:(\d+):(\d{4}):(\d{1,2})$/', $data, $m) === 1) {
             $actor = $deps->users->findByTelegramId($actorTelegramId);
             if ($actor === null || !$access->hasConductorPrivileges($actor)) {
-                $bot->answerCallbackQuery(text: $deps->texts->get('admin.only_conductor_or_owner'), show_alert: true);
+                SafeTelegram::answerCallbackQuery($bot, [
+                    'text' => $deps->texts->get('admin.only_conductor_or_owner'),
+                    'show_alert' => true,
+                ]);
 
                 return true;
             }
@@ -51,27 +65,16 @@ final class PaymentCallbackHandler
         int $month,
     ): void {
         $user = $deps->users->findByTelegramId($telegramId);
-        if ($user === null || ($user['status'] ?? '') !== UserStatus::ACTIVE) {
-            $bot->answerCallbackQuery();
-
-            return;
-        }
-
-        $role = (string) ($user['role'] ?? '');
-        if (
-            $role !== UserRole::MEMBER
-            && $role !== UserRole::ADMIN
-            && $role !== UserRole::OWNER
-        ) {
-            $bot->answerCallbackQuery();
+        if ($user === null || !PaymentMemberHandler::isActivePayer($user)) {
+            SafeTelegram::answerCallbackQuery($bot);
 
             return;
         }
 
         $deps->payments->claimByMember((int) $user['id'], $year, $month);
-        $bot->answerCallbackQuery();
+        SafeTelegram::answerCallbackQuery($bot);
         CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('payment.inline_answer_claimed'));
-        $bot->sendMessage($deps->texts->get('payment.member_marked'));
+        SafeTelegram::sendMessage($bot, $deps->texts->get('payment.member_marked'));
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
         $conductorTg = $deps->recipients->resolveTelegramId();
@@ -86,15 +89,53 @@ final class PaymentCallbackHandler
             ),
         );
 
-        $bot->sendMessage(
-            chat_id: $conductorTg,
-            text: $deps->texts->get('payment.conductor_confirm_prompt', [
+        SafeTelegram::sendMessage(
+            $bot,
+            $deps->texts->get('payment.conductor_confirm_prompt', [
                 'name' => (string) ($user['display_name'] ?? ''),
                 'month' => $placeholders['month'],
                 'year' => $placeholders['year'],
             ]),
-            reply_markup: $keyboard,
+            chatId: $conductorTg,
+            replyMarkup: $keyboard,
         );
+    }
+
+    private static function handlePayLater(
+        Nutgram $bot,
+        PaymentDeps $deps,
+        int $telegramId,
+        int $year,
+        int $month,
+    ): void {
+        $user = $deps->users->findByTelegramId($telegramId);
+        if ($user === null || !PaymentMemberHandler::isActivePayer($user)) {
+            SafeTelegram::answerCallbackQuery($bot);
+
+            return;
+        }
+
+        SafeTelegram::answerCallbackQuery($bot);
+        PaymentMemberHandler::beginDeferCommentFlow($bot, $deps, $telegramId, $year, $month);
+    }
+
+    private static function handlePayLaterSkip(
+        Nutgram $bot,
+        PaymentDeps $deps,
+        int $telegramId,
+        int $year,
+        int $month,
+    ): void {
+        $user = $deps->users->findByTelegramId($telegramId);
+        if ($user === null || !PaymentMemberHandler::isActivePayer($user)) {
+            SafeTelegram::answerCallbackQuery($bot);
+
+            return;
+        }
+
+        SafeTelegram::answerCallbackQuery($bot);
+        $deps->flows->clear($telegramId);
+        PaymentMemberHandler::completeDefer($bot, $deps, $user, $year, $month, null);
     }
 
     /**
@@ -110,19 +151,20 @@ final class PaymentCallbackHandler
     ): void {
         $member = $deps->users->findById($memberUserId);
         if ($member === null) {
-            $bot->answerCallbackQuery();
+            SafeTelegram::answerCallbackQuery($bot);
 
             return;
         }
 
         $deps->payments->confirmByConductor($memberUserId, $year, $month, (int) $conductor['id']);
-        $bot->answerCallbackQuery(text: $deps->texts->get('payment.admin_confirmed_ok'));
+        SafeTelegram::answerCallbackQuery($bot, ['text' => $deps->texts->get('payment.admin_confirmed_ok')]);
         CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('payment.inline_answer_confirmed'));
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
-        $bot->sendMessage(
-            chat_id: (int) $member['telegram_id'],
-            text: $deps->texts->get('payment.conductor_confirmed_member', $placeholders),
+        SafeTelegram::sendMessage(
+            $bot,
+            $deps->texts->get('payment.conductor_confirmed_member', $placeholders),
+            chatId: (int) $member['telegram_id'],
         );
     }
 }

@@ -39,7 +39,7 @@ final class PaymentReminderFirstJob
         $tz = new \DateTimeZone($config->timezone);
         $local = $now->setTimezone($tz);
 
-        $day = $this->settings->getInt('payment_reminder_day_1', 23);
+        $day = $this->settings->getInt('payment_reminder_day_1', 15);
         $hour = $this->settings->getInt('payment_reminder_hour', 12);
 
         if ((int) $local->format('j') !== $day || (int) $local->format('G') !== $hour) {
@@ -49,13 +49,7 @@ final class PaymentReminderFirstJob
         $period = PaymentPeriod::targetForFirstReminder($local);
         $periodKey = PaymentPeriod::periodKey($period['year'], $period['month']);
         $message = $this->reminderTexts->formatReminder(1, $period['year'], $period['month']);
-
-        $keyboard = InlineKeyboardMarkup::make()->addRow(
-            InlineKeyboardButton::make(
-                $this->texts->get('buttons.i_paid'),
-                callback_data: 'pay:ok:' . $period['year'] . ':' . $period['month'],
-            ),
-        );
+        $keyboard = $this->paymentActionKeyboard($period['year'], $period['month']);
 
         $sent = 0;
         $skippedConfirmed = 0;
@@ -72,6 +66,12 @@ final class PaymentReminderFirstJob
                 continue;
             }
 
+            if ($this->payments->hasMemberClaim($row)) {
+                $this->deliveries->tryClaim($jobKey, 'payment_reminder_1', $userId);
+
+                continue;
+            }
+
             if (!$this->deliveries->tryClaim($jobKey, 'payment_reminder_1', $userId)) {
                 continue;
             }
@@ -81,5 +81,19 @@ final class PaymentReminderFirstJob
         }
 
         return ['sent' => $sent, 'skipped_confirmed' => $skippedConfirmed];
+    }
+
+    private function paymentActionKeyboard(int $year, int $month): InlineKeyboardMarkup
+    {
+        return InlineKeyboardMarkup::make()->addRow(
+            InlineKeyboardButton::make(
+                $this->texts->get('buttons.i_paid'),
+                callback_data: 'pay:ok:' . $year . ':' . $month,
+            ),
+            InlineKeyboardButton::make(
+                $this->texts->get('buttons.pay_later'),
+                callback_data: 'pay:later:' . $year . ':' . $month,
+            ),
+        );
     }
 }

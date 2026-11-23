@@ -23,9 +23,9 @@ use PHPUnit\Framework\TestCase;
 
 final class PaymentCronTest extends TestCase
 {
-    public function testFirstReminderIdempotentOn23rd(): void
+    public function testFirstReminderIdempotentOn15th(): void
     {
-        putenv('FAKE_NOW=2026-04-23T12:10:00+05:00');
+        putenv('FAKE_NOW=2026-04-15T12:10:00+05:00');
 
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $config = $this->testConfig();
@@ -64,7 +64,7 @@ final class PaymentCronTest extends TestCase
 
     public function testFirstReminderSkipsWhenConfirmed(): void
     {
-        putenv('FAKE_NOW=2026-04-23T12:10:00+05:00');
+        putenv('FAKE_NOW=2026-04-15T12:10:00+05:00');
 
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $config = $this->testConfig();
@@ -75,7 +75,7 @@ final class PaymentCronTest extends TestCase
         $uid = $users->create(7003, 'Оплачен', 'alto_1', UserRole::MEMBER, UserStatus::ACTIVE);
 
         $payments = new PaymentRecordRepository($pdo);
-        $payments->confirmByConductor($uid, 2026, 5, 1);
+        $payments->confirmByConductor($uid, 2026, 4, 1);
 
         $outbound = new RecordingTelegramOutbound();
         $settings = new BotSettingsRepository($pdo);
@@ -101,7 +101,7 @@ final class PaymentCronTest extends TestCase
 
     public function testSecondReminderSkipsWhenConfirmed(): void
     {
-        putenv('FAKE_NOW=2026-05-01T12:00:00+05:00');
+        putenv('FAKE_NOW=2026-05-20T12:00:00+05:00');
 
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $config = $this->testConfig();

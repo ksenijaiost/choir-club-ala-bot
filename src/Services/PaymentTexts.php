@@ -17,6 +17,11 @@ final class PaymentTexts
         return $this->texts->get('calendar.month_' . $month);
     }
 
+    public function monthShort(int $month): string
+    {
+        return mb_substr($this->monthName($month), 0, 3);
+    }
+
     /**
      * @return array{month: string, year: string}
      */
