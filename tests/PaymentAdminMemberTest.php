@@ -131,6 +131,26 @@ final class PaymentAdminMemberTest extends TestCase
         self::assertTrue($handled);
     }
 
+    public function testMemberPickerButtonWithoutPaymentsShowsNameOnly(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $paymentTexts = new PaymentTexts($texts);
+
+        $labelNoPaid = $texts->get('payment.admin_member_picker_button_name_only', [
+            'name' => 'Без оплат',
+        ]);
+        self::assertSame('Без оплат', $labelNoPaid);
+        self::assertStringNotContainsString(' — ', $labelNoPaid);
+
+        $ph = $paymentTexts->monthYearPlaceholders(2026, 3);
+        $labelPaid = $texts->get('payment.admin_member_picker_button', [
+            'name' => 'С оплатой',
+            'month' => $ph['month'],
+            'year' => $ph['year'],
+        ]);
+        self::assertSame('С оплатой — март 2026', $labelPaid);
+    }
+
     public function testPickerPaginationSlicesTenMembers(): void
     {
         $pdo = $this->pdo();

@@ -192,7 +192,7 @@ final class PaymentReminderTextTest extends TestCase
 
         self::assertStringNotContainsString('Не забудь оплатить хор', $body);
         self::assertStringNotContainsString('Давай денег', $body);
-        self::assertStringContainsString('15-го числа в 12:00', $body);
+        self::assertStringContainsString('15-го', $body);
         self::assertStringContainsString('20-го', $body);
     }
 

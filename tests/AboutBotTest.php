@@ -37,6 +37,25 @@ final class AboutBotTest extends TestCase
         }
     }
 
+    public function testAboutSectionsHaveNoUnresolvedPlaceholdersAndFitTelegram(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+
+        foreach (['member', 'staff', 'conductor', 'owner'] as $sectionId) {
+            $body = AboutBotHandler::sectionText($texts, $sectionId);
+            self::assertDoesNotMatchRegularExpression(
+                '/\{[a-z_0-9]+\}/',
+                $body,
+                'Unresolved placeholder in about.' . $sectionId . '_body',
+            );
+            self::assertLessThanOrEqual(
+                4000,
+                mb_strlen($body),
+                'Section ' . $sectionId . ' exceeds 4000 chars',
+            );
+        }
+    }
+
     public function testOwnerHasConductorAndOwnerSectionsWithAdminLabels(): void
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
