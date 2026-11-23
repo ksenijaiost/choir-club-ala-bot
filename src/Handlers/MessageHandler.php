@@ -138,6 +138,15 @@ final class MessageHandler
                     return;
                 }
 
+                if ($payments !== null && $telegramId !== null && PaymentMemberHandler::handleFlowMessage(
+                    $bot,
+                    $payments,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
                 if ($telegramId !== null && AttendanceMemberHandler::handleFlowMessage(
                     $bot,
                     $attendance,
@@ -375,6 +384,12 @@ final class MessageHandler
 
         if ($text === $texts->get('menu.about_bot')) {
             AboutBotHandler::openHome($bot, $texts, $access, $user, $schedule->interactiveMenus);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.payment')) {
+            PaymentMemberHandler::openHome($bot, $payments, $user);
 
             return;
         }

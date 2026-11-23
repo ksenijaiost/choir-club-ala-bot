@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Clock;
 use App\Services\AccessControl;
+use App\Services\PaymentStatusFormatter;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
@@ -181,14 +182,6 @@ final class PaymentAdminHandler
      */
     private static function statusLine(PaymentDeps $deps, ?array $row): string
     {
-        if ($deps->payments->isConductorConfirmed($row)) {
-            return $deps->texts->get('payment.status_confirmed');
-        }
-
-        if ($deps->payments->hasMemberClaim($row)) {
-            return $deps->texts->get('payment.status_awaiting');
-        }
-
-        return $deps->texts->get('payment.status_unpaid');
+        return PaymentStatusFormatter::forRecord($deps->texts, $deps->payments, $row);
     }
 }

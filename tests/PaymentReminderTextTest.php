@@ -34,7 +34,7 @@ final class PaymentReminderTextTest extends TestCase
 {
     public function testJobUsesCustomTextAndMonthPlaceholder(): void
     {
-        putenv('FAKE_NOW=2026-04-23T12:10:00+05:00');
+        putenv('FAKE_NOW=2026-04-15T12:10:00+05:00');
 
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $config = $this->testConfig();
@@ -66,7 +66,7 @@ final class PaymentReminderTextTest extends TestCase
 
         $result = $job->runIfDue($config);
         self::assertSame(1, $result['sent']);
-        self::assertStringContainsString('Оплата за май', $outbound->messages[0]['text']);
+        self::assertStringContainsString('апрел', mb_strtolower($outbound->messages[0]['text']));
 
         putenv('FAKE_NOW');
     }
@@ -192,7 +192,8 @@ final class PaymentReminderTextTest extends TestCase
 
         self::assertStringNotContainsString('Не забудь оплатить хор', $body);
         self::assertStringNotContainsString('Давай денег', $body);
-        self::assertStringContainsString('23-го числа в 12:00', $body);
+        self::assertStringContainsString('15-го числа в 12:00', $body);
+        self::assertStringContainsString('20-го', $body);
     }
 
     public function testEditFlowSavesViaCallback(): void

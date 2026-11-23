@@ -8,6 +8,7 @@ use App\Clock;
 use App\Repositories\PaymentRecordRepository;
 use App\Services\AccessControl;
 use App\Services\AttendanceHistoryPresenter;
+use App\Services\PaymentStatusFormatter;
 use App\Services\PaymentTexts;
 use App\Services\UserRolePresenter;
 use App\Telegram\CallbackUi;
@@ -157,13 +158,7 @@ final class AdminHistoryHandler
         $placeholders = $ctx->paymentTexts->monthYearPlaceholders($year, $month);
         $row = $ctx->payments->find($userId, $year, $month);
 
-        if ($ctx->payments->isConductorConfirmed($row)) {
-            $status = $ctx->texts->get('payment.status_confirmed');
-        } elseif ($ctx->payments->hasMemberClaim($row)) {
-            $status = $ctx->texts->get('payment.status_awaiting');
-        } else {
-            $status = $ctx->texts->get('payment.status_unpaid');
-        }
+        $status = PaymentStatusFormatter::forRecord($ctx->texts, $ctx->payments, $row);
 
         return $ctx->texts->get('history.payment_month', [
             'month' => $placeholders['month'],
