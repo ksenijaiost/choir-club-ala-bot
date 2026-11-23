@@ -84,6 +84,98 @@ final class AdminChatSongListRecordingsTest extends TestCase
         self::assertStringContainsString($expected, $body);
     }
 
+    public function testRecordingWithLinkShowsSuffix(): void
+    {
+        $deps = $this->presenter();
+        $texts = $deps['texts'];
+        $suffix = $texts->get('admin_chat.recording_link_suffix');
+        $songId = $deps['songs']->create('Ссылки');
+        $materialId = $deps['materials']->insertRecording($songId, ['soprano_1'], 'r1', 'u1', $deps['uploaderId'], null);
+        $deps['materials']->setSourceMessageUrl($materialId, 'https://t.me/c/1/42');
+
+        $body = implode("\n", $deps['presenter']->buildMessageChunks());
+
+        self::assertStringContainsString('Сопрано 1' . $suffix, $body);
+    }
+
+    public function testRecordingWithoutLinkOmitsSuffix(): void
+    {
+        $deps = $this->presenter();
+        $suffix = $deps['texts']->get('admin_chat.recording_link_suffix');
+        $songId = $deps['songs']->create('Без ссылки');
+        $deps['materials']->insertRecording($songId, ['tenor'], 'r1', 'u1', $deps['uploaderId'], null);
+
+        $body = implode("\n", $deps['presenter']->buildMessageChunks());
+
+        self::assertStringContainsString('Тенор', $body);
+        self::assertStringNotContainsString('Тенор' . $suffix, $body);
+    }
+
+    public function testMultiPartRecordingWithLinkShowsSuffixOnce(): void
+    {
+        $deps = $this->presenter();
+        $texts = $deps['texts'];
+        $suffix = $texts->get('admin_chat.recording_link_suffix');
+        $songId = $deps['songs']->create('Набор');
+        $materialId = $deps['materials']->insertRecording($songId, ['alto_1', 'alto_2'], 'r1', 'u1', $deps['uploaderId'], null);
+        $deps['materials']->setSourceMessageUrl($materialId, 'https://t.me/c/1/99');
+
+        $detail = 'Альт 1 + Альт 2' . $suffix;
+        $body = implode("\n", $deps['presenter']->buildMessageChunks());
+
+        self::assertStringContainsString(
+            $texts->get('admin_chat.songs_block_recordings', ['detail' => $detail]),
+            $body,
+        );
+    }
+
+    public function testTuttiWithLinkShowsSuffix(): void
+    {
+        $deps = $this->presenter();
+        $texts = $deps['texts'];
+        $suffix = $texts->get('admin_chat.recording_link_suffix');
+        $songId = $deps['songs']->create('Тутти ссылка');
+        $materialId = $deps['materials']->insertRecording($songId, VoicePart::CODES, 'r1', 'u1', $deps['uploaderId'], null);
+        $deps['materials']->setSourceMessageUrl($materialId, 'https://t.me/c/1/7');
+
+        $detail = $texts->get('admin_chat.recording_tutti') . $suffix;
+        $body = implode("\n", $deps['presenter']->buildMessageChunks());
+
+        self::assertStringContainsString(
+            $texts->get('admin_chat.songs_block_recordings', ['detail' => $detail]),
+            $body,
+        );
+    }
+
+    public function testWhitespaceOnlyLinkCountsAsEmpty(): void
+    {
+        $deps = $this->presenter();
+        $suffix = $deps['texts']->get('admin_chat.recording_link_suffix');
+        $songId = $deps['songs']->create('Пробелы');
+        $materialId = $deps['materials']->insertRecording($songId, ['bass'], 'r1', 'u1', $deps['uploaderId'], null);
+        $deps['materials']->setSourceMessageUrl($materialId, '   ');
+
+        $body = implode("\n", $deps['presenter']->buildMessageChunks());
+
+        self::assertStringContainsString('Бас', $body);
+        self::assertStringNotContainsString('Бас' . $suffix, $body);
+    }
+
+    public function testMissingPartsLineUnchangedWhenLinkPresent(): void
+    {
+        $deps = $this->presenter();
+        $texts = $deps['texts'];
+        $suffix = $texts->get('admin_chat.recording_link_suffix');
+        $songId = $deps['songs']->create('Не хватает');
+        $materialId = $deps['materials']->insertRecording($songId, ['soprano_1'], 'r1', 'u1', $deps['uploaderId'], null);
+        $deps['materials']->setSourceMessageUrl($materialId, 'https://t.me/c/1/1');
+
+        $body = implode("\n", $deps['presenter']->buildMessageChunks());
+
+        self::assertStringContainsString('Сопрано 1' . $suffix, $body);
+        self::assertStringContainsString($texts->get('materials.recordings_missing_line', ['parts' => 'Сопрано 2, Альт 1, Альт 2, Тенор, Баритон, Бас']), $body);
+    }
+
     public function testNoRecordingsKeepsPlaceholder(): void
     {
         $deps = $this->presenter();

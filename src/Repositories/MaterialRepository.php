@@ -379,12 +379,13 @@ final class MaterialRepository
     }
 
     /**
-     * @return array<int, list<list<string>>> song id => list of recordings (each recording is sorted voice part codes)
+     * @return array<int, list<array{parts: list<string>, has_link: bool}>>
      */
     public function listCurrentRecordingPartSetsBySong(): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT m.song_id, m.id AS material_id, GROUP_CONCAT(mvp.voice_part) AS parts
+            'SELECT m.song_id, m.id AS material_id, GROUP_CONCAT(mvp.voice_part) AS parts,
+                    CASE WHEN m.source_message_url IS NOT NULL AND TRIM(m.source_message_url) <> \'\' THEN 1 ELSE 0 END AS has_link
              FROM materials m
              INNER JOIN material_voice_parts mvp ON mvp.material_id = m.id
              WHERE m.type = ? AND m.is_current = 1
@@ -406,7 +407,10 @@ final class MaterialRepository
             }
 
             $map[$songId] ??= [];
-            $map[$songId][] = $parts;
+            $map[$songId][] = [
+                'parts' => $parts,
+                'has_link' => ((int) ($row['has_link'] ?? 0)) === 1,
+            ];
         }
 
         return $map;

@@ -80,7 +80,7 @@ final class AdminChatSongListPresenter
     }
 
     /**
-     * @param list<list<string>> $recordingSets
+     * @param list<array{parts: list<string>, has_link: bool}> $recordingSets
      */
     private function formatRecordingsDetail(array $recordingSets): string
     {
@@ -92,56 +92,63 @@ final class AdminChatSongListPresenter
     }
 
     /**
-     * @param list<list<string>> $recordingSets
+     * @param list<array{parts: list<string>, has_link: bool}> $recordingSets
      */
     private function formatRecordingItems(array $recordingSets): string
     {
         $sorted = $recordingSets;
         usort($sorted, static function (array $a, array $b): int {
-            $aTutti = self::isTutti($a);
-            $bTutti = self::isTutti($b);
+            $aTutti = self::isTutti($a['parts']);
+            $bTutti = self::isTutti($b['parts']);
             if ($aTutti !== $bTutti) {
                 return $aTutti ? -1 : 1;
             }
 
-            $aIndex = self::primaryPartIndex($a);
-            $bIndex = self::primaryPartIndex($b);
+            $aIndex = self::primaryPartIndex($a['parts']);
+            $bIndex = self::primaryPartIndex($b['parts']);
             if ($aIndex !== $bIndex) {
                 return $aIndex <=> $bIndex;
             }
 
-            return implode(',', $a) <=> implode(',', $b);
+            return implode(',', $a['parts']) <=> implode(',', $b['parts']);
         });
 
-        $items = array_map(fn (array $parts): string => $this->formatRecordingItem($parts), $sorted);
+        $items = array_map(fn (array $recording): string => $this->formatRecordingItem($recording), $sorted);
 
         return implode('; ', $items);
     }
 
     /**
-     * @param list<string> $parts
+     * @param array{parts: list<string>, has_link: bool} $recording
      */
-    private function formatRecordingItem(array $parts): string
+    private function formatRecordingItem(array $recording): string
     {
+        $parts = $recording['parts'];
         if (self::isTutti($parts)) {
-            return $this->texts->get('admin_chat.recording_tutti');
+            $label = $this->texts->get('admin_chat.recording_tutti');
+        } else {
+            usort($parts, static function (string $a, string $b): int {
+                $ia = array_search($a, VoicePart::CODES, true);
+                $ib = array_search($b, VoicePart::CODES, true);
+                $ia = $ia === false ? 999 : $ia;
+                $ib = $ib === false ? 999 : $ib;
+
+                return $ia <=> $ib;
+            });
+
+            $labels = array_map(
+                fn (string $code): string => $this->texts->get('parts.' . $code),
+                $parts,
+            );
+
+            $label = implode(' + ', $labels);
         }
 
-        usort($parts, static function (string $a, string $b): int {
-            $ia = array_search($a, VoicePart::CODES, true);
-            $ib = array_search($b, VoicePart::CODES, true);
-            $ia = $ia === false ? 999 : $ia;
-            $ib = $ib === false ? 999 : $ib;
+        if ($recording['has_link'] ?? false) {
+            $label .= TelegramHtml::escape($this->texts->get('admin_chat.recording_link_suffix'));
+        }
 
-            return $ia <=> $ib;
-        });
-
-        $labels = array_map(
-            fn (string $code): string => $this->texts->get('parts.' . $code),
-            $parts,
-        );
-
-        return implode(' + ', $labels);
+        return $label;
     }
 
     /**

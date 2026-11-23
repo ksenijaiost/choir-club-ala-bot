@@ -64,6 +64,7 @@
     "songs_recordings": "записи: {items}",
     "songs_recordings_none": "записей нет",
     "recording_tutti": "тутти",
+    "recording_link_suffix": " +🔗",
     "notes_many": "{count} шт.",
     "members_header": "Участники хора:",
     "members_conductor": "Дирижёр: {name}{username}",
