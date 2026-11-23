@@ -9,6 +9,7 @@ use App\Services\ProgramDateParser;
 use App\Support\SqlPagination;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -303,7 +304,12 @@ final class ProgramAdminHandler
             }
             $deps->programs->rename($programId, $trimmed);
             $deps->flows->clear($telegramId);
-            SafeTelegram::sendMessage($bot, $deps->texts->get('programs.renamed'));
+            $actor = $deps->users->findByTelegramId($telegramId);
+            if ($actor !== null) {
+                MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('programs.renamed'));
+            } else {
+                SafeTelegram::sendMessage($bot, $deps->texts->get('programs.renamed'));
+            }
 
             return true;
         }
@@ -323,7 +329,12 @@ final class ProgramAdminHandler
             }
             $deps->programs->setDate($programId, $dateIso);
             $deps->flows->clear($telegramId);
-            SafeTelegram::sendMessage($bot, $deps->texts->get('programs.date_saved'));
+            $actor = $deps->users->findByTelegramId($telegramId);
+            if ($actor !== null) {
+                MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('programs.date_saved'));
+            } else {
+                SafeTelegram::sendMessage($bot, $deps->texts->get('programs.date_saved'));
+            }
 
             return true;
         }

@@ -10,6 +10,7 @@ use App\Services\AccessControl;
 use App\Services\ErrorReportService;
 use App\Services\UserIdentitySync;
 use App\Telegram\MenuKeyboard;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\PartKeyboard;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -104,7 +105,7 @@ final class MessageHandler
             if ($status === UserStatus::ACTIVE) {
                 if (in_array($text, MenuKeyboard::allMenuLabels($texts), true)) {
                     self::clearActiveFlows($telegramId, $schedule, $attendance, $materials, $payments, $broadcast);
-                    self::handleActiveMenu(
+                    MenuActionDispatcher::dispatchMenuByLabel(
                         $bot,
                         $texts,
                         $users,
@@ -236,22 +237,9 @@ final class MessageHandler
                     return;
                 }
 
-                self::handleActiveMenu(
-                    $bot,
-                    $texts,
-                    $users,
-                    $access,
-                    $schedule,
-                    $attendance,
-                    $payments,
-                    $materials,
-                    $adminHistory,
-                    $adminChat,
-                    $broadcast,
-                    $programDeps,
-                    $user,
-                    $text,
-                );
+                if (!in_array($text, MenuKeyboard::allMenuLabels($texts), true)) {
+                    MenuReplyHelper::sendWithMenu($bot, $texts, $user, $texts->get('common.unknown_menu_hint'));
+                }
 
                 return;
             }
@@ -313,152 +301,5 @@ final class MessageHandler
             text: $texts->get('registration.ask_part'),
             reply_markup: PartKeyboard::registration($texts),
         );
-    }
-
-    /**
-     * @param array<string, mixed> $user
-     */
-    private static function handleActiveMenu(
-        Nutgram $bot,
-        TextRepository $texts,
-        UserRepository $users,
-        AccessControl $access,
-        ScheduleDeps $schedule,
-        AttendanceDeps $attendance,
-        PaymentDeps $payments,
-        ?MaterialsDeps $materials,
-        ?AdminHistoryContext $adminHistory,
-        ?AdminChatDeps $adminChat,
-        ?BroadcastDeps $broadcast,
-        ?ProgramDeps $programDeps,
-        array $user,
-        string $text,
-    ): void {
-        $labels = MenuKeyboard::allMenuLabels($texts);
-        if (!in_array($text, $labels, true)) {
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_helpers')) {
-            HelpersAdminHandler::openHelpersUi($bot, $texts, $users, $access, $user, $schedule->interactiveMenus);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.assign_conductor')) {
-            ConductorAdminHandler::openConductorPicker($bot, $texts, $users, $access, $user, $schedule->interactiveMenus);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_members')) {
-            MembersAdminHandler::openFilterUi($bot, $texts, $access, $user, $schedule->interactiveMenus);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.schedule')) {
-            ScheduleMemberHandler::sendUpcoming(
-                $bot,
-                $texts,
-                $schedule->config,
-                $schedule->generator,
-                $schedule->presenter,
-            );
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.wont_come')) {
-            AttendanceMemberHandler::openWontComePicker($bot, $attendance);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_schedule')) {
-            ScheduleAdminHandler::openAdminHome($bot, $schedule, $access, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_attendance')) {
-            AttendanceAdminHandler::openHome($bot, $attendance, $access, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_payment')) {
-            PaymentAdminHandler::openHome($bot, $payments, $access, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_materials') && $materials !== null && $adminChat !== null) {
-            MaterialsAdminHandler::openHome($bot, $texts, $access, $materials, $adminChat->resolver, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_chat') && $adminChat !== null) {
-            AdminChatOwnerHandler::openHome($bot, $texts, $access, $adminChat, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.find_song') && $materials !== null) {
-            SongMemberHandler::beginSearch($bot, $materials, (int) $user['telegram_id']);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.my_recordings') && $materials !== null) {
-            SongMemberHandler::openMyRecordings($bot, $materials, $materials->delivery, $user, $programDeps);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.programs') && $programDeps !== null) {
-            ProgramAdminHandler::openHome($bot, $programDeps, $access, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.my_profile')) {
-            ProfileHandler::openProfile($bot, $texts, $users, $user, $schedule->interactiveMenus);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.about_bot')) {
-            AboutBotHandler::openHome($bot, $texts, $access, $user, $schedule->interactiveMenus);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.payment')) {
-            PaymentMemberHandler::openHome($bot, $payments, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.admin_history') && $adminHistory !== null) {
-            AdminHistoryHandler::openHome($bot, $access, $user, $adminHistory);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.broadcast') && $broadcast !== null) {
-            BroadcastWizardHandler::start($bot, $broadcast, $access, $user);
-
-            return;
-        }
-
-        if ($text === $texts->get('menu.broadcasts_list') && $broadcast !== null) {
-            BroadcastAdminHandler::openList($bot, $broadcast, $access, $user, false);
-
-            return;
-        }
-
-        $bot->sendMessage($texts->get('common.soon'));
     }
 }

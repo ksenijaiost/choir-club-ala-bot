@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Repositories\BroadcastRepository;
 use App\Telegram\CallbackUi;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 
@@ -89,7 +90,7 @@ final class BroadcastRecipientHandler
         $deps->flows->clear($telegramId);
 
         self::redrawRecipientMessage($bot, $deps, $broadcast, $user);
-        SafeTelegram::sendMessage($bot, $deps->texts->get('broadcast.custom_saved'));
+        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $deps->texts->get('broadcast.custom_saved'));
 
         return true;
     }

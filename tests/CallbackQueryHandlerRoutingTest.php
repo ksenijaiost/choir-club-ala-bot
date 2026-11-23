@@ -52,6 +52,7 @@ final class CallbackQueryHandlerRoutingTest extends TestCase
         'rp:',
         'rr:',
         'prg:',
+        'stats:',
     ];
 
     /**

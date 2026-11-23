@@ -18,10 +18,13 @@ use App\Repositories\RegistrationRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
+use App\Repositories\UsageStatsRepository;
 use App\Repositories\UserActionRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
+use App\Services\StatsPresenter;
+use App\Services\UsageSectionResolver;
 use App\Services\UserActionRecorder;
 use App\Telegram\UserActionMiddleware;
 use App\Services\AccessControl;
@@ -84,7 +87,17 @@ final class HandlerRegistry
             $config,
             $adminChatResolver,
         );
-        UserActionMiddleware::register($bot, new UserActionRecorder($userActions, $texts, $flows));
+        $usageStats = new UsageStatsRepository($pdo);
+        $usageSections = new UsageSectionResolver($texts);
+        UserActionMiddleware::register($bot, new UserActionRecorder(
+            $userActions,
+            $texts,
+            $flows,
+            $usageStats,
+            $usageSections,
+            $config,
+        ));
+        $statsPresenter = new StatsPresenter($usageStats, $texts, $config);
         $generator = new ScheduleGenerator($templates, $rehearsals, $settings);
         $presenter = new SchedulePresenter($rehearsals, $texts);
         $broadcast = new ScheduleBroadcastService($users, $texts);
@@ -238,6 +251,7 @@ final class HandlerRegistry
             $programDeps,
             $interactiveMenus,
             $errorReports,
+            $statsPresenter,
         );
         MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
         AdminChatCommandHandler::register($bot, $texts, $access, $users, $songRepo, $materialRepo, $materials, $programRepo, $programDelivery);
@@ -248,6 +262,21 @@ final class HandlerRegistry
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService, $interactiveMenus);
         BroadcastCommandHandler::register($bot, $broadcast, $access, $users);
         ProgramCommandHandler::register($bot, $programDeps, $access, $users);
+        StatsCommandHandler::register($bot, $texts, $users, $access, $statsPresenter);
+        PrivateMenuCommandHandler::register(
+            $bot,
+            $texts,
+            $users,
+            $access,
+            $schedule,
+            $attendance,
+            $paymentDeps,
+            $materials,
+            $adminHistory,
+            $adminChat,
+            $broadcast,
+            $programDeps,
+        );
         MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat, $broadcast, $programDeps, $errorReports);
     }
 }

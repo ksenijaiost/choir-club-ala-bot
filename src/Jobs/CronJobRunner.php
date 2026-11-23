@@ -15,6 +15,7 @@ use App\Repositories\PaymentRecordRepository;
 use App\Repositories\ProgramRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
+use App\Repositories\UsageStatsRepository;
 use App\Repositories\UserRepository;
 use App\Services\AttendanceDiscipline;
 use App\Services\AttendanceMessageFactory;
@@ -41,6 +42,7 @@ final class CronJobRunner
         $rehearsals = new RehearsalRepository($pdo);
         $users = new UserRepository($pdo);
         $deliveries = new JobDeliveryRepository($pdo);
+        (new UsageStatsRepository($pdo))->purgeUsersOlderThan(90);
 
         $generator = new ScheduleGenerator(
             new ScheduleTemplateRepository($pdo),

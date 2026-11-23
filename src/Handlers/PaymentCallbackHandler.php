@@ -8,6 +8,7 @@ use App\Clock;
 use App\Services\AccessControl;
 use App\Services\PaymentPeriod;
 use App\Telegram\CallbackUi;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -91,7 +92,7 @@ final class PaymentCallbackHandler
         $deps->payments->claimByMember((int) $user['id'], $year, $month);
         SafeTelegram::answerCallbackQuery($bot);
         CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('payment.inline_answer_claimed'));
-        SafeTelegram::sendMessage($bot, $deps->texts->get('payment.member_marked'));
+        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $deps->texts->get('payment.member_marked'));
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
         $conductorTg = $deps->recipients->resolveTelegramId();

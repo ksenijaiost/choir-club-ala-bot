@@ -8,6 +8,7 @@ use App\Services\AccessControl;
 use App\Services\PaymentReminderTextService;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\MenuReplyHelper;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -135,7 +136,12 @@ final class PaymentReminderTextAdminHandler
 
         if (mb_strtolower(trim($text)) === mb_strtolower($deps->texts->get('payment.reminder_edit_cancel'))) {
             $deps->flows->clear($telegramId);
-            $bot->sendMessage($deps->texts->get('payment.reminder_edit_cancelled'));
+            $actor = $deps->users->findByTelegramId($telegramId);
+            if ($actor !== null) {
+                MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('payment.reminder_edit_cancelled'));
+            } else {
+                $bot->sendMessage($deps->texts->get('payment.reminder_edit_cancelled'));
+            }
 
             return true;
         }

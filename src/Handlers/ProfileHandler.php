@@ -13,6 +13,7 @@ use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\InteractiveMenuService;
 use App\Telegram\MenuKeyboard;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\PartKeyboard;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -211,7 +212,7 @@ final class ProfileHandler
         $users->updateDisplayName((int) $user['id'], $name);
         $flows->clear($telegramId);
         $fresh = $users->findById((int) $user['id']) ?? $user;
-        $bot->sendMessage($texts->get('profile.name_saved'));
+        MenuReplyHelper::sendWithMenu($bot, $texts, $fresh, $texts->get('profile.name_saved'));
         self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus);
 
         return true;

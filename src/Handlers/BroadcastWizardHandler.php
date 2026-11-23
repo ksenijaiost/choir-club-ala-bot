@@ -8,6 +8,7 @@ use App\Repositories\BroadcastRepository;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -75,6 +76,7 @@ final class BroadcastWizardHandler
         if ($data === 'bc:w:cn') {
             $deps->flows->clear($telegramId);
             CallbackUi::editCurrentMessage($bot, $deps->texts->get('broadcast.wizard_cancelled'), null, $deps->interactiveMenus, $telegramId);
+            MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('broadcast.wizard_cancelled'));
 
             return true;
         }
@@ -263,6 +265,7 @@ final class BroadcastWizardHandler
             'failed' => (string) $stats['failed'],
         ]);
         CallbackUi::editCurrentMessage($bot, $result, null, $deps->interactiveMenus, $telegramId);
+        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $result);
 
         return true;
     }

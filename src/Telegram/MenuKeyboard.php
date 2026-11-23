@@ -75,7 +75,7 @@ final class MenuKeyboard
             ];
         }
 
-        $keyboard = ReplyKeyboardMarkup::make(resize_keyboard: true);
+        $keyboard = ReplyKeyboardMarkup::make(resize_keyboard: true, is_persistent: true);
         foreach ($rows as $row) {
             $buttons = array_map(
                 static fn (string $label): KeyboardButton => KeyboardButton::make($label),

@@ -23,6 +23,12 @@ final class BotCommandsRegistrationTest extends TestCase
 
         $bot->assertCalled('setMyCommands', 2);
         self::assertSame([null, 'ru'], $this->languageCodesFromSetMyCommands($bot));
+
+        $commandsJson = $this->firstSetMyCommandsPayload($bot)['commands'] ?? '[]';
+        foreach (['start', 'help', 'song', 'recordings', 'profile', 'about'] as $name) {
+            self::assertStringContainsString('"command":"' . $name . '"', $commandsJson);
+        }
+        self::assertStringNotContainsString('"command":"stats"', $commandsJson);
     }
 
     public function testAdminChatCommandsRegisteredForDefaultAndRussian(): void

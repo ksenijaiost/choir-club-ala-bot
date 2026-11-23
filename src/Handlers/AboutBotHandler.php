@@ -122,6 +122,12 @@ final class AboutBotHandler
     public static function menuPlaceholders(TextRepository $texts): array
     {
         return [
+            'cmd_start' => $texts->get('commands.start'),
+            'cmd_song' => $texts->get('commands.song'),
+            'cmd_recordings' => $texts->get('commands.recordings'),
+            'cmd_profile' => $texts->get('commands.profile'),
+            'cmd_about' => $texts->get('commands.about'),
+            'cmd_stats' => $texts->get('commands.stats'),
             'btn_schedule' => $texts->get('menu.schedule'),
             'btn_wont_come' => $texts->get('menu.wont_come'),
             'btn_find_song' => $texts->get('menu.find_song'),

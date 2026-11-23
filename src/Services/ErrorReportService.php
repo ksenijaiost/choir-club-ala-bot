@@ -10,6 +10,7 @@ use App\Repositories\UserActionRepository;
 use App\Repositories\UserRepository;
 use App\Support\DbTime;
 use App\Support\ErrorLog;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use App\Telegram\TelegramHtml;
 use App\Text\TextRepository;
@@ -172,7 +173,12 @@ final class ErrorReportService
         }
 
         $this->reports->markReported($reportId);
-        $bot->sendMessage($this->texts->get('errors.report_thanks'), chat_id: $bot->chatId());
+        $thanks = $this->texts->get('errors.report_thanks');
+        if ($userRow !== null) {
+            MenuReplyHelper::sendWithMenu($bot, $this->texts, $userRow, $thanks);
+        } else {
+            $bot->sendMessage($thanks, chat_id: $bot->chatId());
+        }
 
         return true;
     }
