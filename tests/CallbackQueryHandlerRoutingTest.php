@@ -51,6 +51,8 @@ final class CallbackQueryHandlerRoutingTest extends TestCase
         'hp:',
         'rp:',
         'rr:',
+        'prg:',
+        'stats:',
     ];
 
     /**
@@ -59,6 +61,23 @@ final class CallbackQueryHandlerRoutingTest extends TestCase
     private const ROUTED_EXACT = [
         InlineMenuHelper::CLOSE_CALLBACK,
     ];
+
+    public function testPrgHomeOpensViaCallbackQueryHandler(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $pdo = $this->pdo();
+        $users = new UserRepository($pdo);
+        $users->upsertConductor(self::CONDUCTOR_TG, 'Дирижёр');
+
+        $bot = $this->fakePrivateBot(self::CONDUCTOR_TG);
+        HandlerRegistry::register($bot, $texts, $this->testConfig(), $pdo);
+
+        $bot->hearCallbackQueryData('prg:home')
+            ->willStartConversation()
+            ->reply()
+            ->assertCalled('answerCallbackQuery')
+            ->assertCalled('editMessageText');
+    }
 
     public function testPaPickerOpensViaCallbackQueryHandler(): void
     {

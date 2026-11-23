@@ -16,6 +16,10 @@ final class PrivateChatBotCommands
         $commands = [
             BotCommand::make($texts->get('commands.start'), $texts->get('commands.desc_start')),
             BotCommand::make($texts->get('commands.help'), $texts->get('commands.desc_help')),
+            BotCommand::make($texts->get('commands.song'), $texts->get('commands.desc_song')),
+            BotCommand::make($texts->get('commands.recordings'), $texts->get('commands.desc_recordings')),
+            BotCommand::make($texts->get('commands.profile'), $texts->get('commands.desc_profile')),
+            BotCommand::make($texts->get('commands.about'), $texts->get('commands.desc_about')),
         ];
 
         $scope = new BotCommandScopeAllPrivateChats();

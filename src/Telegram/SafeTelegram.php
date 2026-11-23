@@ -7,6 +7,7 @@ namespace App\Telegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\ReplyKeyboardMarkup;
 use SergiX44\Nutgram\Telegram\Types\Message\LinkPreviewOptions;
 use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
@@ -43,7 +44,7 @@ final class SafeTelegram
         Nutgram $bot,
         string $text,
         ?int $chatId = null,
-        ?InlineKeyboardMarkup $replyMarkup = null,
+        InlineKeyboardMarkup|ReplyKeyboardMarkup|null $replyMarkup = null,
         ?ParseMode $parseMode = null,
         bool $disableLinkPreview = false,
     ): ?Message {

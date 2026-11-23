@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Clock;
+use App\Config;
 use App\Repositories\UserActionRepository;
 use App\Repositories\UserFlowRepository;
+use App\Repositories\UsageStatsRepository;
 use App\Support\ErrorLog;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -18,6 +21,9 @@ final class UserActionRecorder
         private readonly UserActionRepository $actions,
         private readonly TextRepository $texts,
         private readonly UserFlowRepository $flows,
+        private readonly ?UsageStatsRepository $usageStats = null,
+        private readonly ?UsageSectionResolver $usageSections = null,
+        private readonly ?Config $config = null,
     ) {
     }
 
@@ -48,6 +54,27 @@ final class UserActionRecorder
             $this->actions->add($telegramId, $updateType, $action);
         } catch (\Throwable $e) {
             error_log('[user-actions] ' . $e->getMessage());
+        }
+
+        $this->recordUsageStats($bot, $telegramId);
+    }
+
+    private function recordUsageStats(Nutgram $bot, int $telegramId): void
+    {
+        if ($this->usageStats === null || $this->usageSections === null || $this->config === null) {
+            return;
+        }
+
+        try {
+            $section = $this->usageSections->resolveSection($bot, $this->flows, $telegramId);
+            if ($section === null || $section === '') {
+                return;
+            }
+
+            $day = Clock::now($this->config)->format('Y-m-d');
+            $this->usageStats->recordHit($day, $section, $telegramId);
+        } catch (\Throwable $e) {
+            error_log('[usage-stats] ' . $e->getMessage());
         }
     }
 

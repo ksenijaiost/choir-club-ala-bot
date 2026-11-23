@@ -47,6 +47,9 @@ final class MenuKeyboard
             ];
             $rows[] = [
                 $texts->get('menu.broadcast'),
+                $texts->get('menu.programs'),
+            ];
+            $rows[] = [
                 $texts->get('menu.broadcasts_list'),
             ];
         }
@@ -72,7 +75,7 @@ final class MenuKeyboard
             ];
         }
 
-        $keyboard = ReplyKeyboardMarkup::make(resize_keyboard: true);
+        $keyboard = ReplyKeyboardMarkup::make(resize_keyboard: true, is_persistent: true);
         foreach ($rows as $row) {
             $buttons = array_map(
                 static fn (string $label): KeyboardButton => KeyboardButton::make($label),
@@ -126,6 +129,7 @@ final class MenuKeyboard
             $texts->get('menu.admin_chat'),
             $texts->get('menu.broadcast'),
             $texts->get('menu.broadcasts_list'),
+            $texts->get('menu.programs'),
         ];
     }
 }

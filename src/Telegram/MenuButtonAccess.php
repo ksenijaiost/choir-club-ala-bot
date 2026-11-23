@@ -57,7 +57,8 @@ final class MenuButtonAccess
         }
 
         if ($label === $texts->get('menu.broadcast')
-            || $label === $texts->get('menu.broadcasts_list')) {
+            || $label === $texts->get('menu.broadcasts_list')
+            || $label === $texts->get('menu.programs')) {
             return $access->canManageBroadcasts($user);
         }
 

@@ -122,6 +122,12 @@ final class AboutBotHandler
     public static function menuPlaceholders(TextRepository $texts): array
     {
         return [
+            'cmd_start' => $texts->get('commands.start'),
+            'cmd_song' => $texts->get('commands.song'),
+            'cmd_recordings' => $texts->get('commands.recordings'),
+            'cmd_profile' => $texts->get('commands.profile'),
+            'cmd_about' => $texts->get('commands.about'),
+            'cmd_stats' => $texts->get('commands.stats'),
             'btn_schedule' => $texts->get('menu.schedule'),
             'btn_wont_come' => $texts->get('menu.wont_come'),
             'btn_find_song' => $texts->get('menu.find_song'),
@@ -145,8 +151,13 @@ final class AboutBotHandler
             'btn_admin_chat' => $texts->get('menu.admin_chat'),
             'btn_broadcast' => $texts->get('menu.broadcast'),
             'btn_broadcasts_list' => $texts->get('menu.broadcasts_list'),
+            'btn_programs' => $texts->get('menu.programs'),
             'btn_broadcast_read' => $texts->get('broadcast.button_read'),
             'btn_broadcast_custom' => $texts->get('broadcast.button_custom'),
+            'btn_my_recordings_programs' => $texts->get('programs.hub_programs_button'),
+            'btn_my_recordings_pick' => $texts->get('programs.hub_pick_button'),
+            'btn_my_recordings_all' => $texts->get('programs.hub_all_button'),
+            'programs_notify_button' => $texts->get('programs.button_open_recordings'),
             'recording_link_suffix' => $texts->get('admin_chat.recording_link_suffix'),
             'phrase_materials_notifications' => $texts->get('materials.notifications_sent', ['count' => 'N']),
         ];

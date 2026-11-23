@@ -9,6 +9,7 @@ use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
+use App\Telegram\MenuReplyHelper;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
@@ -117,7 +118,7 @@ final class AttendanceMemberHandler
         }
 
         $deps->flows->clear($telegramId);
-        $bot->sendMessage($deps->texts->get('absence.confirmed'));
+        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $deps->texts->get('absence.confirmed'));
     }
 
     public static function finishReasonWithoutReason(
@@ -157,7 +158,7 @@ final class AttendanceMemberHandler
         $deps->flows->clear($telegramId);
 
         if ($source === AttendanceSource::CHECKIN) {
-            $bot->sendMessage($deps->texts->get('checkin.thanks_no'));
+            MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $deps->texts->get('checkin.thanks_no'));
         }
     }
 

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Domain\VoicePart;
 use App\Repositories\MaterialRepository;
+use App\Repositories\ProgramRepository;
 use App\Repositories\SongRepository;
 use App\Telegram\TelegramHtml;
 use App\Telegram\TelegramMessageChunker;
@@ -19,6 +20,8 @@ final class AdminChatSongListPresenter
         private readonly SongRepository $songs,
         private readonly MaterialRepository $materials,
         private readonly TextRepository $texts,
+        private readonly ?ProgramRepository $programs = null,
+        private readonly ?string $todayIso = null,
     ) {
         $this->availability = new SongRecordingAvailability($materials, $texts);
     }
@@ -56,6 +59,14 @@ final class AdminChatSongListPresenter
                     : $this->texts->get('admin_chat.songs_block_translit_no'),
                 $this->texts->get('admin_chat.songs_block_recordings', ['detail' => $recordingDetail]),
             ];
+
+            if ($this->programs !== null && $this->todayIso !== null) {
+                $programTitles = $this->programs->activeProgramTitlesForSong($songId, $this->todayIso);
+                $programsDetail = $programTitles === []
+                    ? $this->texts->get('admin_chat.word_no')
+                    : implode(', ', $programTitles);
+                $lines[] = $this->texts->get('admin_chat.songs_block_programs', ['detail' => $programsDetail]);
+            }
 
             if ($hasRecordings && $buckets['missing'] !== []) {
                 $lines[] = $this->availability->formatMissingLine($songId);

@@ -10,6 +10,7 @@ use App\Domain\UserStatus;
 use App\Repositories\PaymentRecordRepository;
 use App\Services\PaymentPeriod;
 use App\Services\PaymentStatusFormatter;
+use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
@@ -172,8 +173,10 @@ final class PaymentMemberHandler
         $deps->payments->deferByMember((int) $user['id'], $year, $month, $comment);
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
-        SafeTelegram::sendMessage(
+        MenuReplyHelper::sendWithMenu(
             $bot,
+            $deps->texts,
+            $user,
             $deps->texts->get('payment.member_deferred', $placeholders),
         );
 

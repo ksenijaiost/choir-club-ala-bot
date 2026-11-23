@@ -13,6 +13,7 @@ use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AdminChatResolver;
 use App\Services\ErrorReportService;
+use App\Services\StatsPresenter;
 use App\Services\MemberBlockService;
 use App\Services\RegistrationAdminMessageBuilder;
 use App\Services\UserIdentitySync;
@@ -44,10 +45,12 @@ final class CallbackQueryHandler
         AdminHistoryContext $adminHistory,
         AdminChatDeps $adminChat,
         ?BroadcastDeps $broadcast,
+        ?ProgramDeps $programDeps,
         InteractiveMenuService $interactiveMenus,
         ErrorReportService $errorReports,
+        StatsPresenter $statsPresenter,
     ): void {
-        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $broadcast, $interactiveMenus, $errorReports): void {
+        $bot->onCallbackQuery(function (Nutgram $bot) use ($texts, $config, $users, $registrations, $access, $blocks, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $broadcast, $programDeps, $interactiveMenus, $errorReports, $statsPresenter): void {
             $callback = $bot->callbackQuery();
             if ($callback === null) {
                 return;
@@ -65,6 +68,12 @@ final class CallbackQueryHandler
 
             if (str_starts_with($data, 'err:')) {
                 if (ErrorReportHandler::handleCallback($bot, $texts, $schedule->flows, $errorReports, $data, $actorTelegramId)) {
+                    return;
+                }
+            }
+
+            if (str_starts_with($data, 'stats:')) {
+                if (StatsCommandHandler::handleCallback($bot, $texts, $users, $access, $statsPresenter, $data, $actorTelegramId)) {
                     return;
                 }
             }
@@ -108,6 +117,19 @@ final class CallbackQueryHandler
             if (str_starts_with($data, 'mat:')) {
                 $actorRow = $users->findByTelegramId($actorTelegramId);
                 if ($actorRow !== null && MaterialsCallbackHandler::handle($bot, $materials, $access, $actorRow, $data)) {
+                    return;
+                }
+
+                return;
+            }
+
+            if (str_starts_with($data, 'prg:') && $programDeps !== null && $materials !== null) {
+                $actorRow = $users->findByTelegramId($actorTelegramId);
+                if ($actorRow === null) {
+                    return;
+                }
+
+                if (ProgramCallbackHandler::handle($bot, $programDeps, $materials, $access, $actorRow, $data)) {
                     return;
                 }
 
