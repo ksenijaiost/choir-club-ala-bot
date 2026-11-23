@@ -161,21 +161,25 @@ final class PaymentAdminMemberHandler
         foreach ($slice as $user) {
             $uid = (int) $user['id'];
             $last = $deps->payments->findLastConfirmed($uid);
-            $lastLabel = $deps->texts->get('payment.admin_member_last_none');
-            if ($last !== null) {
-                $lastLabel = $deps->paymentTexts->monthShort((int) $last['period_month'])
-                    . ' '
-                    . (string) $last['period_year'];
+            $displayName = (string) ($user['display_name'] ?? '');
+            if ($last === null) {
+                $label = $deps->texts->get('payment.admin_member_picker_button_name_only', [
+                    'name' => $displayName,
+                ]);
+            } else {
+                $lastPh = $deps->paymentTexts->monthYearPlaceholders(
+                    (int) $last['period_year'],
+                    (int) $last['period_month'],
+                );
+                $label = $deps->texts->get('payment.admin_member_picker_button', [
+                    'name' => $displayName,
+                    'month' => $lastPh['month'],
+                    'year' => $lastPh['year'],
+                ]);
             }
 
             $keyboard = $keyboard->addRow(
-                InlineKeyboardButton::make(
-                    $deps->texts->get('payment.admin_member_picker_button', [
-                        'name' => (string) ($user['display_name'] ?? ''),
-                        'last_paid' => $lastLabel,
-                    ]),
-                    callback_data: 'pa:u:' . $uid,
-                ),
+                InlineKeyboardButton::make($label, callback_data: 'pa:u:' . $uid),
             );
         }
 
