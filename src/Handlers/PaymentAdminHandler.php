@@ -6,7 +6,7 @@ namespace App\Handlers;
 
 use App\Clock;
 use App\Services\AccessControl;
-use App\Services\PaymentStatusFormatter;
+use App\Services\PaymentPeriod;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use SergiX44\Nutgram\Nutgram;
@@ -26,6 +26,35 @@ final class PaymentAdminHandler
             return;
         }
 
+        $keyboard = self::buildHomeKeyboard($deps);
+        $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $deps->texts->get('payment.admin_pick_month'),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $actor
+     */
+    public static function renderHomeEdit(Nutgram $bot, PaymentDeps $deps, array $actor): void
+    {
+        $actorTg = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $deps->texts->get('payment.admin_pick_month'),
+            self::buildHomeKeyboard($deps),
+            $deps->interactiveMenus,
+            $actorTg,
+        );
+    }
+
+    public static function buildHomeKeyboard(PaymentDeps $deps): InlineKeyboardMarkup
+    {
         $tz = new \DateTimeZone($deps->config->timezone);
         $local = Clock::now($deps->config)->setTimezone($tz);
 
@@ -42,27 +71,18 @@ final class PaymentAdminHandler
                     callback_data: PaymentReminderTextAdminHandler::CB_HOME,
                 ),
             );
-        for ($i = 0; $i < 3; $i++) {
-            $cursor = $local->modify('-' . $i . ' months');
-            $year = (int) $cursor->format('Y');
-            $month = (int) $cursor->format('n');
-            $label = $deps->paymentTexts->monthName($month) . ' ' . $year;
+
+        foreach (PaymentPeriod::adminMonthChoices($local) as $choice) {
+            $label = $deps->paymentTexts->monthName($choice['month']) . ' ' . $choice['year'];
             $keyboard = $keyboard->addRow(
-                InlineKeyboardButton::make($label, callback_data: 'pay:adm:' . $year . ':' . $month),
+                InlineKeyboardButton::make(
+                    $label,
+                    callback_data: 'pay:adm:' . $choice['year'] . ':' . $choice['month'],
+                ),
             );
         }
 
-        $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts);
-
-        $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu(
-            $bot,
-            $deps->interactiveMenus,
-            $ownerTelegramId,
-            $deps->texts->get('payment.admin_pick_month'),
-            $keyboard,
-            $bot->chatId() ?? $ownerTelegramId,
-        );
+        return InlineMenuHelper::appendFooter($keyboard, $deps->texts);
     }
 
     public static function handleCallback(
@@ -74,6 +94,10 @@ final class PaymentAdminHandler
     ): bool {
         if (str_starts_with($data, 'pa:')) {
             return PaymentAdminMemberHandler::handleCallback($bot, $deps, $access, $actor, $data);
+        }
+
+        if (PaymentAdminMonthHandler::handleCallback($bot, $deps, $access, $actor, $data)) {
+            return true;
         }
 
         if (str_starts_with($data, 'pay:rt:')) {
@@ -97,23 +121,8 @@ final class PaymentAdminHandler
             }
 
             $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
             $deps->flows->clear((int) ($actor['telegram_id'] ?? 0));
-            self::openHome($bot, $deps, $access, $actor);
-
-            return true;
-        }
-
-        if (preg_match('/^pay:adm:(\d{4}):(\d{1,2}):pg:(\d+)$/', $data, $m) === 1) {
-            if (!$access->hasConductorPrivileges($actor)) {
-                $bot->answerCallbackQuery(text: $deps->texts->get('admin.only_conductor_or_owner'), show_alert: true);
-
-                return true;
-            }
-
-            $bot->answerCallbackQuery();
-            CallbackUi::clearKeyboard($bot);
-            self::sendMonthMemberList($bot, $deps, (int) $m[1], (int) $m[2], (int) $m[3]);
+            self::renderHomeEdit($bot, $deps, $actor);
 
             return true;
         }
@@ -128,71 +137,9 @@ final class PaymentAdminHandler
             return true;
         }
 
-        $year = (int) $m[1];
-        $month = (int) $m[2];
         $bot->answerCallbackQuery();
-        CallbackUi::clearKeyboard($bot);
-        self::sendMonthMemberList($bot, $deps, $year, $month, 0);
+        PaymentAdminMonthHandler::showMonthScreen($bot, $deps, $actor, (int) $m[1], (int) $m[2]);
 
         return true;
-    }
-
-    private static function sendMonthMemberList(
-        Nutgram $bot,
-        PaymentDeps $deps,
-        int $year,
-        int $month,
-        int $page,
-    ): void {
-        $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
-        $lines = [$deps->texts->get('payment.admin_list_header', $placeholders)];
-
-        $all = $deps->users->listActivePayers();
-        $total = count($all);
-        $keyboard = InlineKeyboardMarkup::make();
-
-        foreach (InlineMenuHelper::pageSlice($all, $page) as $user) {
-            $uid = (int) $user['id'];
-            $name = (string) ($user['display_name'] ?? '');
-            $row = $deps->payments->find($uid, $year, $month);
-            $status = self::statusLine($deps, $row);
-            $lines[] = '• ' . $name . ' — ' . $status;
-
-            if (!$deps->payments->isConductorConfirmed($row)) {
-                $keyboard = $keyboard->addRow(
-                    InlineKeyboardButton::make(
-                        $name . ' ✓',
-                        callback_data: 'pay:cf:' . $uid . ':' . $year . ':' . $month,
-                    ),
-                );
-            }
-        }
-
-        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
-            $keyboard,
-            $deps->texts,
-            $page,
-            $total,
-            'pay:adm:' . $year . ':' . $month . ':pg:',
-            'pay:adm:home',
-        );
-
-        $ownerTelegramId = (int) ($bot->userId() ?? 0);
-        InlineMenuHelper::sendInteractiveMenu(
-            $bot,
-            $deps->interactiveMenus,
-            $ownerTelegramId,
-            implode("\n", $lines),
-            $keyboard,
-            $bot->chatId() ?? $ownerTelegramId,
-        );
-    }
-
-    /**
-     * @param array<string, mixed>|null $row
-     */
-    private static function statusLine(PaymentDeps $deps, ?array $row): string
-    {
-        return PaymentStatusFormatter::forRecord($deps->texts, $deps->payments, $row);
     }
 }
