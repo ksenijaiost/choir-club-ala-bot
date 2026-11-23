@@ -31,12 +31,6 @@ final class TelegramApiRetry
             }
 
             throw $e;
-        } catch (\Throwable $e) {
-            if (self::isCurlTimeout($e)) {
-                return $action();
-            }
-
-            throw $e;
         }
     }
 
@@ -60,13 +54,5 @@ final class TelegramApiRetry
         }
 
         return 0;
-    }
-
-    public static function isCurlTimeout(\Throwable $e): bool
-    {
-        $message = $e->getMessage();
-
-        return str_contains($message, 'cURL error 28')
-            || str_contains($message, 'Operation timed out');
     }
 }

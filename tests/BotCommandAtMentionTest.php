@@ -48,6 +48,11 @@ final class BotCommandAtMentionTest extends TestCase
 
         self::assertSame('My_Test_Bot', $nutgramConfig->botName);
         self::assertFalse($nutgramConfig->enableHttp2);
+        self::assertSame(5.0, $nutgramConfig->clientOptions['connect_timeout']);
+        self::assertInstanceOf(
+            \GuzzleHttp\HandlerStack::class,
+            $nutgramConfig->clientOptions['handler'],
+        );
     }
 
     public function testSongsWithBotMentionInAdminChat(): void
