@@ -30,8 +30,10 @@ final class PaymentMemberHandler
 
         $tz = new \DateTimeZone($deps->config->timezone);
         $local = Clock::now($deps->config)->setTimezone($tz);
-        $current = PaymentPeriod::currentMonth($local);
-        $previous = PaymentPeriod::previousMonth($local);
+        $claimWindow = PaymentPeriod::memberClaimWindow($local);
+        $previous = $claimWindow[0];
+        $current = $claimWindow[1];
+        $next = $claimWindow[2];
         $userId = (int) $user['id'];
 
         $lines = [];
@@ -58,13 +60,22 @@ final class PaymentMemberHandler
         $keyboard = InlineKeyboardMarkup::make();
         $hasButtons = false;
 
-        if (!$deps->payments->isConductorConfirmed($currentRow)) {
+        if (
+            !$deps->payments->isConductorConfirmed($currentRow)
+            && !$deps->payments->hasMemberClaim($currentRow)
+        ) {
             $hasButtons = true;
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
                     $deps->texts->get('payment.screen_claim_current', $currentPh),
                     callback_data: 'pay:ok:' . $current['year'] . ':' . $current['month'],
                 ),
+            );
+        }
+
+        if (!$deps->payments->isConductorConfirmed($currentRow)) {
+            $hasButtons = true;
+            $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
                     $deps->texts->get('buttons.pay_later'),
                     callback_data: 'pay:later:' . $current['year'] . ':' . $current['month'],
@@ -76,7 +87,6 @@ final class PaymentMemberHandler
         if (
             !$deps->payments->isConductorConfirmed($prevRow)
             && !$deps->payments->hasMemberClaim($prevRow)
-            && !($deps->payments->isMemberDeferred($prevRow))
         ) {
             $prevPh = $deps->paymentTexts->monthYearPlaceholders($previous['year'], $previous['month']);
             $hasButtons = true;
@@ -84,6 +94,21 @@ final class PaymentMemberHandler
                 InlineKeyboardButton::make(
                     $deps->texts->get('payment.screen_claim_previous', $prevPh),
                     callback_data: 'pay:ok:' . $previous['year'] . ':' . $previous['month'],
+                ),
+            );
+        }
+
+        $nextRow = $deps->payments->find($userId, $next['year'], $next['month']);
+        if (
+            !$deps->payments->isConductorConfirmed($nextRow)
+            && !$deps->payments->hasMemberClaim($nextRow)
+        ) {
+            $nextPh = $deps->paymentTexts->monthYearPlaceholders($next['year'], $next['month']);
+            $hasButtons = true;
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('payment.screen_claim_next', $nextPh),
+                    callback_data: 'pay:ok:' . $next['year'] . ':' . $next['month'],
                 ),
             );
         }

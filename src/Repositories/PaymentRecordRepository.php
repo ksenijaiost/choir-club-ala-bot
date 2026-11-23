@@ -148,4 +148,36 @@ final class PaymentRecordRepository
 
         return $at !== null && $at !== '';
     }
+
+    /**
+     * Переносит запись за период на другой месяц. false, если целевой период уже занят или исходной записи нет.
+     */
+    public function moveToMonth(
+        int $userId,
+        int $fromYear,
+        int $fromMonth,
+        int $toYear,
+        int $toMonth,
+    ): bool {
+        if ($fromYear === $toYear && $fromMonth === $toMonth) {
+            return false;
+        }
+
+        if ($this->find($userId, $toYear, $toMonth) !== null) {
+            return false;
+        }
+
+        $source = $this->find($userId, $fromYear, $fromMonth);
+        if ($source === null) {
+            return false;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE payment_records SET period_year = ?, period_month = ?
+             WHERE user_id = ? AND period_year = ? AND period_month = ?'
+        );
+        $stmt->execute([$toYear, $toMonth, $userId, $fromYear, $fromMonth]);
+
+        return $stmt->rowCount() > 0;
+    }
 }

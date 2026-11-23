@@ -50,6 +50,62 @@ final class PaymentPeriod
         ];
     }
 
+    /**
+     * Следующий, текущий и два предыдущих месяца (для админ-выбора).
+     *
+     * @return list<array{year: int, month: int}>
+     */
+    public static function adminMonthChoices(\DateTimeImmutable $local): array
+    {
+        $current = self::currentMonth($local);
+        $next = self::nextMonth($current['year'], $current['month']);
+        $prev1 = self::previousMonth($local);
+        $prev2 = $local->modify('first day of -2 months');
+
+        return [
+            $next,
+            $current,
+            [
+                'year' => (int) $prev1['year'],
+                'month' => (int) $prev1['month'],
+            ],
+            [
+                'year' => (int) $prev2->format('Y'),
+                'month' => (int) $prev2->format('n'),
+            ],
+        ];
+    }
+
+    /**
+     * Прошлый, текущий и следующий — для самоотметки участника.
+     *
+     * @return list<array{year: int, month: int}>
+     */
+    public static function memberClaimWindow(\DateTimeImmutable $local): array
+    {
+        $current = self::currentMonth($local);
+        $prev = self::previousMonth($local);
+        $next = self::nextMonth($current['year'], $current['month']);
+
+        return [$prev, $current, $next];
+    }
+
+    public static function matchesMonth(int $year, int $month, array $ym): bool
+    {
+        return $year === $ym['year'] && $month === $ym['month'];
+    }
+
+    public static function isInMemberClaimWindow(\DateTimeImmutable $local, int $year, int $month): bool
+    {
+        foreach (self::memberClaimWindow($local) as $ym) {
+            if (self::matchesMonth($year, $month, $ym)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function periodKey(int $year, int $month): string
     {
         return sprintf('%04d-%02d', $year, $month);

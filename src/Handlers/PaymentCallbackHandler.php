@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Handlers;
 
+use App\Clock;
 use App\Services\AccessControl;
+use App\Services\PaymentPeriod;
 use App\Telegram\CallbackUi;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
@@ -64,8 +66,23 @@ final class PaymentCallbackHandler
         int $year,
         int $month,
     ): void {
+        $tz = new \DateTimeZone($deps->config->timezone);
+        $local = Clock::now($deps->config)->setTimezone($tz);
+        if (!PaymentPeriod::isInMemberClaimWindow($local, $year, $month)) {
+            SafeTelegram::answerCallbackQuery($bot);
+
+            return;
+        }
+
         $user = $deps->users->findByTelegramId($telegramId);
         if ($user === null || !PaymentMemberHandler::isActivePayer($user)) {
+            SafeTelegram::answerCallbackQuery($bot);
+
+            return;
+        }
+
+        $row = $deps->payments->find((int) $user['id'], $year, $month);
+        if ($deps->payments->isConductorConfirmed($row) || $deps->payments->hasMemberClaim($row)) {
             SafeTelegram::answerCallbackQuery($bot);
 
             return;
@@ -108,8 +125,24 @@ final class PaymentCallbackHandler
         int $year,
         int $month,
     ): void {
+        $tz = new \DateTimeZone($deps->config->timezone);
+        $local = Clock::now($deps->config)->setTimezone($tz);
+        $current = PaymentPeriod::currentMonth($local);
+        if (!PaymentPeriod::matchesMonth($year, $month, $current)) {
+            SafeTelegram::answerCallbackQuery($bot);
+
+            return;
+        }
+
         $user = $deps->users->findByTelegramId($telegramId);
         if ($user === null || !PaymentMemberHandler::isActivePayer($user)) {
+            SafeTelegram::answerCallbackQuery($bot);
+
+            return;
+        }
+
+        $row = $deps->payments->find((int) $user['id'], $year, $month);
+        if ($deps->payments->isConductorConfirmed($row)) {
             SafeTelegram::answerCallbackQuery($bot);
 
             return;
