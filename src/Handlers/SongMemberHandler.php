@@ -317,7 +317,14 @@ final class SongMemberHandler
         MaterialsDeps $deps,
         SongDeliveryService $delivery,
         array $user,
+        ?ProgramDeps $programs = null,
     ): void {
+        if ($programs !== null) {
+            ProgramMemberHandler::openHub($bot, $programs, $deps, $user);
+
+            return;
+        }
+
         if (VoicePartRules::isConductor($user)) {
             self::sendMyRecordingsPage($bot, $deps, VoicePartRules::RECORDINGS_ALL_PARTS, 0);
 

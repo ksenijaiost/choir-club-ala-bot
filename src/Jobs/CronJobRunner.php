@@ -12,6 +12,7 @@ use App\Repositories\CheckInPromptRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\JobDeliveryRepository;
 use App\Repositories\PaymentRecordRepository;
+use App\Repositories\ProgramRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\ScheduleTemplateRepository;
 use App\Repositories\UserRepository;
@@ -61,6 +62,7 @@ final class CronJobRunner
             'checkin_close' => ['closed' => 0, 'marks' => 0],
             'payment_reminder_1' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
             'payment_reminder_2' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
+            'program_archive' => ['archived' => 0, 'ids' => []],
         ];
 
         if ($bot === null || trim($config->botToken) === '') {
@@ -136,6 +138,8 @@ final class CronJobRunner
             $reminderTexts,
             $outbound,
         ))->runIfDue($config);
+
+        $result['program_archive'] = (new ProgramArchiveJob(new ProgramRepository($pdo)))->run($config);
 
         return $result;
     }

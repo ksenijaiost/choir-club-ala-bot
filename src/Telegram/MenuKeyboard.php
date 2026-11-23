@@ -47,6 +47,9 @@ final class MenuKeyboard
             ];
             $rows[] = [
                 $texts->get('menu.broadcast'),
+                $texts->get('menu.programs'),
+            ];
+            $rows[] = [
                 $texts->get('menu.broadcasts_list'),
             ];
         }
@@ -126,6 +129,7 @@ final class MenuKeyboard
             $texts->get('menu.admin_chat'),
             $texts->get('menu.broadcast'),
             $texts->get('menu.broadcasts_list'),
+            $texts->get('menu.programs'),
         ];
     }
 }

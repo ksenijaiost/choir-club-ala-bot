@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Repositories\MaterialRepository;
+use App\Repositories\ProgramRepository;
 use App\Repositories\SongRepository;
+use App\Services\ProgramDeliveryService;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Services\AdminChatCommandMessenger;
@@ -24,8 +26,11 @@ final class AdminChatCommandHandler
         SongRepository $songs,
         MaterialRepository $materials,
         MaterialsDeps $materialsDeps,
+        ?ProgramRepository $programs = null,
+        ?ProgramDeliveryService $programDelivery = null,
     ): void {
-        $songPresenter = new AdminChatSongListPresenter($songs, $materials, $texts);
+        $todayIso = $programDelivery?->todayIso();
+        $songPresenter = new AdminChatSongListPresenter($songs, $materials, $texts, $programs, $todayIso);
 
         $bot->onCommand('songs', function (Nutgram $bot) use ($access, $users, $songPresenter): void {
             if (!self::isAdminChatMessage($bot, $access)) {

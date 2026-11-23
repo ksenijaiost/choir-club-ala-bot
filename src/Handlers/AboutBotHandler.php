@@ -145,8 +145,13 @@ final class AboutBotHandler
             'btn_admin_chat' => $texts->get('menu.admin_chat'),
             'btn_broadcast' => $texts->get('menu.broadcast'),
             'btn_broadcasts_list' => $texts->get('menu.broadcasts_list'),
+            'btn_programs' => $texts->get('menu.programs'),
             'btn_broadcast_read' => $texts->get('broadcast.button_read'),
             'btn_broadcast_custom' => $texts->get('broadcast.button_custom'),
+            'btn_my_recordings_programs' => $texts->get('programs.hub_programs_button'),
+            'btn_my_recordings_pick' => $texts->get('programs.hub_pick_button'),
+            'btn_my_recordings_all' => $texts->get('programs.hub_all_button'),
+            'programs_notify_button' => $texts->get('programs.button_open_recordings'),
             'recording_link_suffix' => $texts->get('admin_chat.recording_link_suffix'),
             'phrase_materials_notifications' => $texts->get('materials.notifications_sent', ['count' => 'N']),
         ];

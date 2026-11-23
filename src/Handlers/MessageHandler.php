@@ -29,9 +29,10 @@ final class MessageHandler
         ?AdminHistoryContext $adminHistory = null,
         ?AdminChatDeps $adminChat = null,
         ?BroadcastDeps $broadcast = null,
+        ?ProgramDeps $programDeps = null,
         ?ErrorReportService $errorReports = null,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $broadcast, $errorReports): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $broadcast, $programDeps, $errorReports): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -115,6 +116,7 @@ final class MessageHandler
                         $adminHistory,
                         $adminChat,
                         $broadcast,
+                        $programDeps,
                         $user,
                         $text,
                     );
@@ -208,6 +210,16 @@ final class MessageHandler
                     return;
                 }
 
+                if ($programDeps !== null && $telegramId !== null && ProgramAdminHandler::handleFlowMessage(
+                    $bot,
+                    $programDeps,
+                    $access,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
                 if ($telegramId !== null && ScheduleAdminHandler::handleFlowMessage(
                     $bot,
                     $texts,
@@ -236,6 +248,7 @@ final class MessageHandler
                     $adminHistory,
                     $adminChat,
                     $broadcast,
+                    $programDeps,
                     $user,
                     $text,
                 );
@@ -317,6 +330,7 @@ final class MessageHandler
         ?AdminHistoryContext $adminHistory,
         ?AdminChatDeps $adminChat,
         ?BroadcastDeps $broadcast,
+        ?ProgramDeps $programDeps,
         array $user,
         string $text,
     ): void {
@@ -398,7 +412,13 @@ final class MessageHandler
         }
 
         if ($text === $texts->get('menu.my_recordings') && $materials !== null) {
-            SongMemberHandler::openMyRecordings($bot, $materials, $materials->delivery, $user);
+            SongMemberHandler::openMyRecordings($bot, $materials, $materials->delivery, $user, $programDeps);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.programs') && $programDeps !== null) {
+            ProgramAdminHandler::openHome($bot, $programDeps, $access, $user);
 
             return;
         }
