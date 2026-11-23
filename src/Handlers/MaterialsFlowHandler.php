@@ -287,9 +287,45 @@ final class MaterialsFlowHandler
             if ($state !== null) {
                 $ctx = $state['context'];
                 $ctx['selected_parts'] = [];
+                $adminChatId = (int) ($ctx['admin_chat_id'] ?? 0);
+                $wizardMessageId = (int) ($ctx['wizard_message_id'] ?? 0);
+                if ($adminChatId !== 0 && $wizardMessageId !== 0) {
+                    $ctx['part_picker_chat_id'] = $adminChatId;
+                    $ctx['part_picker_message_id'] = $wizardMessageId;
+                }
                 $deps->flows->set($telegramId, 'material_upload', $ctx);
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     *
+     * @return array{chat_id: int, message_id: int}|null
+     */
+    public static function resolvePartPickerTarget(Nutgram $bot, array $ctx): ?array
+    {
+        $chatId = (int) ($ctx['part_picker_chat_id'] ?? 0);
+        $messageId = (int) ($ctx['part_picker_message_id'] ?? 0);
+        if ($chatId !== 0 && $messageId !== 0) {
+            return ['chat_id' => $chatId, 'message_id' => $messageId];
+        }
+
+        $chatId = (int) ($ctx['admin_chat_id'] ?? 0);
+        $messageId = (int) ($ctx['wizard_message_id'] ?? 0);
+        if ($chatId !== 0 && $messageId !== 0) {
+            return ['chat_id' => $chatId, 'message_id' => $messageId];
+        }
+
+        $message = CallbackUi::callbackMessage($bot);
+        if ($message !== null) {
+            return [
+                'chat_id' => (int) $message->chat->id,
+                'message_id' => (int) $message->message_id,
+            ];
+        }
+
+        return null;
     }
 
     /**
