@@ -78,6 +78,20 @@ final class CallbackQueryHandler
                 }
             }
 
+            if (str_starts_with($data, 'opn:')) {
+                if (AdminChatOpenerHandler::handleCallback(
+                    $bot,
+                    $programDeps,
+                    $broadcast,
+                    $access,
+                    $users,
+                    $data,
+                    $actorTelegramId,
+                )) {
+                    return;
+                }
+            }
+
             if ($data === InlineMenuHelper::CLOSE_CALLBACK) {
                 InlineMenuHelper::handleClose($bot, $schedule->flows, $interactiveMenus, $actorTelegramId);
 
