@@ -45,6 +45,10 @@ final class MenuKeyboard
                 $texts->get('menu.admin_schedule'),
                 $texts->get('menu.admin_materials'),
             ];
+            $rows[] = [
+                $texts->get('menu.broadcast'),
+                $texts->get('menu.broadcasts_list'),
+            ];
         }
 
         if ($role === UserRole::CONDUCTOR || $role === UserRole::OWNER) {
@@ -120,6 +124,8 @@ final class MenuKeyboard
             $texts->get('menu.admin_materials'),
             $texts->get('menu.assign_conductor'),
             $texts->get('menu.admin_chat'),
+            $texts->get('menu.broadcast'),
+            $texts->get('menu.broadcasts_list'),
         ];
     }
 }

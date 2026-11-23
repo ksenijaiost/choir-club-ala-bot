@@ -56,6 +56,11 @@ final class MenuButtonAccess
             return $access->isOwner($user);
         }
 
+        if ($label === $texts->get('menu.broadcast')
+            || $label === $texts->get('menu.broadcasts_list')) {
+            return $access->canManageBroadcasts($user);
+        }
+
         return false;
     }
 }

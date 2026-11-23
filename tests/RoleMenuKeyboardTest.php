@@ -48,6 +48,8 @@ final class RoleMenuKeyboardTest extends TestCase
                     $texts->get('menu.payment'),
                     $texts->get('menu.admin_schedule'),
                     $texts->get('menu.admin_materials'),
+                    $texts->get('menu.broadcast'),
+                    $texts->get('menu.broadcasts_list'),
                 ],
             ],
             'conductor' => [
@@ -66,6 +68,8 @@ final class RoleMenuKeyboardTest extends TestCase
                     $texts->get('menu.admin_payment'),
                     $texts->get('menu.admin_helpers'),
                     $texts->get('menu.admin_members'),
+                    $texts->get('menu.broadcast'),
+                    $texts->get('menu.broadcasts_list'),
                 ],
             ],
             'owner' => [
@@ -87,6 +91,8 @@ final class RoleMenuKeyboardTest extends TestCase
                     $texts->get('menu.admin_members'),
                     $texts->get('menu.assign_conductor'),
                     $texts->get('menu.admin_chat'),
+                    $texts->get('menu.broadcast'),
+                    $texts->get('menu.broadcasts_list'),
                 ],
             ],
         ];

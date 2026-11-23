@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use App\Config;
+use App\Repositories\BroadcastRepository;
 use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\BlockEventRepository;
@@ -32,6 +33,9 @@ use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\BroadcastDeliveryService;
+use App\Services\BroadcastKeyboardBuilder;
+use App\Services\BroadcastStatusPresenter;
 use App\Services\MaterialNotificationService;
 use App\Services\MaterialsService;
 use App\Services\SongDeliveryService;
@@ -150,6 +154,31 @@ final class HandlerRegistry
 
         $adminChat = new AdminChatDeps($config, $settings, $adminChatResolver, $flows, $texts, $interactiveMenus);
 
+        $broadcastRepo = new BroadcastRepository($pdo);
+        $broadcastKeyboards = new BroadcastKeyboardBuilder($texts);
+        $broadcastDelivery = new BroadcastDeliveryService(
+            $users,
+            $broadcastRepo,
+            $texts,
+            $rolePresenter,
+            $broadcastKeyboards,
+            $outbound,
+        );
+        $broadcastStatus = new BroadcastStatusPresenter($texts, $broadcastRepo, $users);
+        $broadcast = new BroadcastDeps(
+            $config,
+            $users,
+            $broadcastRepo,
+            $flows,
+            $texts,
+            $interactiveMenus,
+            $broadcastDelivery,
+            $broadcastStatus,
+            $broadcastKeyboards,
+            $rolePresenter,
+            $outbound,
+        );
+
         $attendance = new AttendanceDeps(
             $config,
             $users,
@@ -180,6 +209,7 @@ final class HandlerRegistry
             $materials,
             $adminHistory,
             $adminChat,
+            $broadcast,
             $interactiveMenus,
             $errorReports,
         );
@@ -190,6 +220,7 @@ final class HandlerRegistry
         ConductorAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);
         HelpersAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService, $interactiveMenus);
-        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat, $errorReports);
+        BroadcastCommandHandler::register($bot, $broadcast, $access, $users);
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat, $broadcast, $errorReports);
     }
 }

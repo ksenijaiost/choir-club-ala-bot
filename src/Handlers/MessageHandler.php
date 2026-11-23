@@ -28,9 +28,10 @@ final class MessageHandler
         ?MaterialsDeps $materials = null,
         ?AdminHistoryContext $adminHistory = null,
         ?AdminChatDeps $adminChat = null,
+        ?BroadcastDeps $broadcast = null,
         ?ErrorReportService $errorReports = null,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $errorReports): void {
+        $bot->onMessage(function (Nutgram $bot) use ($texts, $users, $access, $schedule, $attendance, $payments, $materials, $adminHistory, $adminChat, $broadcast, $errorReports): void {
             if ($bot->message()?->text === null) {
                 return;
             }
@@ -101,7 +102,7 @@ final class MessageHandler
 
             if ($status === UserStatus::ACTIVE) {
                 if (in_array($text, MenuKeyboard::allMenuLabels($texts), true)) {
-                    self::clearActiveFlows($telegramId, $schedule, $attendance, $materials, $payments);
+                    self::clearActiveFlows($telegramId, $schedule, $attendance, $materials, $payments, $broadcast);
                     self::handleActiveMenu(
                         $bot,
                         $texts,
@@ -113,6 +114,7 @@ final class MessageHandler
                         $materials,
                         $adminHistory,
                         $adminChat,
+                        $broadcast,
                         $user,
                         $text,
                     );
@@ -187,6 +189,25 @@ final class MessageHandler
                     return;
                 }
 
+                if ($broadcast !== null && $telegramId !== null && BroadcastWizardHandler::handleFlowMessage(
+                    $bot,
+                    $broadcast,
+                    $access,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
+                if ($broadcast !== null && $telegramId !== null && BroadcastRecipientHandler::handleFlowMessage(
+                    $bot,
+                    $broadcast,
+                    $telegramId,
+                    $text,
+                )) {
+                    return;
+                }
+
                 if ($telegramId !== null && ScheduleAdminHandler::handleFlowMessage(
                     $bot,
                     $texts,
@@ -214,6 +235,7 @@ final class MessageHandler
                     $materials,
                     $adminHistory,
                     $adminChat,
+                    $broadcast,
                     $user,
                     $text,
                 );
@@ -229,6 +251,7 @@ final class MessageHandler
         AttendanceDeps $attendance,
         ?MaterialsDeps $materials,
         ?PaymentDeps $payments = null,
+        ?BroadcastDeps $broadcast = null,
     ): void {
         if ($telegramId === null) {
             return;
@@ -241,6 +264,9 @@ final class MessageHandler
         }
         if ($payments !== null) {
             $payments->flows->clear($telegramId);
+        }
+        if ($broadcast !== null) {
+            $broadcast->flows->clear($telegramId);
         }
     }
 
@@ -290,6 +316,7 @@ final class MessageHandler
         ?MaterialsDeps $materials,
         ?AdminHistoryContext $adminHistory,
         ?AdminChatDeps $adminChat,
+        ?BroadcastDeps $broadcast,
         array $user,
         string $text,
     ): void {
@@ -396,6 +423,18 @@ final class MessageHandler
 
         if ($text === $texts->get('menu.admin_history') && $adminHistory !== null) {
             AdminHistoryHandler::openHome($bot, $access, $user, $adminHistory);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.broadcast') && $broadcast !== null) {
+            BroadcastWizardHandler::start($bot, $broadcast, $access, $user);
+
+            return;
+        }
+
+        if ($text === $texts->get('menu.broadcasts_list') && $broadcast !== null) {
+            BroadcastAdminHandler::openList($bot, $broadcast, $access, $user, false);
 
             return;
         }

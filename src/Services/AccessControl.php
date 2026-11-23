@@ -144,4 +144,20 @@ final class AccessControl
 
         return in_array($role, [UserRole::OWNER, UserRole::ADMIN, UserRole::CONDUCTOR], true);
     }
+
+    /**
+     * Рассылки и опросы — дирижёр, владелица и помощники.
+     *
+     * @param array<string, mixed> $user
+     */
+    public function canManageBroadcasts(array $user): bool
+    {
+        if (($user['status'] ?? '') !== UserStatus::ACTIVE) {
+            return false;
+        }
+
+        $role = (string) ($user['role'] ?? '');
+
+        return in_array($role, [UserRole::OWNER, UserRole::CONDUCTOR, UserRole::ADMIN], true);
+    }
 }

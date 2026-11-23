@@ -218,6 +218,8 @@ final class UserActionRecorder
             'assign_conductor',
             'about_bot',
             'admin_chat',
+            'broadcast',
+            'broadcasts_list',
         ] as $key) {
             try {
                 $labels[] = $this->texts->get('menu.' . $key);
