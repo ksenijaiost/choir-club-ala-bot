@@ -79,10 +79,13 @@ final class StatsCommandHandler
             if ($user === null || !self::canViewStats($access, $user)) {
                 return;
             }
-            $privateId = (int) ($user['telegram_id'] ?? 0);
-            if ($privateId > 0) {
-                SafeTelegram::sendMessage($bot, $texts->get('usage_stats.admin_chat_redirect'), $privateId);
-            }
+            $built = $presenter->build($period);
+            SafeTelegram::sendMessage(
+                $bot,
+                $built['text'],
+                chatId: (int) $chatId,
+                replyMarkup: $built['keyboard'],
+            );
 
             return;
         }

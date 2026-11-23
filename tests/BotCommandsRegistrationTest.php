@@ -42,9 +42,14 @@ final class BotCommandsRegistrationTest extends TestCase
         self::assertSame([null, 'ru'], $this->languageCodesFromSetMyCommands($bot));
 
         $commandsJson = $this->firstSetMyCommandsPayload($bot)['commands'] ?? '[]';
-        self::assertStringContainsString('"command":"notes"', $commandsJson);
-        self::assertStringContainsString('"command":"edit"', $commandsJson);
+        foreach (['notes', 'songs', 'members', 'edit', 'programs', 'broadcast', 'polls', 'stats'] as $name) {
+            self::assertStringContainsString('"command":"' . $name . '"', $commandsJson);
+        }
         self::assertStringNotContainsString('"command":"translit"', $commandsJson);
+
+        $decoded = json_decode($commandsJson, true);
+        self::assertIsArray($decoded);
+        self::assertCount(8, $decoded);
     }
 
     /**

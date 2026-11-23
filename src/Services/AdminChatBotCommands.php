@@ -18,6 +18,10 @@ final class AdminChatBotCommands
             BotCommand::make($texts->get('admin_chat.cmd_songs'), $texts->get('admin_chat.cmd_desc_songs')),
             BotCommand::make($texts->get('admin_chat.cmd_members'), $texts->get('admin_chat.cmd_desc_members')),
             BotCommand::make($texts->get('admin_chat.cmd_edit'), $texts->get('admin_chat.cmd_desc_edit')),
+            BotCommand::make($texts->get('admin_chat.cmd_programs'), $texts->get('admin_chat.cmd_desc_programs')),
+            BotCommand::make($texts->get('admin_chat.cmd_broadcast'), $texts->get('admin_chat.cmd_desc_broadcast')),
+            BotCommand::make($texts->get('admin_chat.cmd_polls'), $texts->get('admin_chat.cmd_desc_polls')),
+            BotCommand::make($texts->get('admin_chat.cmd_stats'), $texts->get('admin_chat.cmd_desc_stats')),
         ];
 
         $scope = BotCommandScopeChat::make(chat_id: $adminChatId);

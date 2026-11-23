@@ -6,7 +6,7 @@ namespace App\Handlers;
 
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
-use App\Telegram\SafeTelegram;
+use App\Services\AdminChatCommandRedirect;
 use SergiX44\Nutgram\Nutgram;
 
 final class BroadcastCommandHandler
@@ -24,10 +24,15 @@ final class BroadcastCommandHandler
                 if ($user === null || !$access->canManageBroadcasts($user)) {
                     return;
                 }
-                $privateId = (int) ($user['telegram_id'] ?? 0);
-                if ($privateId > 0) {
-                    SafeTelegram::sendMessage($bot, $deps->texts->get('broadcast.admin_chat_redirect'), $privateId);
-                }
+                AdminChatCommandRedirect::notifyOpenedInPrivate(
+                    $bot,
+                    $deps->texts,
+                    (int) $chatId,
+                    (int) ($user['telegram_id'] ?? 0),
+                    'broadcast.admin_chat_open_button',
+                    $deps->texts->get('broadcast.admin_chat_open_action'),
+                    'opn:bc',
+                );
 
                 return;
             }
@@ -52,10 +57,15 @@ final class BroadcastCommandHandler
                 if ($user === null || !$access->canManageBroadcasts($user)) {
                     return;
                 }
-                $privateId = (int) ($user['telegram_id'] ?? 0);
-                if ($privateId > 0) {
-                    SafeTelegram::sendMessage($bot, $deps->texts->get('broadcast.admin_chat_redirect'), $privateId);
-                }
+                AdminChatCommandRedirect::notifyOpenedInPrivate(
+                    $bot,
+                    $deps->texts,
+                    (int) $chatId,
+                    (int) ($user['telegram_id'] ?? 0),
+                    'broadcast.admin_chat_open_polls_button',
+                    $deps->texts->get('broadcast.admin_chat_open_polls_action'),
+                    'opn:polls',
+                );
 
                 return;
             }
