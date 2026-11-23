@@ -55,12 +55,53 @@ final class MaterialNotificationServiceTest extends TestCase
         );
     }
 
-    public function testTuttiNotifiesAllExceptAuthor(): void
+    public function testUploaderReceivesRecordingForOwnPartWhenEnabled(): void
+    {
+        $deps = $this->deps();
+        $song = ['id' => $deps['songId'], 'title' => 'Своя партия'];
+
+        $count = $deps['notifier']->afterMaterialSaved(
+            $deps['uploader'],
+            [
+                'type' => MaterialType::RECORDING,
+                'song' => $song,
+                'voice_parts' => ['tenor'],
+            ],
+        );
+
+        $chatIds = array_column($deps['outbound']->messages, 'chat_id');
+        self::assertContains($deps['uploaderTg'], $chatIds);
+        self::assertContains($deps['tenorTg'], $chatIds);
+        self::assertSame(2, $count);
+    }
+
+    public function testUploaderSkippedWhenNotificationsDisabled(): void
+    {
+        $deps = $this->deps();
+        $deps['users']->setMaterialNotificationsEnabled((int) $deps['uploader']['id'], false);
+        $song = ['id' => $deps['songId'], 'title' => 'Выкл у автора'];
+
+        $count = $deps['notifier']->afterMaterialSaved(
+            $deps['users']->findById((int) $deps['uploader']['id']) ?? [],
+            [
+                'type' => MaterialType::NOTES,
+                'song' => $song,
+                'voice_parts' => [],
+            ],
+        );
+
+        $chatIds = array_column($deps['outbound']->messages, 'chat_id');
+        self::assertNotContains($deps['uploaderTg'], $chatIds);
+        self::assertContains($deps['soprano1Tg'], $chatIds);
+        self::assertSame(3, $count);
+    }
+
+    public function testTuttiNotifiesAllWithNotificationsOn(): void
     {
         $deps = $this->deps();
         $song = ['id' => $deps['songId'], 'title' => 'Общая'];
 
-        $deps['notifier']->afterMaterialSaved(
+        $count = $deps['notifier']->afterMaterialSaved(
             $deps['uploader'],
             [
                 'type' => MaterialType::RECORDING,
@@ -72,8 +113,9 @@ final class MaterialNotificationServiceTest extends TestCase
         $chatIds = array_column($deps['outbound']->messages, 'chat_id');
         self::assertContains($deps['soprano1Tg'], $chatIds);
         self::assertContains($deps['tenorTg'], $chatIds);
-        self::assertNotContains($deps['uploaderTg'], $chatIds);
+        self::assertContains($deps['uploaderTg'], $chatIds);
         self::assertNotContains($deps['conductorTg'], $chatIds);
+        self::assertSame(4, $count);
     }
 
     public function testConductorReceivesAllRecordingPartsWhenEnabled(): void
@@ -119,12 +161,12 @@ final class MaterialNotificationServiceTest extends TestCase
         self::assertNotContains($deps['soprano1Tg'], $chatIds);
     }
 
-    public function testNotesNotifyEveryoneExceptAuthor(): void
+    public function testNotesNotifyEveryoneIncludingUploader(): void
     {
         $deps = $this->deps();
         $song = ['id' => $deps['songId'], 'title' => 'Ноты'];
 
-        $deps['notifier']->afterMaterialSaved(
+        $count = $deps['notifier']->afterMaterialSaved(
             $deps['uploader'],
             [
                 'type' => MaterialType::NOTES,
@@ -136,7 +178,8 @@ final class MaterialNotificationServiceTest extends TestCase
         $chatIds = array_column($deps['outbound']->messages, 'chat_id');
         self::assertContains($deps['soprano1Tg'], $chatIds);
         self::assertContains($deps['tenorTg'], $chatIds);
-        self::assertNotContains($deps['uploaderTg'], $chatIds);
+        self::assertContains($deps['uploaderTg'], $chatIds);
+        self::assertSame(4, $count);
     }
 
     public function testReassignmentNotifiesNewPart(): void
@@ -144,12 +187,35 @@ final class MaterialNotificationServiceTest extends TestCase
         $deps = $this->deps();
         $song = ['id' => $deps['songId'], 'title' => 'Перенос'];
 
-        $deps['notifier']->afterRecordingReassigned($song, ['alto_1'], (int) $deps['uploader']['id']);
+        $count = $deps['notifier']->afterRecordingReassigned($song, ['alto_1']);
 
         $chatIds = array_column($deps['outbound']->messages, 'chat_id');
         self::assertContains($deps['alto1Tg'], $chatIds);
         self::assertNotContains($deps['uploaderTg'], $chatIds);
         self::assertNotContains($deps['soprano1Tg'], $chatIds);
+        self::assertSame(1, $count);
+    }
+
+    public function testReturnCountExcludesBlockedRecipient(): void
+    {
+        $blockedTg = 1008205296;
+        $outbound = new ThrowingRecordingTelegramOutbound($blockedTg);
+        $deps = $this->deps($outbound);
+        $deps['users']->create($blockedTg, 'Blocked', 'tenor', UserRole::MEMBER, UserStatus::ACTIVE);
+
+        $song = ['id' => $deps['songId'], 'title' => 'С блоком'];
+
+        $count = $deps['notifier']->afterMaterialSaved(
+            $deps['uploader'],
+            [
+                'type' => MaterialType::NOTES,
+                'song' => $song,
+                'voice_parts' => [],
+            ],
+        );
+
+        self::assertSame(4, $count);
+        self::assertCount(4, $outbound->recordedMessages());
     }
 
     public function testDefaultConductorOffMemberOn(): void

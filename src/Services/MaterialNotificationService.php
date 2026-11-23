@@ -32,26 +32,27 @@ final class MaterialNotificationService
      * @param array<string, mixed> $actor
      * @param array<string, mixed> $result saveUpload / saveTextUpload result
      */
-    public function afterMaterialSaved(array $actor, array $result): void
+    public function afterMaterialSaved(array $actor, array $result): int
     {
         try {
             $type = (string) ($result['type'] ?? '');
             $song = $result['song'] ?? null;
             if (!is_array($song)) {
-                return;
+                return 0;
             }
 
-            $actorId = (int) ($actor['id'] ?? 0);
             $voiceParts = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
 
-            match ($type) {
-                MaterialType::NOTES => $this->notifyEveryone($song, $actorId, 'notes'),
-                MaterialType::TRANSLIT => $this->notifyEveryone($song, $actorId, 'translit'),
-                MaterialType::RECORDING => $this->notifyRecording($song, $voiceParts, $actorId),
-                default => null,
+            return match ($type) {
+                MaterialType::NOTES => $this->notifyEveryone($song, 'notes'),
+                MaterialType::TRANSLIT => $this->notifyEveryone($song, 'translit'),
+                MaterialType::RECORDING => $this->notifyRecording($song, $voiceParts),
+                default => 0,
             };
         } catch (\Throwable $e) {
             error_log('[material-notify] afterMaterialSaved failed: ' . $e->getMessage());
+
+            return 0;
         }
     }
 
@@ -59,32 +60,44 @@ final class MaterialNotificationService
      * @param list<string> $voiceParts
      * @param array<string, mixed> $song
      */
-    public function afterRecordingReassigned(array $song, array $voiceParts, int $actorUserId): void
+    public function afterRecordingReassigned(array $song, array $voiceParts): int
     {
         if ($voiceParts === []) {
-            return;
+            return 0;
         }
 
-        $this->notifyRecording($song, $voiceParts, $actorUserId);
+        try {
+            return $this->notifyRecording($song, $voiceParts);
+        } catch (\Throwable $e) {
+            error_log('[material-notify] afterRecordingReassigned failed: ' . $e->getMessage());
+
+            return 0;
+        }
     }
 
     /**
      * @param array<string, mixed> $song
      */
-    public function afterNotesReplaced(array $song, int $actorUserId): void
+    public function afterNotesReplaced(array $song): int
     {
-        $this->notifyEveryone($song, $actorUserId, 'notes');
+        try {
+            return $this->notifyEveryone($song, 'notes');
+        } catch (\Throwable $e) {
+            error_log('[material-notify] afterNotesReplaced failed: ' . $e->getMessage());
+
+            return 0;
+        }
     }
 
     /**
      * @param array<string, mixed> $song
      */
-    private function notifyEveryone(array $song, int $excludeUserId, string $kind): void
+    private function notifyEveryone(array $song, string $kind): int
     {
         $songId = (int) ($song['id'] ?? 0);
         $title = (string) ($song['title'] ?? '');
         if ($songId === 0 || $title === '') {
-            return;
+            return 0;
         }
 
         $text = match ($kind) {
@@ -93,35 +106,35 @@ final class MaterialNotificationService
         };
 
         $keyboard = $this->openSongKeyboard($songId);
+        $sent = 0;
         foreach ($this->users->listActiveParticipants() as $user) {
             if (!$this->users->materialNotificationsEnabled($user)) {
                 continue;
             }
 
-            $userId = (int) ($user['id'] ?? 0);
-            if ($userId === $excludeUserId) {
-                continue;
+            if ($this->sendToTelegramId((int) ($user['telegram_id'] ?? 0), $text, $keyboard)) {
+                $sent++;
             }
-
-            $this->sendToTelegramId((int) ($user['telegram_id'] ?? 0), $text, $keyboard);
         }
+
+        return $sent;
     }
 
     /**
      * @param array<string, mixed> $song
      * @param list<string> $voiceParts
      */
-    private function notifyRecording(array $song, array $voiceParts, int $excludeUserId): void
+    private function notifyRecording(array $song, array $voiceParts): int
     {
         $normalized = $this->materials->normalizeVoiceParts($voiceParts);
         if ($normalized === []) {
-            return;
+            return 0;
         }
 
         $songId = (int) ($song['id'] ?? 0);
         $title = (string) ($song['title'] ?? '');
         if ($songId === 0 || $title === '') {
-            return;
+            return 0;
         }
 
         $partLabel = $this->materials->formatRecordingPartsLabel($normalized);
@@ -132,25 +145,25 @@ final class MaterialNotificationService
         $keyboard = $this->openSongKeyboard($songId);
 
         $isTutti = VoicePart::isTuttiParts($normalized);
-        foreach ($this->resolveRecordingRecipients($normalized, $isTutti, $excludeUserId) as $telegramId) {
-            $this->sendToTelegramId($telegramId, $text, $keyboard);
+        $sent = 0;
+        foreach ($this->resolveRecordingRecipients($normalized, $isTutti) as $telegramId) {
+            if ($this->sendToTelegramId($telegramId, $text, $keyboard)) {
+                $sent++;
+            }
         }
+
+        return $sent;
     }
 
     /**
      * @param list<string> $voiceParts
      * @return list<int>
      */
-    private function resolveRecordingRecipients(array $voiceParts, bool $isTutti, int $excludeUserId): array
+    private function resolveRecordingRecipients(array $voiceParts, bool $isTutti): array
     {
         $telegramIds = [];
         foreach ($this->users->listActiveParticipants() as $user) {
             if (!$this->users->materialNotificationsEnabled($user)) {
-                continue;
-            }
-
-            $userId = (int) ($user['id'] ?? 0);
-            if ($userId === $excludeUserId) {
                 continue;
             }
 
@@ -189,42 +202,48 @@ final class MaterialNotificationService
         );
     }
 
-    private function sendToTelegramId(int $telegramId, string $text, InlineKeyboardMarkup $keyboard): void
+    private function sendToTelegramId(int $telegramId, string $text, InlineKeyboardMarkup $keyboard): bool
     {
         if ($telegramId <= 0) {
-            return;
+            return false;
         }
 
+        $sent = false;
         try {
-            TelegramApiRetry::run(function () use ($telegramId, $text, $keyboard): void {
-                $this->outbound->sendMessage($telegramId, $text, $keyboard);
+            $messageId = TelegramApiRetry::run(function () use ($telegramId, $text, $keyboard): ?int {
+                return $this->outbound->sendMessage($telegramId, $text, $keyboard);
             });
+            $sent = $messageId !== null;
         } catch (TelegramException $e) {
             if (TelegramApiErrors::isVoiceMessagesForbidden($e)) {
-                return;
+                return false;
             }
 
             if (TelegramApiErrors::isRecipientUnreachable($e)) {
                 error_log('[material-notify] skip chat_id=' . $telegramId . ': ' . $e->getMessage());
 
-                return;
+                return false;
             }
 
             error_log('[material-notify] send failed chat_id=' . $telegramId . ': ' . $e->getMessage());
         } catch (\Throwable $e) {
             if (TelegramApiErrors::isVoiceMessagesForbidden($e)) {
-                return;
+                return false;
             }
 
             if (TelegramApiErrors::isRecipientUnreachable($e)) {
                 error_log('[material-notify] skip chat_id=' . $telegramId . ': ' . $e->getMessage());
 
-                return;
+                return false;
             }
 
             error_log('[material-notify] send failed chat_id=' . $telegramId . ': ' . $e->getMessage());
         }
 
-        usleep(self::PAUSE_MICROSECONDS);
+        if ($sent) {
+            usleep(self::PAUSE_MICROSECONDS);
+        }
+
+        return $sent;
     }
 }

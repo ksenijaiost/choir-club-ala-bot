@@ -471,19 +471,20 @@ final class MaterialsRecordingEditHandler
         $deps->materials->setVoiceParts($materialId, $newParts);
         $material = $deps->materials->findById($materialId) ?? $material;
         $song = $deps->songs->findById($songId);
-        if ($song !== null && $added !== []) {
-            $actor = $deps->users->findByTelegramId($telegramId);
-            $actorUserId = $actor !== null ? (int) $actor['id'] : 0;
-            $deps->materialNotifications->afterRecordingReassigned($song, $added, $actorUserId);
-        }
 
         $partLabel = $deps->service->formatRecordingPartsLabel($newParts);
         SafeTelegram::answerCallbackQuery($bot, [
             'text' => $deps->texts->get('materials.recording_part_updated', ['part' => $partLabel]),
         ]);
 
+        $notifyCount = 0;
+        if ($song !== null && $added !== []) {
+            $notifyCount = $deps->materialNotifications->afterRecordingReassigned($song, $added);
+        }
+
         self::persistDraftParts($deps, $telegramId, $materialId, $newParts);
         $text = self::buildEditorText($deps, $songId, $material, true);
+        $text .= "\n" . $deps->texts->get('materials.notifications_sent', ['count' => $notifyCount]);
         self::refreshStep(
             $bot,
             $deps,

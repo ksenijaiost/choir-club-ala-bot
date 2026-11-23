@@ -320,6 +320,7 @@
     "text_notes_saved_append_start": "Заметки к «{song}» обновлены: добавлено в начало.",
     "text_notes_saved_replace": "Заметки к «{song}» обновлены: заменено.",
     "upload_success": "Материал сохранён: {song}, {type}{part_suffix}.",
+    "notifications_sent": "Уведомлений отправлено: {count}.",
     "ask_song": "Выбери песню или создай новую:",
     "ask_type": "Тип материала:",
     "ask_part": "Для какой партии запись?",

@@ -283,8 +283,8 @@ final class MaterialsCallbackHandler
             $ctx['selected_parts'] = $selected;
             $ctx['step'] = 'save';
             $deps->flows->set($telegramId, 'material_upload', $ctx);
-            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
             SafeTelegram::answerCallbackQuery($bot);
+            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
             self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
@@ -307,8 +307,8 @@ final class MaterialsCallbackHandler
                 $deps->flows->set($telegramId, 'material_upload', $ctx);
             }
 
-            MaterialsFlowHandler::completeUpload($bot, $deps, $actor, true);
             SafeTelegram::answerCallbackQuery($bot);
+            MaterialsFlowHandler::completeUpload($bot, $deps, $actor, true);
             self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
@@ -367,8 +367,8 @@ final class MaterialsCallbackHandler
             };
             $ctx['step'] = 'save';
             $deps->flows->set($telegramId, 'material_upload', $ctx);
-            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
             SafeTelegram::answerCallbackQuery($bot);
+            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
             self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
@@ -395,8 +395,8 @@ final class MaterialsCallbackHandler
             $ctx['notes_mode'] = $data === 'mat:up:nt:add' ? 'add' : 'replace_all';
             $ctx['step'] = 'save';
             $deps->flows->set($telegramId, 'material_upload', $ctx);
-            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
             SafeTelegram::answerCallbackQuery($bot);
+            MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
             self::clearKeyboardUnlessAdminWizard($bot, $deps, $telegramId);
 
             return true;
