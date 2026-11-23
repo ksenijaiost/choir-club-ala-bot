@@ -13,6 +13,12 @@ final class TelegramApiErrors
         return str_contains($e->getMessage(), 'message is not modified');
     }
 
+    public static function isQueryTooOld(\Throwable $e): bool
+    {
+        return str_contains($e->getMessage(), 'query is too old')
+            || str_contains($e->getMessage(), 'response timeout expired');
+    }
+
     public static function isRecipientUnreachable(\Throwable $e): bool
     {
         if (self::isMessageNotModified($e)) {
@@ -33,6 +39,7 @@ final class TelegramApiErrors
     public static function shouldSkipApiErrorLog(\Throwable $e): bool
     {
         return self::isMessageNotModified($e)
+            || self::isQueryTooOld($e)
             || self::isRecipientUnreachable($e)
             || self::isVoiceMessagesForbidden($e);
     }
@@ -45,6 +52,12 @@ final class TelegramApiErrors
     public static function logTelegramIssue(string $method, \Throwable $e): void
     {
         if (self::isMessageNotModified($e)) {
+            return;
+        }
+
+        if (self::isQueryTooOld($e)) {
+            error_log('[telegram] ' . $method . ' skipped: callback query expired');
+
             return;
         }
 

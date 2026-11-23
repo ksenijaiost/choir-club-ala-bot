@@ -135,6 +135,69 @@ final class MaterialsAdminUploadWizardTest extends TestCase
         self::assertSame('uniq-save', $notes[0]['telegram_file_unique_id']);
     }
 
+    public function testAdminRecordingPartPickerPersistsWizardMessageForMarkup(): void
+    {
+        $deps = $this->deps();
+        $songId = $deps->songs->create('Партии');
+        $wizardId = 1200;
+        $deps->flows->set(self::ADMIN_TG, 'material_upload', [
+            'admin_chat_id' => self::ADMIN_CHAT_ID,
+            'wizard_message_id' => $wizardId,
+            'song_id' => $songId,
+            'type' => MaterialType::RECORDING,
+            'step' => 'part',
+            'file_id' => 'f',
+            'file_unique_id' => 'uniq-part',
+        ]);
+
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->telegramUser(self::ADMIN_TG));
+        MaterialsFlowHandler::sendRecordingPartPicker($bot, $deps, self::ADMIN_TG);
+
+        $ctx = $deps->flows->get(self::ADMIN_TG)['context'] ?? [];
+        self::assertSame(self::ADMIN_CHAT_ID, (int) ($ctx['part_picker_chat_id'] ?? 0));
+        self::assertSame($wizardId, (int) ($ctx['part_picker_message_id'] ?? 0));
+    }
+
+    public function testAdminPartToggleUpdatesReplyMarkupWithCheckmark(): void
+    {
+        $deps = $this->deps();
+        $texts = $deps->texts;
+        $songId = $deps->songs->create('Галочки');
+        $wizardId = 1301;
+        $deps->flows->set(self::ADMIN_TG, 'material_upload', [
+            'admin_chat_id' => self::ADMIN_CHAT_ID,
+            'wizard_message_id' => $wizardId,
+            'part_picker_chat_id' => self::ADMIN_CHAT_ID,
+            'part_picker_message_id' => $wizardId,
+            'song_id' => $songId,
+            'type' => MaterialType::RECORDING,
+            'step' => 'part',
+            'selected_parts' => [],
+            'file_id' => 'f',
+            'file_unique_id' => 'uniq-chk',
+        ]);
+
+        $actor = $deps->users->findByTelegramId(self::ADMIN_TG);
+        self::assertNotNull($actor);
+        $access = new AccessControl($this->testConfig());
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->telegramUser(self::ADMIN_TG));
+
+        MaterialsCallbackHandler::handle($bot, $deps, $access, $actor, 'mat:up:pt:t:tenor');
+        self::assertSame(['tenor'], $deps->flows->get(self::ADMIN_TG)['context']['selected_parts'] ?? []);
+        $tenorLabel = $texts->get('parts.tenor');
+        self::assertSame(
+            '✅ ' . $tenorLabel,
+            $this->buttonTextForCallback($bot, 'mat:up:pt:t:tenor'),
+        );
+        self::assertSame(0, $this->countMethodCalls($bot, 'editMessageText'));
+
+        MaterialsCallbackHandler::handle($bot, $deps, $access, $actor, 'mat:up:pt:t:tenor');
+        self::assertSame([], $deps->flows->get(self::ADMIN_TG)['context']['selected_parts'] ?? []);
+        self::assertSame($tenorLabel, $this->buttonTextForCallback($bot, 'mat:up:pt:t:tenor'));
+    }
+
     public function testDoubleDoneDoesNotDuplicateRecording(): void
     {
         $deps = $this->deps();
@@ -192,6 +255,43 @@ final class MaterialsAdminUploadWizardTest extends TestCase
         );
 
         self::assertCount(0, $deps->materials->listCurrentRecordings($songId, 'tenor'));
+    }
+
+    private function buttonTextForCallback(Nutgram $bot, string $callbackData): ?string
+    {
+        $markup = $this->lastEditReplyMarkupBody($bot);
+        if (!is_array($markup)) {
+            return null;
+        }
+
+        foreach ($markup['reply_markup']['inline_keyboard'] ?? [] as $row) {
+            foreach ($row as $button) {
+                if (($button['callback_data'] ?? '') === $callbackData) {
+                    return (string) ($button['text'] ?? '');
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function lastEditReplyMarkupBody(Nutgram $bot): ?array
+    {
+        $last = null;
+        foreach ($bot->getRequestHistory() as $entry) {
+            $uri = (string) $entry['request']->getUri();
+            if (!str_contains($uri, 'editMessageReplyMarkup')) {
+                continue;
+            }
+
+            $body = json_decode((string) $entry['request']->getBody(), true);
+            if (is_array($body)) {
+                $last = $body;
+            }
+        }
+
+        return $last;
     }
 
     private function countMethodCalls(Nutgram $bot, string $method): int

@@ -77,6 +77,32 @@ final class VoiceRecordingDeliveryTest extends TestCase
         self::assertStringContainsString('https://t.me/c/1234567890/42', $warning);
     }
 
+    public function testQueryTooOldLogsShortLineOnly(): void
+    {
+        $logFile = tempnam(sys_get_temp_dir(), 'choir-telegram-log-');
+        self::assertNotFalse($logFile);
+        $previous = ini_get('error_log');
+        ini_set('error_log', $logFile);
+
+        try {
+            \App\Telegram\TelegramApiErrors::logTelegramIssue(
+                'answerCallbackQuery',
+                new \SergiX44\Nutgram\Telegram\Exceptions\TelegramException(
+                    'Bad Request: query is too old and response timeout expired or query ID is invalid',
+                    400,
+                ),
+            );
+        } finally {
+            ini_set('error_log', $previous !== false ? $previous : '');
+        }
+
+        $content = (string) file_get_contents($logFile);
+        unlink($logFile);
+
+        self::assertStringContainsString('callback query expired', $content);
+        self::assertStringNotContainsString('warning:', $content);
+    }
+
     public function testMessageNotModifiedIsNotLoggedAsWarning(): void
     {
         $logFile = tempnam(sys_get_temp_dir(), 'choir-telegram-log-');

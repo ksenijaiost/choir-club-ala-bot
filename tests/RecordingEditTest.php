@@ -89,6 +89,35 @@ final class RecordingEditTest extends TestCase
         self::assertStringContainsString($hint, $payload);
     }
 
+    public function testPrivateUploadPartToggleUpdatesReplyMarkup(): void
+    {
+        $deps = $this->deps();
+        $texts = $deps['texts'];
+        $songId = $deps['songs']->create('Личка');
+        $deps['flows']->set(self::UPLOADER_TG, 'material_upload', [
+            'step' => 'part',
+            'song_id' => $songId,
+            'type' => 'recording',
+            'part_picker_chat_id' => self::UPLOADER_TG,
+            'part_picker_message_id' => 42,
+            'selected_parts' => [],
+        ]);
+
+        $uploader = $deps['users']->findByTelegramId(self::UPLOADER_TG);
+        self::assertNotNull($uploader);
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->telegramUser(self::UPLOADER_TG));
+
+        MaterialsCallbackHandler::handle($bot, $deps['handlerDeps'], $deps['access'], $uploader, 'mat:up:pt:t:alto_1');
+
+        $altoLabel = $texts->get('parts.alto_1');
+        self::assertGreaterThanOrEqual(1, $this->countMethodCalls($bot, 'editMessageReplyMarkup'));
+        $body = $this->lastBodyForMethod($bot, 'editMessageReplyMarkup');
+        $encoded = json_encode($body['reply_markup'] ?? [], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        self::assertStringContainsString('mat:up:pt:t:alto_1', $encoded);
+        self::assertStringContainsString('✅ ' . $altoLabel, $encoded);
+    }
+
     public function testUploadWizardShowsNoRecordingsHintWhenEmpty(): void
     {
         $deps = $this->deps();
