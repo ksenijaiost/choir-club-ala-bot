@@ -743,6 +743,13 @@ final class MaterialsFlowHandler
             return;
         }
 
+        $notifyCount = 0;
+        try {
+            $notifyCount = $deps->materialNotifications->afterMaterialSaved($user, $result);
+        } catch (\Throwable $e) {
+            error_log('[materials] notify after save failed: ' . $e->getMessage());
+        }
+
         $chatId = (int) ($ctx['admin_chat_id'] ?? 0);
         $partList = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
         $lines = [
@@ -753,6 +760,7 @@ final class MaterialsFlowHandler
         if ($result['archived_previous'] !== null) {
             $lines[] = $deps->texts->get('materials.archived_notice');
         }
+        $lines[] = $deps->texts->get('materials.notifications_sent', ['count' => $notifyCount]);
 
         $text = implode("\n", $lines);
         $wizardMessageId = (int) ($ctx['wizard_message_id'] ?? 0);
@@ -770,12 +778,6 @@ final class MaterialsFlowHandler
             SafeTelegram::sendMessage($bot, $text, $chatId);
         } else {
             SafeTelegram::sendMessage($bot, $text);
-        }
-
-        try {
-            $deps->materialNotifications->afterMaterialSaved($user, $result);
-        } catch (\Throwable $e) {
-            error_log('[materials] notify after save failed: ' . $e->getMessage());
         }
     }
 }

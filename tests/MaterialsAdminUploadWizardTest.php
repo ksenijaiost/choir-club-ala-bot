@@ -21,7 +21,9 @@ use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Tests\Support\MaterialsTestDeps;
+use App\Tests\Support\RecordingTelegramOutbound;
 use App\Tests\Support\ThrowingRecordingTelegramOutbound;
+use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
 use SergiX44\Nutgram\Nutgram;
@@ -102,11 +104,33 @@ final class MaterialsAdminUploadWizardTest extends TestCase
         MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
 
         self::assertCount(1, $deps->materials->listCurrentNotes($songId));
-        self::assertGreaterThanOrEqual(
-            1,
-            $this->countMethodCalls($bot, 'editMessageText'),
-            'wizard success screen should be shown before notify errors',
-        );
+        self::assertGreaterThanOrEqual(1, $this->countMethodCalls($bot, 'editMessageText'));
+        self::assertCount(2, $outbound->recordedMessages());
+    }
+
+    public function testCompleteUploadNotifyCountMatchesSuccessfulSends(): void
+    {
+        $outbound = new RecordingTelegramOutbound();
+        $deps = $this->deps($outbound);
+        $songId = $deps->songs->create('Счётчик');
+        $deps->flows->set(self::ADMIN_TG, 'material_upload', [
+            'file_id' => 'f-count',
+            'file_unique_id' => 'uniq-count',
+            'admin_chat_id' => self::ADMIN_CHAT_ID,
+            'wizard_message_id' => 991,
+            'song_id' => $songId,
+            'type' => MaterialType::RECORDING,
+            'selected_parts' => ['tenor'],
+            'step' => 'save',
+        ]);
+
+        $actor = $deps->users->findByTelegramId(self::ADMIN_TG);
+        self::assertNotNull($actor);
+        $bot = Nutgram::fake();
+        MaterialsFlowHandler::completeUpload($bot, $deps, $actor);
+
+        self::assertCount(1, $outbound->messages);
+        self::assertGreaterThanOrEqual(1, $this->countMethodCalls($bot, 'editMessageText'));
     }
 
     public function test429OnClearKeyboardDoesNotBlockSave(): void
@@ -307,7 +331,7 @@ final class MaterialsAdminUploadWizardTest extends TestCase
         return $count;
     }
 
-    private function deps(?ThrowingRecordingTelegramOutbound $outbound = null): MaterialsDeps
+    private function deps(?TelegramOutbound $outbound = null): MaterialsDeps
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
         $config = $this->testConfig();

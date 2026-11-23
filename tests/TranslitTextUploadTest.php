@@ -139,7 +139,9 @@ final class TranslitTextUploadTest extends TestCase
         self::assertSame("У-у-у\nНа небе", $current['text_content']);
         self::assertNull($current['telegram_file_id']);
         $bot->assertReplyText(
-            $texts->get('materials.text_notes_saved_new', ['song' => 'Новая песня']),
+            $texts->get('materials.text_notes_saved_new', ['song' => 'Новая песня'])
+                . "\n"
+                . $texts->get('materials.notifications_sent', ['count' => 1]),
             index: 1,
         );
     }
@@ -282,8 +284,10 @@ final class TranslitTextUploadTest extends TestCase
         $bot->assertReplyText(
             $texts->get('materials.text_notes_saved_append_end', ['song' => 'Песня'])
                 . "\n"
-                . $texts->get('materials.archived_notice'),
-            index: 1,
+                . $texts->get('materials.archived_notice')
+                . "\n"
+                . $texts->get('materials.notifications_sent', ['count' => 1]),
+            index: 2,
         );
     }
 
@@ -320,8 +324,10 @@ final class TranslitTextUploadTest extends TestCase
         $bot->assertReplyText(
             $texts->get('materials.text_notes_saved_replace', ['song' => 'Песня'])
                 . "\n"
-                . $texts->get('materials.archived_notice'),
-            index: 1,
+                . $texts->get('materials.archived_notice')
+                . "\n"
+                . $texts->get('materials.notifications_sent', ['count' => 1]),
+            index: 2,
         );
     }
 

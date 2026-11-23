@@ -168,14 +168,15 @@ final class MaterialsAdminChatHandler
             $deps->flows->clear((int) $user['telegram_id']);
             $song = $deps->songs->findById((int) $target['song_id']);
             if ($song !== null) {
+                $notifyCount = 0;
                 if ($type === MaterialType::NOTES) {
-                    $deps->materialNotifications->afterNotesReplaced($song, (int) $user['id']);
+                    $notifyCount = $deps->materialNotifications->afterNotesReplaced($song);
                 }
-                $bot->sendMessage($deps->service->uploadSuccessText(
-                    $song,
-                    $type,
-                    [],
-                ));
+                $lines = [
+                    $deps->service->uploadSuccessText($song, $type, []),
+                    $deps->texts->get('materials.notifications_sent', ['count' => $notifyCount]),
+                ];
+                $bot->sendMessage(implode("\n", $lines));
             }
 
             return;
