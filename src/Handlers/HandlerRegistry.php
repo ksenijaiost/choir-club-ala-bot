@@ -253,7 +253,7 @@ final class HandlerRegistry
             $errorReports,
             $statsPresenter,
         );
-        MaterialsAdminChatHandler::register($bot, $texts, $access, $materials);
+        MaterialsAdminChatHandler::register($bot, $texts, $access, $materials, $programDeps, $broadcast);
         AdminChatCommandHandler::register($bot, $texts, $access, $users, $songRepo, $materialRepo, $materials, $programRepo, $programDelivery);
         ErrorReportHandler::register($bot, $texts, $users, $access, $flows, $errorReports);
         StartHandler::register($bot, $texts, $users, $access, $interactiveMenus);

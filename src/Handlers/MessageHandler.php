@@ -198,6 +198,7 @@ final class MessageHandler
                     $access,
                     $telegramId,
                     $text,
+                    $bot->chatId(),
                 )) {
                     return;
                 }
@@ -217,6 +218,7 @@ final class MessageHandler
                     $access,
                     $telegramId,
                     $text,
+                    $bot->chatId(),
                 )) {
                     return;
                 }

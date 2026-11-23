@@ -44,6 +44,17 @@ final class ProgramCallbackHandler
             return true;
         }
 
+        $chatId = $bot->chatId();
+        if ($chatId !== null && $access->isAdminChatId($chatId)) {
+            if (!$programs->interactiveMenus->callbackAllowed(
+                $bot,
+                (int) ($actor['telegram_id'] ?? 0),
+                $programs->texts->get('common.unavailable'),
+            )) {
+                return true;
+            }
+        }
+
         return ProgramAdminHandler::handleCallback($bot, $programs, $access, $actor, $data);
     }
 }

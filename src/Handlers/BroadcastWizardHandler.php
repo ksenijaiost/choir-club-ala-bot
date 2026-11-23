@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Repositories\BroadcastRepository;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
+use App\Telegram\GroupFlowSession;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
@@ -23,8 +24,14 @@ final class BroadcastWizardHandler
     /**
      * @param array<string, mixed> $actor
      */
-    public static function start(Nutgram $bot, BroadcastDeps $deps, AccessControl $access, array $actor): void
-    {
+    public static function start(
+        Nutgram $bot,
+        BroadcastDeps $deps,
+        AccessControl $access,
+        array $actor,
+        ?int $targetChatId = null,
+        ?int $replyToMessageId = null,
+    ): void {
         if (!$access->canManageBroadcasts($actor)) {
             SafeTelegram::sendMessage($bot, $deps->texts->get('broadcast.forbidden'));
 
@@ -32,13 +39,15 @@ final class BroadcastWizardHandler
         }
 
         $telegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
-        $deps->flows->set($telegramId, self::FLOW, [
+        $ctx = [
             'step' => 'kind',
             'kind' => null,
             'multi' => false,
             'allow_custom' => false,
             'options' => [],
-        ]);
+        ];
+        self::bindAdminChatContext($bot, $access, $ctx, $telegramId, $targetChatId, $replyToMessageId);
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
         self::presentStep($bot, $deps, $telegramId);
     }
 
@@ -63,9 +72,20 @@ final class BroadcastWizardHandler
         }
 
         $telegramId = (int) ($actor['telegram_id'] ?? 0);
+        $chatId = $bot->chatId();
+        if ($chatId !== null && $access->isAdminChatId($chatId)) {
+            if (!$deps->interactiveMenus->callbackAllowed($bot, $telegramId, $deps->texts->get('common.unavailable'))) {
+                return true;
+            }
+        }
+
         $state = $deps->flows->get($telegramId);
         if ($state === null || ($state['flow'] ?? '') !== self::FLOW) {
-            SafeTelegram::answerCallbackQuery($bot);
+            if ($chatId !== null && $access->isAdminChatId($chatId)) {
+                SafeTelegram::answerCallbackQuery($bot, ['text' => $deps->texts->get('common.unavailable')]);
+            } else {
+                SafeTelegram::answerCallbackQuery($bot);
+            }
 
             return true;
         }
@@ -76,7 +96,15 @@ final class BroadcastWizardHandler
         if ($data === 'bc:w:cn') {
             $deps->flows->clear($telegramId);
             CallbackUi::editCurrentMessage($bot, $deps->texts->get('broadcast.wizard_cancelled'), null, $deps->interactiveMenus, $telegramId);
-            MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('broadcast.wizard_cancelled'));
+            if (GroupFlowSession::isGroupContext($ctx)) {
+                SafeTelegram::sendMessage(
+                    $bot,
+                    $deps->texts->get('broadcast.wizard_cancelled'),
+                    GroupFlowSession::targetChatId($ctx, $bot, $telegramId),
+                );
+            } else {
+                MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('broadcast.wizard_cancelled'));
+            }
 
             return true;
         }
@@ -151,6 +179,7 @@ final class BroadcastWizardHandler
         AccessControl $access,
         int $telegramId,
         string $text,
+        ?int $chatId = null,
     ): bool {
         $state = $deps->flows->get($telegramId);
         if ($state === null || ($state['flow'] ?? '') !== self::FLOW) {
@@ -165,12 +194,16 @@ final class BroadcastWizardHandler
         }
 
         $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
+        if (!GroupFlowSession::matchesChat($ctx, $chatId)) {
+            return false;
+        }
+
         $step = (string) ($ctx['step'] ?? '');
 
         if ($step === 'body') {
             $trimmed = trim($text);
             if ($trimmed === '' || mb_strlen($trimmed) > self::TEXT_BODY_MAX) {
-                SafeTelegram::sendMessage($bot, $deps->texts->get('broadcast.wizard_body_invalid'));
+                self::sendWizardPrompt($bot, $deps, $ctx, $telegramId, 'broadcast.wizard_body_invalid');
 
                 return true;
             }
@@ -191,13 +224,13 @@ final class BroadcastWizardHandler
         if ($step === 'options') {
             $option = trim($text);
             if ($option === '' || mb_strlen($option) > BroadcastRepository::OPTION_LABEL_MAX) {
-                SafeTelegram::sendMessage($bot, $deps->texts->get('broadcast.wizard_option_invalid'));
+                self::sendWizardPrompt($bot, $deps, $ctx, $telegramId, 'broadcast.wizard_option_invalid');
 
                 return true;
             }
             $options = is_array($ctx['options'] ?? null) ? $ctx['options'] : [];
             if (count($options) >= BroadcastRepository::MAX_OPTIONS) {
-                SafeTelegram::sendMessage($bot, $deps->texts->get('broadcast.wizard_options_full'));
+                self::sendWizardPrompt($bot, $deps, $ctx, $telegramId, 'broadcast.wizard_options_full');
 
                 return true;
             }
@@ -265,7 +298,15 @@ final class BroadcastWizardHandler
             'failed' => (string) $stats['failed'],
         ]);
         CallbackUi::editCurrentMessage($bot, $result, null, $deps->interactiveMenus, $telegramId);
-        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $result);
+        if (GroupFlowSession::isGroupContext($ctx)) {
+            SafeTelegram::sendMessage(
+                $bot,
+                $result,
+                GroupFlowSession::targetChatId($ctx, $bot, $telegramId),
+            );
+        } else {
+            MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $result);
+        }
 
         return true;
     }
@@ -296,6 +337,11 @@ final class BroadcastWizardHandler
 
         if ($extra !== null && $extra !== '') {
             $text .= "\n\n" . $extra;
+        }
+
+        if (GroupFlowSession::isGroupContext($ctx) && ($step === 'body' || $step === 'options')) {
+            GroupFlowSession::sendTextPrompt($bot, $deps->texts, $text, $ctx, 'bc:w:cn');
+            $text = $deps->texts->get('broadcast.wizard_group_step_hint');
         }
 
         $keyboard = self::stepKeyboard($deps, $ctx, $step);
@@ -452,10 +498,60 @@ final class BroadcastWizardHandler
             self::persistWizardMessage($deps, $telegramId, $messageId);
         }
 
+        $sessionChatId = (int) ($ctx[GroupFlowSession::CTX_CHAT] ?? 0);
+
         return [
-            'chat_id' => (int) ($bot->chatId() ?? $telegramId),
+            'chat_id' => $sessionChatId !== 0 ? $sessionChatId : (int) ($bot->chatId() ?? $telegramId),
             'message_id' => $messageId,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    private static function bindAdminChatContext(
+        Nutgram $bot,
+        AccessControl $access,
+        array &$ctx,
+        int $ownerTelegramId,
+        ?int $targetChatId = null,
+        ?int $replyToMessageId = null,
+    ): void {
+        $chatId = $targetChatId ?? $bot->chatId();
+        if ($chatId === null || !$access->isAdminChatId((int) $chatId)) {
+            return;
+        }
+
+        if ($replyToMessageId === null) {
+            $callbackMessage = CallbackUi::callbackMessage($bot);
+            if ($callbackMessage !== null) {
+                $replyToMessageId = (int) $callbackMessage->message_id;
+            } else {
+                $commandMessageId = (int) ($bot->message()?->message_id ?? 0);
+                $replyToMessageId = $commandMessageId > 0 ? $commandMessageId : null;
+            }
+        }
+
+        GroupFlowSession::bindGroup($ctx, (int) $chatId, $ownerTelegramId, $replyToMessageId);
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    private static function sendWizardPrompt(
+        Nutgram $bot,
+        BroadcastDeps $deps,
+        array $ctx,
+        int $telegramId,
+        string $textKey,
+    ): void {
+        if (GroupFlowSession::isGroupContext($ctx)) {
+            GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($textKey), $ctx, 'bc:w:cn');
+
+            return;
+        }
+
+        SafeTelegram::sendMessage($bot, $deps->texts->get($textKey));
     }
 
     private static function persistWizardMessage(BroadcastDeps $deps, int $telegramId, int $messageId): void

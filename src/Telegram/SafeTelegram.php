@@ -6,6 +6,7 @@ namespace App\Telegram;
 
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\ForceReply;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\ReplyKeyboardMarkup;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\ReplyKeyboardRemove;
@@ -45,14 +46,15 @@ final class SafeTelegram
         Nutgram $bot,
         string $text,
         ?int $chatId = null,
-        InlineKeyboardMarkup|ReplyKeyboardMarkup|ReplyKeyboardRemove|null $replyMarkup = null,
+        InlineKeyboardMarkup|ReplyKeyboardMarkup|ReplyKeyboardRemove|ForceReply|null $replyMarkup = null,
         ?ParseMode $parseMode = null,
         bool $disableLinkPreview = false,
+        ?int $replyToMessageId = null,
     ): ?Message {
         try {
             $linkPreview = $disableLinkPreview ? LinkPreviewOptions::make(is_disabled: true) : null;
 
-            return self::call(static function () use ($bot, $text, $chatId, $replyMarkup, $parseMode, $linkPreview): ?Message {
+            return self::call(static function () use ($bot, $text, $chatId, $replyMarkup, $parseMode, $linkPreview, $replyToMessageId): ?Message {
                 if ($chatId !== null) {
                     return $bot->sendMessage(
                         text: $text,
@@ -60,6 +62,7 @@ final class SafeTelegram
                         reply_markup: $replyMarkup,
                         parse_mode: $parseMode,
                         link_preview_options: $linkPreview,
+                        reply_to_message_id: $replyToMessageId,
                     );
                 }
 
@@ -68,6 +71,7 @@ final class SafeTelegram
                     reply_markup: $replyMarkup,
                     parse_mode: $parseMode,
                     link_preview_options: $linkPreview,
+                    reply_to_message_id: $replyToMessageId,
                 );
             });
         } catch (\Throwable $e) {
