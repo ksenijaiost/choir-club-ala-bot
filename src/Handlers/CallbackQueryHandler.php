@@ -19,6 +19,7 @@ use App\Services\UserIdentitySync;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\InteractiveMenuService;
 use App\Telegram\MenuKeyboard;
+use App\Telegram\SafeTelegram;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
@@ -134,13 +135,19 @@ final class CallbackQueryHandler
                 return;
             }
 
-            if (str_starts_with($data, 'pay:')) {
+            if (str_starts_with($data, 'pay:') || str_starts_with($data, 'pa:')) {
                 $actorRow = $users->findByTelegramId($actorTelegramId);
                 if ($actorRow === null) {
                     return;
                 }
 
                 if (PaymentAdminHandler::handleCallback($bot, $payments, $access, $actorRow, $data)) {
+                    return;
+                }
+
+                if (str_starts_with($data, 'pa:')) {
+                    SafeTelegram::answerCallbackQuery($bot);
+
                     return;
                 }
 
@@ -165,7 +172,7 @@ final class CallbackQueryHandler
                 return;
             }
 
-            if (str_starts_with($data, 'att:')) {
+            if (str_starts_with($data, 'att:') || str_starts_with($data, 'chk:')) {
                 AttendanceCallbackHandler::handle($bot, $attendance, $data, $actorTelegramId);
 
                 return;
