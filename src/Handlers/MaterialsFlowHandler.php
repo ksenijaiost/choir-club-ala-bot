@@ -512,7 +512,7 @@ final class MaterialsFlowHandler
 
         $newTitle = trim($text);
         if (mb_strlen($newTitle) < 2 || mb_strlen($newTitle) > 255) {
-            $bot->sendMessage($deps->texts->get('materials.invalid_song_title'));
+            SafeTelegram::sendMessage($bot, $deps->texts->get('materials.invalid_song_title'));
 
             return true;
         }
@@ -548,7 +548,7 @@ final class MaterialsFlowHandler
         $ctx = $state['context'];
 
         if (mb_strlen($text) < 2 || mb_strlen($text) > 255) {
-            $bot->sendMessage($deps->texts->get('materials.invalid_song_title'));
+            SafeTelegram::sendMessage($bot, $deps->texts->get('materials.invalid_song_title'));
 
             return true;
         }
@@ -718,8 +718,6 @@ final class MaterialsFlowHandler
             $lines[] = $deps->texts->get('materials.archived_notice');
         }
 
-        $deps->materialNotifications->afterMaterialSaved($user, $result);
-
         $text = implode("\n", $lines);
         $wizardMessageId = (int) ($ctx['wizard_message_id'] ?? 0);
         $deps->flows->clear($telegramId);
@@ -732,14 +730,16 @@ final class MaterialsFlowHandler
                 $text,
                 InlineKeyboardMarkup::make(),
             );
-
-            return;
-        }
-
-        if ($chatId !== 0) {
+        } elseif ($chatId !== 0) {
             SafeTelegram::sendMessage($bot, $text, $chatId);
         } else {
             SafeTelegram::sendMessage($bot, $text);
+        }
+
+        try {
+            $deps->materialNotifications->afterMaterialSaved($user, $result);
+        } catch (\Throwable $e) {
+            error_log('[materials] notify after save failed: ' . $e->getMessage());
         }
     }
 }

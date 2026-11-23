@@ -215,7 +215,7 @@ final class MaterialsCallbackHandler
         if (preg_match('/^mat:up:pt:t:([a-z0-9_]+)$/', $data, $m) === 1) {
             $part = $m[1];
             if (!VoicePart::isValid($part)) {
-                $bot->answerCallbackQuery();
+                SafeTelegram::answerCallbackQuery($bot);
 
                 return true;
             }
@@ -223,7 +223,7 @@ final class MaterialsCallbackHandler
             $telegramId = (int) $actor['telegram_id'];
             $state = $deps->flows->get($telegramId);
             if ($state === null || ($state['flow'] ?? '') !== 'material_upload') {
-                $bot->answerCallbackQuery();
+                SafeTelegram::answerCallbackQuery($bot);
 
                 return true;
             }
@@ -240,7 +240,7 @@ final class MaterialsCallbackHandler
             $ctx['selected_parts'] = $selected;
             $deps->flows->set($telegramId, 'material_upload', $ctx);
 
-            $bot->answerCallbackQuery();
+            SafeTelegram::answerCallbackQuery($bot);
             $chatId = (int) ($ctx['part_picker_chat_id'] ?? 0);
             $messageId = (int) ($ctx['part_picker_message_id'] ?? 0);
             if ($chatId !== 0 && $messageId !== 0) {

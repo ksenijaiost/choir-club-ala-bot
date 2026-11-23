@@ -15,11 +15,7 @@ final class NutgramOutbound implements TelegramOutbound
 
     public function sendMessage(int $chatId, string $text, ?InlineKeyboardMarkup $replyMarkup = null): ?int
     {
-        $message = $this->bot->sendMessage(
-            text: $text,
-            chat_id: $chatId,
-            reply_markup: $replyMarkup,
-        );
+        $message = SafeTelegram::sendMessage($this->bot, $text, $chatId, $replyMarkup);
 
         return $message?->message_id;
     }

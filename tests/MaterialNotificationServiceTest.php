@@ -17,6 +17,8 @@ use App\Repositories\UserRepository;
 use App\Services\MaterialNotificationService;
 use App\Services\MaterialsService;
 use App\Tests\Support\RecordingTelegramOutbound;
+use App\Tests\Support\ThrowingRecordingTelegramOutbound;
+use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -157,6 +159,30 @@ final class MaterialNotificationServiceTest extends TestCase
         self::assertTrue($deps['users']->materialNotificationsEnabled($deps['soprano1']));
     }
 
+    public function testBlockedRecipientDoesNotStopBroadcast(): void
+    {
+        $blockedTg = 1008205296;
+        $outbound = new ThrowingRecordingTelegramOutbound($blockedTg);
+        $deps = $this->deps($outbound);
+        $deps['users']->create($blockedTg, 'Blocked', 'tenor', UserRole::MEMBER, UserStatus::ACTIVE);
+
+        $song = ['id' => $deps['songId'], 'title' => 'С блоком'];
+
+        $deps['notifier']->afterMaterialSaved(
+            $deps['uploader'],
+            [
+                'type' => MaterialType::NOTES,
+                'song' => $song,
+                'voice_parts' => [],
+            ],
+        );
+
+        $chatIds = array_column($outbound->recordedMessages(), 'chat_id');
+        self::assertContains($deps['soprano1Tg'], $chatIds);
+        self::assertContains($deps['tenorTg'], $chatIds);
+        self::assertNotContains($blockedTg, $chatIds);
+    }
+
     public function testOpenSongButtonInKeyboard(): void
     {
         $deps = $this->deps();
@@ -188,7 +214,7 @@ final class MaterialNotificationServiceTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function deps(): array
+    private function deps(?TelegramOutbound $outbound = null): array
     {
         $config = $this->testConfig();
         $pdo = Connection::make($config);
@@ -206,7 +232,7 @@ final class MaterialNotificationServiceTest extends TestCase
         $songId = $songs->create('Test song');
         $materials = new MaterialRepository($pdo);
         $service = new MaterialsService($materials, $songs, $texts);
-        $outbound = new RecordingTelegramOutbound();
+        $outbound ??= new RecordingTelegramOutbound();
         $notifier = new MaterialNotificationService($users, $texts, $service, $outbound);
 
         return [

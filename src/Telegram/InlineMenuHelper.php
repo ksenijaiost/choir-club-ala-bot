@@ -146,23 +146,13 @@ final class InlineMenuHelper
         ?ParseMode $parseMode = null,
     ): ?Message {
         if (!self::keyboardHasCloseButton($keyboard)) {
-            return $bot->sendMessage(
-                text: $text,
-                chat_id: $chatId,
-                reply_markup: $keyboard,
-                parse_mode: $parseMode,
-            );
+            return SafeTelegram::sendMessage($bot, $text, $chatId, $keyboard, $parseMode);
         }
 
         $chatId ??= $bot->chatId() ?? $ownerTelegramId;
         $menus->dismissPrevious($bot, $ownerTelegramId, $chatId);
 
-        $message = $bot->sendMessage(
-            text: $text,
-            chat_id: $chatId,
-            reply_markup: $keyboard,
-            parse_mode: $parseMode,
-        );
+        $message = SafeTelegram::sendMessage($bot, $text, $chatId, $keyboard, $parseMode);
 
         if ($message !== null) {
             $menus->recordOpen($ownerTelegramId, $chatId, $message->message_id);

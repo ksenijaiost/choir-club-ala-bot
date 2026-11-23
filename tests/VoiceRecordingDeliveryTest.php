@@ -77,6 +77,28 @@ final class VoiceRecordingDeliveryTest extends TestCase
         self::assertStringContainsString('https://t.me/c/1234567890/42', $warning);
     }
 
+    public function testMessageNotModifiedIsNotLoggedAsWarning(): void
+    {
+        $logFile = tempnam(sys_get_temp_dir(), 'choir-telegram-log-');
+        self::assertNotFalse($logFile);
+        $previous = ini_get('error_log');
+        ini_set('error_log', $logFile);
+
+        try {
+            \App\Telegram\TelegramApiErrors::logTelegramIssue(
+                'editMessageText',
+                new \SergiX44\Nutgram\Telegram\Exceptions\TelegramException('Bad Request: message is not modified', 400),
+            );
+        } finally {
+            ini_set('error_log', $previous !== false ? $previous : '');
+        }
+
+        $content = (string) file_get_contents($logFile);
+        unlink($logFile);
+
+        self::assertSame('', $content);
+    }
+
     public function testVoiceForbiddenNotLoggedAsExceptionWarning(): void
     {
         $logFile = tempnam(sys_get_temp_dir(), 'choir-telegram-log-');

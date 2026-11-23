@@ -31,6 +31,10 @@ final class NutgramErrorHooks
         });
 
         $bot->onApiError(function (Nutgram $bot, TelegramException $e) use ($config): void {
+            if (TelegramApiErrors::shouldSkipApiErrorLog($e)) {
+                return;
+            }
+
             ErrorLog::log($config, $e, ErrorLog::contextFromNutgram($bot));
         });
     }

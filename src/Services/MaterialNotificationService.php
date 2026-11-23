@@ -34,21 +34,25 @@ final class MaterialNotificationService
      */
     public function afterMaterialSaved(array $actor, array $result): void
     {
-        $type = (string) ($result['type'] ?? '');
-        $song = $result['song'] ?? null;
-        if (!is_array($song)) {
-            return;
+        try {
+            $type = (string) ($result['type'] ?? '');
+            $song = $result['song'] ?? null;
+            if (!is_array($song)) {
+                return;
+            }
+
+            $actorId = (int) ($actor['id'] ?? 0);
+            $voiceParts = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
+
+            match ($type) {
+                MaterialType::NOTES => $this->notifyEveryone($song, $actorId, 'notes'),
+                MaterialType::TRANSLIT => $this->notifyEveryone($song, $actorId, 'translit'),
+                MaterialType::RECORDING => $this->notifyRecording($song, $voiceParts, $actorId),
+                default => null,
+            };
+        } catch (\Throwable $e) {
+            error_log('[material-notify] afterMaterialSaved failed: ' . $e->getMessage());
         }
-
-        $actorId = (int) ($actor['id'] ?? 0);
-        $voiceParts = is_array($result['voice_parts'] ?? null) ? $result['voice_parts'] : [];
-
-        match ($type) {
-            MaterialType::NOTES => $this->notifyEveryone($song, $actorId, 'notes'),
-            MaterialType::TRANSLIT => $this->notifyEveryone($song, $actorId, 'translit'),
-            MaterialType::RECORDING => $this->notifyRecording($song, $voiceParts, $actorId),
-            default => null,
-        };
     }
 
     /**
@@ -200,8 +204,8 @@ final class MaterialNotificationService
                 return;
             }
 
-            if (self::isBlockedOrUnreachable($e)) {
-                error_log('[material-notify] blocked or unreachable chat_id=' . $telegramId . ': ' . $e->getMessage());
+            if (TelegramApiErrors::isRecipientUnreachable($e)) {
+                error_log('[material-notify] skip chat_id=' . $telegramId . ': ' . $e->getMessage());
 
                 return;
             }
@@ -212,8 +216,8 @@ final class MaterialNotificationService
                 return;
             }
 
-            if (self::isBlockedOrUnreachable($e)) {
-                error_log('[material-notify] blocked or unreachable chat_id=' . $telegramId . ': ' . $e->getMessage());
+            if (TelegramApiErrors::isRecipientUnreachable($e)) {
+                error_log('[material-notify] skip chat_id=' . $telegramId . ': ' . $e->getMessage());
 
                 return;
             }
@@ -222,18 +226,5 @@ final class MaterialNotificationService
         }
 
         usleep(self::PAUSE_MICROSECONDS);
-    }
-
-    private static function isBlockedOrUnreachable(\Throwable $e): bool
-    {
-        $message = $e->getMessage();
-        if ($e instanceof TelegramException && ($e->getCode() === 403 || $e->getCode() === 400)) {
-            return true;
-        }
-
-        return str_contains($message, 'bot was blocked')
-            || str_contains($message, 'user is deactivated')
-            || str_contains($message, 'chat not found')
-            || str_contains($message, 'PEER_ID_INVALID');
     }
 }
