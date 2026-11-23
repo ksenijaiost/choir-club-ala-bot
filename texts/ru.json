@@ -372,7 +372,7 @@
     "recording_source_set_button": "🔗 Ссылка на оригинал",
     "recording_source_clear_button": "Удалить ссылку",
     "recording_source_url_prompt": "Пришли одним сообщением ссылку на сообщение в чате хора (https://t.me/…).",
-    "recording_source_url_invalid": "Нужна ссылка на сообщение Telegram: https://t.me/c/… или https://t.me/имя_чата/номер",
+    "recording_source_url_invalid": "Нужна ссылка на сообщение Telegram, например https://t.me/c/1234567890/123 или https://t.me/c/1234567890/45/123 (сообщение в теме)",
     "recording_source_url_saved": "Ссылка на оригинал сохранена.",
     "recording_source_url_cleared": "Ссылка удалена.",
     "voice_forbidden_warning": "⚠️ Не удалось отправить {count} записей: они загружены как голосовые сообщения, а у тебя, скорее всего, запрещено получать голосовые. Разреши их боту: Настройки → Конфиденциальность → Голосовые сообщения → добавь бота в исключения «Всегда разрешать». Потом запроси записи ещё раз.",
