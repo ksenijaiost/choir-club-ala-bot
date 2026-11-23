@@ -86,6 +86,16 @@ final class PaymentRecordRepository
         $stmt->execute([$userId, $year, $month, $comment]);
     }
 
+    public function unconfirmByConductor(int $userId, int $year, int $month): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE payment_records
+             SET conductor_confirmed_at = NULL, confirmed_by_user_id = NULL
+             WHERE user_id = ? AND period_year = ? AND period_month = ?'
+        );
+        $stmt->execute([$userId, $year, $month]);
+    }
+
     public function confirmByConductor(int $userId, int $year, int $month, int $conductorUserId): void
     {
         $existing = $this->find($userId, $year, $month);

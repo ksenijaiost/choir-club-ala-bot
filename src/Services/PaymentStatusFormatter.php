@@ -36,4 +36,24 @@ final class PaymentStatusFormatter
 
         return $texts->get('payment.status_unpaid');
     }
+
+    /**
+     * @param array<string, mixed>|null $row
+     */
+    public static function emojiForRecord(PaymentRecordRepository $payments, ?array $row): string
+    {
+        if ($payments->isConductorConfirmed($row)) {
+            return '✅';
+        }
+
+        if ($payments->hasMemberClaim($row)) {
+            return '⏳';
+        }
+
+        if ($payments->isMemberDeferred($row)) {
+            return '🕓';
+        }
+
+        return '❌';
+    }
 }

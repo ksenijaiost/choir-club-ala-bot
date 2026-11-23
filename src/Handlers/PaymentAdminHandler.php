@@ -29,12 +29,19 @@ final class PaymentAdminHandler
         $tz = new \DateTimeZone($deps->config->timezone);
         $local = Clock::now($deps->config)->setTimezone($tz);
 
-        $keyboard = InlineKeyboardMarkup::make()->addRow(
-            InlineKeyboardButton::make(
-                $deps->texts->get('payment.reminder_texts_button'),
-                callback_data: PaymentReminderTextAdminHandler::CB_HOME,
-            ),
-        );
+        $keyboard = InlineKeyboardMarkup::make()
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('payment.admin_member_payments_button'),
+                    callback_data: 'pa:p:0',
+                ),
+            )
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $deps->texts->get('payment.reminder_texts_button'),
+                    callback_data: PaymentReminderTextAdminHandler::CB_HOME,
+                ),
+            );
         for ($i = 0; $i < 3; $i++) {
             $cursor = $local->modify('-' . $i . ' months');
             $year = (int) $cursor->format('Y');
@@ -65,6 +72,10 @@ final class PaymentAdminHandler
         array $actor,
         string $data,
     ): bool {
+        if (str_starts_with($data, 'pa:')) {
+            return PaymentAdminMemberHandler::handleCallback($bot, $deps, $access, $actor, $data);
+        }
+
         if (str_starts_with($data, 'pay:rt:')) {
             $actorTelegramId = (int) ($actor['telegram_id'] ?? 0);
 
