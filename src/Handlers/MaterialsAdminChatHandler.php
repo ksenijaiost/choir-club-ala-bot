@@ -19,8 +19,10 @@ final class MaterialsAdminChatHandler
         TextRepository $texts,
         AccessControl $access,
         MaterialsDeps $deps,
+        ?ProgramDeps $programDeps = null,
+        ?BroadcastDeps $broadcastDeps = null,
     ): void {
-        $bot->onMessage(function (Nutgram $bot) use ($access, $deps): void {
+        $bot->onMessage(function (Nutgram $bot) use ($access, $deps, $programDeps, $broadcastDeps): void {
             $chat = $bot->chat();
             if ($chat === null || !$access->isAdminChatId($chat->id)) {
                 return;
@@ -80,7 +82,31 @@ final class MaterialsAdminChatHandler
                     return;
                 }
 
-                MaterialsFlowHandler::handleAdminChatText($bot, $deps, $telegramId, $text);
+                if (MaterialsFlowHandler::handleAdminChatText($bot, $deps, $telegramId, $text)) {
+                    return;
+                }
+
+                if ($programDeps !== null && ProgramAdminHandler::handleFlowMessage(
+                    $bot,
+                    $programDeps,
+                    $access,
+                    $telegramId,
+                    $text,
+                    (int) $chat->id,
+                )) {
+                    return;
+                }
+
+                if ($broadcastDeps !== null && BroadcastWizardHandler::handleFlowMessage(
+                    $bot,
+                    $broadcastDeps,
+                    $access,
+                    $telegramId,
+                    $text,
+                    (int) $chat->id,
+                )) {
+                    return;
+                }
             }
         });
     }

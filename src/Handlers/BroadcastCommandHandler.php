@@ -6,7 +6,6 @@ namespace App\Handlers;
 
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
-use App\Services\AdminChatCommandRedirect;
 use SergiX44\Nutgram\Nutgram;
 
 final class BroadcastCommandHandler
@@ -24,14 +23,13 @@ final class BroadcastCommandHandler
                 if ($user === null || !$access->canManageBroadcasts($user)) {
                     return;
                 }
-                AdminChatCommandRedirect::notifyOpenedInPrivate(
+                BroadcastWizardHandler::start(
                     $bot,
-                    $deps->texts,
+                    $deps,
+                    $access,
+                    $user,
                     (int) $chatId,
-                    (int) ($user['telegram_id'] ?? 0),
-                    'broadcast.admin_chat_open_button',
-                    $deps->texts->get('broadcast.admin_chat_open_action'),
-                    'opn:bc',
+                    self::commandReplyTo($bot),
                 );
 
                 return;
@@ -57,15 +55,7 @@ final class BroadcastCommandHandler
                 if ($user === null || !$access->canManageBroadcasts($user)) {
                     return;
                 }
-                AdminChatCommandRedirect::notifyOpenedInPrivate(
-                    $bot,
-                    $deps->texts,
-                    (int) $chatId,
-                    (int) ($user['telegram_id'] ?? 0),
-                    'broadcast.admin_chat_open_polls_button',
-                    $deps->texts->get('broadcast.admin_chat_open_polls_action'),
-                    'opn:polls',
-                );
+                BroadcastAdminHandler::openList($bot, $deps, $access, $user, true);
 
                 return;
             }
@@ -82,5 +72,12 @@ final class BroadcastCommandHandler
 
             BroadcastAdminHandler::openList($bot, $deps, $access, $user, true);
         });
+    }
+
+    private static function commandReplyTo(Nutgram $bot): ?int
+    {
+        $messageId = (int) ($bot->message()?->message_id ?? 0);
+
+        return $messageId > 0 ? $messageId : null;
     }
 }

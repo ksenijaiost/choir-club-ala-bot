@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
+use App\Telegram\CallbackUi;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
 
@@ -31,6 +32,12 @@ final class AdminChatOpenerHandler
             return true;
         }
 
+        $callbackMessage = CallbackUi::callbackMessage($bot);
+        $targetChatId = $callbackMessage !== null
+            ? (int) $callbackMessage->chat->id
+            : ($bot->chatId() ?? null);
+        $replyTo = $callbackMessage !== null ? (int) $callbackMessage->message_id : null;
+
         if ($data === 'opn:prg') {
             if ($programDeps === null || !$access->canManageBroadcasts($actor)) {
                 SafeTelegram::answerCallbackQuery($bot);
@@ -38,7 +45,7 @@ final class AdminChatOpenerHandler
                 return true;
             }
             SafeTelegram::answerCallbackQuery($bot);
-            ProgramAdminHandler::openHome($bot, $programDeps, $access, $actor);
+            ProgramAdminHandler::openHome($bot, $programDeps, $access, $actor, $targetChatId, $replyTo);
 
             return true;
         }
@@ -50,7 +57,7 @@ final class AdminChatOpenerHandler
                 return true;
             }
             SafeTelegram::answerCallbackQuery($bot);
-            BroadcastWizardHandler::start($bot, $broadcastDeps, $access, $actor);
+            BroadcastWizardHandler::start($bot, $broadcastDeps, $access, $actor, $targetChatId, $replyTo);
 
             return true;
         }

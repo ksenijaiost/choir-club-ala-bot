@@ -6,7 +6,6 @@ namespace App\Handlers;
 
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
-use App\Services\AdminChatCommandRedirect;
 use SergiX44\Nutgram\Nutgram;
 
 final class ProgramCommandHandler
@@ -24,14 +23,14 @@ final class ProgramCommandHandler
                 if ($user === null || !$access->canManageBroadcasts($user)) {
                     return;
                 }
-                AdminChatCommandRedirect::notifyOpenedInPrivate(
+                $messageId = (int) ($bot->message()?->message_id ?? 0);
+                ProgramAdminHandler::openHome(
                     $bot,
-                    $deps->texts,
+                    $deps,
+                    $access,
+                    $user,
                     (int) $chatId,
-                    (int) ($user['telegram_id'] ?? 0),
-                    'programs.admin_chat_open_button',
-                    $deps->texts->get('programs.admin_chat_open_action'),
-                    'opn:prg',
+                    $messageId > 0 ? $messageId : null,
                 );
 
                 return;

@@ -17,7 +17,7 @@ final class MenuReplyHelper
         SafeTelegram::sendMessage(
             $bot,
             $text,
-            replyMarkup: MenuKeyboard::forUser($texts, $user),
+            replyMarkup: MenuKeyboard::forCurrentChat($bot, $texts, $user),
         );
     }
 }

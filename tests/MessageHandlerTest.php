@@ -79,6 +79,33 @@ final class MessageHandlerTest extends TestCase
         self::assertSame('Тест Пользователь', $user['display_name'] ?? '');
     }
 
+    public function testActiveUserUnknownTextInPrivateGetsHintWithMenu(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $config = $this->testConfig();
+        $pdo = Connection::make($config);
+        (new Migrator($pdo, 'sqlite'))->migrate();
+
+        $users = new UserRepository($pdo);
+        $users->create(self::TELEGRAM_ID, 'Иван', 'tenor', UserRole::MEMBER, UserStatus::ACTIVE);
+
+        $schedule = $this->scheduleDeps($config, $pdo, $texts, $users);
+        $attendance = $this->attendanceDeps($config, $pdo, $texts, $users);
+        $payments = $this->paymentDeps($config, $pdo, $users, $texts);
+        $access = new AccessControl($config);
+
+        $bot = Nutgram::fake();
+        $bot->setCommonUser($this->makeUser());
+        $bot->setCommonChat($this->makeChat(self::TELEGRAM_ID, ChatType::PRIVATE));
+
+        MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $payments);
+
+        $bot->hearText('Случайный текст в личке')
+            ->willStartConversation()
+            ->reply()
+            ->assertReplyMessage(['text' => $texts->get('common.unknown_menu_hint')]);
+    }
+
     public function testNonPrivateChatTextIsIgnored(): void
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');

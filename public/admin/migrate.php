@@ -7,6 +7,7 @@ use App\Database\Migrator;
 use App\Http\AdminGate;
 use App\Repositories\BotSettingsRepository;
 use App\Services\AdminChatBotCommands;
+use App\Services\AdminChatKeyboardRemoval;
 use App\Services\AdminChatResolver;
 use App\Services\PrivateChatBotCommands;
 
@@ -59,6 +60,12 @@ try {
                 echo "Admin chat commands registered for chat {$adminChatId}.\n";
             } catch (\Throwable $e) {
                 echo 'Admin chat commands registration failed: ' . $e->getMessage() . "\n";
+            }
+            try {
+                AdminChatKeyboardRemoval::removeReplyKeyboardOnce($bot, $texts, $settings, $adminChatId);
+                echo "Admin chat reply keyboard removal attempted.\n";
+            } catch (\Throwable $e) {
+                echo 'Admin chat keyboard removal failed: ' . $e->getMessage() . "\n";
             }
         }
     }

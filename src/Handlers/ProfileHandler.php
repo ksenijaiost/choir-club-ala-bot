@@ -292,7 +292,7 @@ final class ProfileHandler
             $user = $users->findById((int) $user['id']) ?? $user;
             $bot->sendMessage(
                 $texts->get('profile.part_updated', ['part' => $texts->get('parts.' . $part)]),
-                reply_markup: MenuKeyboard::forUser($texts, $user),
+                reply_markup: MenuKeyboard::forCurrentChat($bot, $texts, $user),
             );
 
             return true;

@@ -47,6 +47,28 @@ final class InteractiveMenuService
         $this->openMenus->delete($telegramId, $chatId);
     }
 
+    public function callbackAllowed(Nutgram $bot, int $actorTelegramId, string $unavailableText): bool
+    {
+        $message = CallbackUi::callbackMessage($bot);
+        if ($message === null) {
+            return true;
+        }
+
+        $chatId = (int) $message->chat->id;
+        if ($chatId > 0) {
+            return true;
+        }
+
+        $stored = $this->openMenus->find($actorTelegramId, $chatId);
+        if ($stored === null || $stored['message_id'] !== (int) $message->message_id) {
+            SafeTelegram::answerCallbackQuery($bot, ['text' => $unavailableText]);
+
+            return false;
+        }
+
+        return true;
+    }
+
     public function removeMessage(Nutgram $bot, int $chatId, int $messageId): void
     {
         try {

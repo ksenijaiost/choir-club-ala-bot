@@ -8,6 +8,7 @@ use App\Services\AccessControl;
 use App\Services\ProgramDateParser;
 use App\Support\SqlPagination;
 use App\Telegram\CallbackUi;
+use App\Telegram\GroupFlowSession;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
@@ -28,8 +29,14 @@ final class ProgramAdminHandler
     /**
      * @param array<string, mixed> $actor
      */
-    public static function openHome(Nutgram $bot, ProgramDeps $deps, AccessControl $access, array $actor): void
-    {
+    public static function openHome(
+        Nutgram $bot,
+        ProgramDeps $deps,
+        AccessControl $access,
+        array $actor,
+        ?int $targetChatId = null,
+        ?int $replyToMessageId = null,
+    ): void {
         if (!$access->canManageBroadcasts($actor)) {
             SafeTelegram::sendMessage($bot, $deps->texts->get('programs.forbidden'));
 
@@ -38,12 +45,14 @@ final class ProgramAdminHandler
 
         $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
         $built = self::buildActiveList($deps, 0);
+        $chatId = $targetChatId ?? $bot->chatId() ?? $ownerTelegramId;
         InlineMenuHelper::sendInteractiveMenu(
             $bot,
             $deps->interactiveMenus,
             $ownerTelegramId,
             $built['text'],
             $built['keyboard'],
+            $chatId,
         );
     }
 
@@ -91,10 +100,20 @@ final class ProgramAdminHandler
             return true;
         }
 
+        if ($data === 'prg:cn') {
+            SafeTelegram::answerCallbackQuery($bot);
+            $state = $deps->flows->get($actorTg);
+            $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
+            $deps->flows->clear($actorTg);
+            self::sendActorFeedback($bot, $deps, $actor, $deps->texts->get('programs.flow_cancelled'), $ctx);
+
+            return true;
+        }
+
         if ($data === 'prg:cr') {
             SafeTelegram::answerCallbackQuery($bot);
-            $deps->flows->set($actorTg, self::FLOW_CREATE_TITLE, []);
-            SafeTelegram::sendMessage($bot, $deps->texts->get('programs.prompt_create_title'));
+            $ctx = [];
+            self::beginTextFlow($bot, $deps, $access, $actorTg, self::FLOW_CREATE_TITLE, $ctx, 'programs.prompt_create_title');
 
             return true;
         }
@@ -149,16 +168,16 @@ final class ProgramAdminHandler
 
         if (preg_match('/^prg:rn:(\d+)$/', $data, $m) === 1) {
             SafeTelegram::answerCallbackQuery($bot);
-            $deps->flows->set($actorTg, self::FLOW_RENAME, ['program_id' => (int) $m[1]]);
-            SafeTelegram::sendMessage($bot, $deps->texts->get('programs.prompt_rename'));
+            $ctx = ['program_id' => (int) $m[1]];
+            self::beginTextFlow($bot, $deps, $access, $actorTg, self::FLOW_RENAME, $ctx, 'programs.prompt_rename');
 
             return true;
         }
 
         if (preg_match('/^prg:dt:(\d+)$/', $data, $m) === 1) {
             SafeTelegram::answerCallbackQuery($bot);
-            $deps->flows->set($actorTg, self::FLOW_SET_DATE, ['program_id' => (int) $m[1]]);
-            SafeTelegram::sendMessage($bot, $deps->texts->get('programs.prompt_set_date'));
+            $ctx = ['program_id' => (int) $m[1]];
+            self::beginTextFlow($bot, $deps, $access, $actorTg, self::FLOW_SET_DATE, $ctx, 'programs.prompt_set_date');
 
             return true;
         }
@@ -245,6 +264,7 @@ final class ProgramAdminHandler
         AccessControl $access,
         int $telegramId,
         string $text,
+        ?int $chatId = null,
     ): bool {
         $state = $deps->flows->get($telegramId);
         if ($state === null) {
@@ -253,6 +273,10 @@ final class ProgramAdminHandler
 
         $flow = (string) ($state['flow'] ?? '');
         $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
+        if (!GroupFlowSession::matchesChat($ctx, $chatId)) {
+            return false;
+        }
+
         $trimmed = trim($text);
 
         if ($flow === self::FLOW_CREATE_TITLE) {
@@ -266,8 +290,15 @@ final class ProgramAdminHandler
                 return true;
             }
             $programId = $deps->programs->create($trimmed, (int) $actor['id'], null);
-            $deps->flows->set($telegramId, self::FLOW_CREATE_DATE, ['program_id' => $programId]);
-            SafeTelegram::sendMessage($bot, $deps->texts->get('programs.prompt_create_date'));
+            $ctx['program_id'] = $programId;
+            $deps->flows->set($telegramId, self::FLOW_CREATE_DATE, $ctx);
+            GroupFlowSession::sendTextPrompt(
+                $bot,
+                $deps->texts,
+                $deps->texts->get('programs.prompt_create_date'),
+                $ctx,
+                'prg:cn',
+            );
 
             return true;
         }
@@ -281,7 +312,7 @@ final class ProgramAdminHandler
             }
             $dateIso = self::parseDateInput($deps, $trimmed);
             if ($dateIso === false) {
-                SafeTelegram::sendMessage($bot, $deps->texts->get('programs.date_invalid'));
+                self::sendFlowPrompt($bot, $deps, $ctx, 'programs.date_invalid');
 
                 return true;
             }
@@ -291,7 +322,17 @@ final class ProgramAdminHandler
             $deps->flows->clear($telegramId);
             $actor = $deps->users->findByTelegramId($telegramId);
             if ($actor !== null) {
-                self::openHome($bot, $deps, $access, $actor);
+                if (GroupFlowSession::isGroupContext($ctx)) {
+                    self::openHome(
+                        $bot,
+                        $deps,
+                        $access,
+                        $actor,
+                        GroupFlowSession::targetChatId($ctx, $bot, $telegramId),
+                    );
+                } else {
+                    self::openHome($bot, $deps, $access, $actor);
+                }
             }
 
             return true;
@@ -306,7 +347,7 @@ final class ProgramAdminHandler
             $deps->flows->clear($telegramId);
             $actor = $deps->users->findByTelegramId($telegramId);
             if ($actor !== null) {
-                MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('programs.renamed'));
+                self::sendActorFeedback($bot, $deps, $actor, $deps->texts->get('programs.renamed'), $ctx);
             } else {
                 SafeTelegram::sendMessage($bot, $deps->texts->get('programs.renamed'));
             }
@@ -323,7 +364,7 @@ final class ProgramAdminHandler
             }
             $dateIso = self::parseDateInput($deps, $trimmed);
             if ($dateIso === false) {
-                SafeTelegram::sendMessage($bot, $deps->texts->get('programs.date_invalid'));
+                self::sendFlowPrompt($bot, $deps, $ctx, 'programs.date_invalid');
 
                 return true;
             }
@@ -331,7 +372,7 @@ final class ProgramAdminHandler
             $deps->flows->clear($telegramId);
             $actor = $deps->users->findByTelegramId($telegramId);
             if ($actor !== null) {
-                MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $deps->texts->get('programs.date_saved'));
+                self::sendActorFeedback($bot, $deps, $actor, $deps->texts->get('programs.date_saved'), $ctx);
             } else {
                 SafeTelegram::sendMessage($bot, $deps->texts->get('programs.date_saved'));
             }
@@ -340,6 +381,91 @@ final class ProgramAdminHandler
         }
 
         return false;
+    }
+
+    /**
+     * @param array<string, mixed> $actor
+     * @param array<string, mixed> $ctx
+     */
+    private static function sendActorFeedback(
+        Nutgram $bot,
+        ProgramDeps $deps,
+        array $actor,
+        string $text,
+        array $ctx,
+    ): void {
+        if (GroupFlowSession::isGroupContext($ctx)) {
+            $ownerTelegramId = (int) ($actor['telegram_id'] ?? $bot->userId() ?? 0);
+            SafeTelegram::sendMessage(
+                $bot,
+                $text,
+                GroupFlowSession::targetChatId($ctx, $bot, $ownerTelegramId),
+            );
+
+            return;
+        }
+
+        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $actor, $text);
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    private static function sendFlowPrompt(Nutgram $bot, ProgramDeps $deps, array $ctx, string $textKey): void
+    {
+        if (GroupFlowSession::isGroupContext($ctx)) {
+            GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($textKey), $ctx, 'prg:cn');
+
+            return;
+        }
+
+        SafeTelegram::sendMessage($bot, $deps->texts->get($textKey));
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    private static function beginTextFlow(
+        Nutgram $bot,
+        ProgramDeps $deps,
+        AccessControl $access,
+        int $actorTg,
+        string $flow,
+        array $ctx,
+        string $promptKey,
+    ): void {
+        self::bindGroupFromBot($bot, $access, $ctx, $actorTg);
+        $deps->flows->set($actorTg, $flow, $ctx);
+        GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($promptKey), $ctx, 'prg:cn');
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    private static function bindGroupFromBot(
+        Nutgram $bot,
+        AccessControl $access,
+        array &$ctx,
+        int $ownerTelegramId,
+        ?int $targetChatId = null,
+        ?int $replyToMessageId = null,
+    ): void {
+        $chatId = $targetChatId ?? $bot->chatId();
+        if ($chatId === null || !$access->isAdminChatId((int) $chatId)) {
+            return;
+        }
+
+        if ($replyToMessageId === null) {
+            $callbackMessage = CallbackUi::callbackMessage($bot);
+            if ($callbackMessage !== null) {
+                $replyToMessageId = (int) $callbackMessage->message_id;
+            } else {
+                $commandMessageId = (int) ($bot->message()?->message_id ?? 0);
+                $replyToMessageId = $commandMessageId > 0 ? $commandMessageId : null;
+            }
+        }
+
+        GroupFlowSession::bindGroup($ctx, (int) $chatId, $ownerTelegramId, $replyToMessageId);
     }
 
     /**
