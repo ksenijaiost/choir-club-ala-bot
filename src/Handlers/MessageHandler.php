@@ -237,7 +237,10 @@ final class MessageHandler
                     return;
                 }
 
-                if (!in_array($text, MenuKeyboard::allMenuLabels($texts), true)) {
+                if (
+                    MenuKeyboard::isPrivateChat($bot)
+                    && !in_array($text, MenuKeyboard::allMenuLabels($texts), true)
+                ) {
                     MenuReplyHelper::sendWithMenu($bot, $texts, $user, $texts->get('common.unknown_menu_hint'));
                 }
 

@@ -113,7 +113,7 @@ final class StartHandler
             $name = (string) ($user['display_name'] ?? '');
             $bot->sendMessage(
                 text: $texts->get('registration.already_registered', ['name' => $name]),
-                reply_markup: MenuKeyboard::forUser($texts, $user),
+                reply_markup: MenuKeyboard::forCurrentChat($bot, $texts, $user),
             );
         }
     }

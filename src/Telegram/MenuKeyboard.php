@@ -6,11 +6,37 @@ namespace App\Telegram;
 
 use App\Domain\UserRole;
 use App\Text\TextRepository;
+use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ChatType;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\KeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\ReplyKeyboardMarkup;
 
 final class MenuKeyboard
 {
+    public static function isPrivateChat(Nutgram $bot): bool
+    {
+        $chat = $bot->chat() ?? $bot->message()?->chat;
+        if ($chat !== null) {
+            return $chat->type === ChatType::PRIVATE;
+        }
+
+        $chatId = $bot->chatId();
+
+        return $chatId !== null && $chatId > 0;
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public static function forCurrentChat(Nutgram $bot, TextRepository $texts, array $user): ?ReplyKeyboardMarkup
+    {
+        if (!self::isPrivateChat($bot)) {
+            return null;
+        }
+
+        return self::forUser($texts, $user);
+    }
+
     /**
      * @param array<string, mixed> $user
      */
