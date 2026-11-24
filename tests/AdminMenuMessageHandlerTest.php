@@ -231,31 +231,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
         TextRepository $texts,
         UserRepository $users,
     ): AttendanceDeps {
-        $rehearsals = new RehearsalRepository($pdo);
-        $flows = new UserFlowRepository($pdo);
-        $marks = new AttendanceMarkRepository($pdo);
-        $outbound = new RecordingTelegramOutbound();
-        $recipients = new NotificationRecipientResolver($config, $users);
-        $blocks = new MemberBlockService($users, new BlockEventRepository($pdo));
-        $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $service = new AttendanceService($marks, $users, $discipline, $recalculator);
-
-        return new AttendanceDeps(
-            $config,
-            $users,
-            $rehearsals,
-            $marks,
-            $flows,
-            $service,
-            new AttendanceMessageFactory($texts),
-            new AttendanceConductorNotifier($recipients, $texts, $outbound),
-            $recalculator,
-            new AttendanceHistoryPresenter($texts),
-            $texts,
-            new CheckInSessionRepository($pdo),
-                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
-        );
+        return \App\Tests\Support\AttendanceDepsFactory::make($config, $pdo, $texts, $users);
     }
 
     private function materialsDeps(

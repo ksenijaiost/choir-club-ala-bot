@@ -6,6 +6,10 @@ namespace App\Jobs;
 
 use App\Clock;
 use App\Config;
+use App\Domain\AttendanceMark;
+use App\Domain\AttendanceSource;
+use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\DayBeforeReminderDeliveryRepository;
 use App\Repositories\JobDeliveryRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\UserRepository;
@@ -17,7 +21,9 @@ final class DayBeforeReminderJob
     public function __construct(
         private readonly RehearsalRepository $rehearsals,
         private readonly UserRepository $users,
+        private readonly AttendanceMarkRepository $marks,
         private readonly JobDeliveryRepository $deliveries,
+        private readonly DayBeforeReminderDeliveryRepository $reminderDeliveries,
         private readonly AttendanceMessageFactory $messages,
         private readonly TelegramOutbound $outbound,
     ) {
@@ -47,15 +53,39 @@ final class DayBeforeReminderJob
             foreach ($this->users->listActiveParticipants() as $user) {
                 $userId = (int) $user['id'];
                 $jobKey = 'day_before:' . $rehearsalId . ':' . $userId;
-                if (!$this->deliveries->tryClaim($jobKey, 'day_before_reminder', $rehearsalId)) {
+                if ($this->deliveries->wasDelivered($jobKey)) {
                     continue;
                 }
 
-                $this->outbound->sendMessage((int) $user['telegram_id'], $text, $keyboard);
-                $sent++;
+                if ($this->shouldSkipEarlyAbsence($rehearsalId, $userId)) {
+                    continue;
+                }
+
+                try {
+                    $this->outbound->sendMessage((int) $user['telegram_id'], $text, $keyboard);
+                    $this->deliveries->record($jobKey, 'day_before_reminder', $rehearsalId);
+                    $this->reminderDeliveries->recordSent($rehearsalId, $userId);
+                    $sent++;
+                } catch (\Throwable $e) {
+                    $this->reminderDeliveries->recordFailed($rehearsalId, $userId, $e->getMessage());
+                }
             }
         }
 
         return ['sent' => $sent, 'skipped_hour' => false];
+    }
+
+    private function shouldSkipEarlyAbsence(int $rehearsalId, int $userId): bool
+    {
+        $mark = $this->marks->find($rehearsalId, $userId);
+        if ($mark === null) {
+            return false;
+        }
+
+        $markCode = (string) ($mark['mark'] ?? '');
+        $source = (string) ($mark['source'] ?? '');
+
+        return in_array($markCode, [AttendanceMark::WARNED, AttendanceMark::UNEXCUSED], true)
+            && $source !== AttendanceSource::DAY_BEFORE;
     }
 }

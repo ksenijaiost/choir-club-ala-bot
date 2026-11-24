@@ -29,6 +29,7 @@ use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Tests\Support\AttendanceDepsFactory;
 use App\Tests\Support\RecordingTelegramOutbound;
 use App\Text\TextRepository;
 use PHPUnit\Framework\TestCase;
@@ -148,30 +149,6 @@ final class AttendanceDayBeforeRevertTest extends TestCase
         UserRepository $users,
         ?RecordingTelegramOutbound $outbound = null,
     ): AttendanceDeps {
-        $rehearsals = new RehearsalRepository($pdo);
-        $flows = new UserFlowRepository($pdo);
-        $marks = new AttendanceMarkRepository($pdo);
-        $outbound ??= new RecordingTelegramOutbound();
-        $recipients = new NotificationRecipientResolver($config, $users);
-        $blocks = new MemberBlockService($users, new BlockEventRepository($pdo));
-        $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $service = new AttendanceService($marks, $users, $discipline, $recalculator);
-
-        return new AttendanceDeps(
-            $config,
-            $users,
-            $rehearsals,
-            $marks,
-            $flows,
-            $service,
-            new AttendanceMessageFactory($texts),
-            new AttendanceConductorNotifier($recipients, $texts, $outbound),
-            $recalculator,
-            new AttendanceHistoryPresenter($texts),
-            $texts,
-            new CheckInSessionRepository($pdo),
-                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
-        );
+        return AttendanceDepsFactory::make($config, $pdo, $texts, $users, $outbound);
     }
 }

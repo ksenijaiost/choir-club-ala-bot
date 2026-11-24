@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Clock;
 use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
+use App\Domain\RehearsalRsvpAnswer;
 use App\Domain\UserStatus;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
@@ -98,6 +99,7 @@ final class AttendanceCallbackHandler
         $userId = (int) $user['id'];
         $existing = $deps->marks->find($rehearsalId, $userId);
         if ($yes) {
+            $deps->rsvp->upsert($rehearsalId, $userId, RehearsalRsvpAnswer::YES);
             if ($existing !== null) {
                 $mark = (string) ($existing['mark'] ?? '');
                 if ($mark === AttendanceMark::WARNED) {
@@ -125,11 +127,13 @@ final class AttendanceCallbackHandler
             return;
         }
 
-        if ($existing !== null) {
+        if ($existing !== null && ($existing['mark'] ?? '') !== AttendanceMark::UNEXCUSED) {
             $bot->answerCallbackQuery(text: $deps->texts->get('absence.already_marked'), show_alert: true);
 
             return;
         }
+
+        $deps->rsvp->upsert($rehearsalId, $userId, RehearsalRsvpAnswer::NO);
 
         $bot->answerCallbackQuery();
         CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('common.inline_answer_no'));
