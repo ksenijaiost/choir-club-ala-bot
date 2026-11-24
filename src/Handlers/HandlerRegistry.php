@@ -7,6 +7,9 @@ namespace App\Handlers;
 use App\Config;
 use App\Repositories\BroadcastRepository;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\DayBeforeReminderDeliveryRepository;
+use App\Repositories\RehearsalRsvpNudgeRepository;
+use App\Repositories\RehearsalRsvpRepository;
 use App\Repositories\CheckInSessionRepository;
 use App\Repositories\BlockEventRepository;
 use App\Repositories\BotSettingsRepository;
@@ -37,6 +40,9 @@ use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\RehearsalRsvpNudgeService;
+use App\Services\RehearsalRsvpStatusPresenter;
+use App\Services\RehearsalRsvpStatusService;
 use App\Services\BroadcastDeliveryService;
 use App\Services\BroadcastKeyboardBuilder;
 use App\Services\BroadcastStatusPresenter;
@@ -197,6 +203,7 @@ final class HandlerRegistry
 
         $programRepo = new ProgramRepository($pdo);
         $programMessages = new ProgramMessageBuilder($texts, $programRepo);
+        $programNotifyDeliveries = new \App\Repositories\ProgramNotifyDeliveryRepository($pdo);
         $programDelivery = new ProgramDeliveryService(
             $config,
             $users,
@@ -204,6 +211,7 @@ final class HandlerRegistry
             $programMessages,
             $texts,
             $outbound,
+            $programNotifyDeliveries,
         );
         $programDeps = new ProgramDeps(
             $config,
@@ -217,6 +225,20 @@ final class HandlerRegistry
             $interactiveMenus,
         );
 
+        $rsvpRepo = new RehearsalRsvpRepository($pdo);
+        $dayBeforeDeliveries = new DayBeforeReminderDeliveryRepository($pdo);
+        $rsvpNudgeRepo = new RehearsalRsvpNudgeRepository($pdo);
+        $messageFactory = new AttendanceMessageFactory($texts);
+        $rsvpNudge = new RehearsalRsvpNudgeService(
+            $rsvpNudgeRepo,
+            $rsvpRepo,
+            $dayBeforeDeliveries,
+            $rehearsals,
+            $users,
+            $messageFactory,
+            $outbound,
+        );
+
         $attendance = new AttendanceDeps(
             $config,
             $users,
@@ -224,13 +246,18 @@ final class HandlerRegistry
             $marks,
             $flows,
             $attendanceService,
-            new AttendanceMessageFactory($texts),
+            $messageFactory,
             $conductorNotifier,
             $recalculator,
             new AttendanceHistoryPresenter($texts),
             $texts,
             new CheckInSessionRepository($pdo),
             $interactiveMenus,
+            $rsvpRepo,
+            $dayBeforeDeliveries,
+            new RehearsalRsvpStatusService($rsvpRepo, $dayBeforeDeliveries, $marks),
+            new RehearsalRsvpStatusPresenter($texts),
+            $rsvpNudge,
         );
 
         CallbackQueryHandler::register(
@@ -262,6 +289,7 @@ final class HandlerRegistry
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService, $interactiveMenus);
         BroadcastCommandHandler::register($bot, $broadcast, $access, $users);
         ProgramCommandHandler::register($bot, $programDeps, $access, $users);
+        RehearsalRsvpCommandHandler::register($bot, $attendance, $access, $users);
         StatsCommandHandler::register($bot, $texts, $users, $access, $statsPresenter);
         PrivateMenuCommandHandler::register(
             $bot,

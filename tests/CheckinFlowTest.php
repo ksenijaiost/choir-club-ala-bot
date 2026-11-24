@@ -174,27 +174,7 @@ final class CheckinFlowTest extends TestCase
         $users = new UserRepository($pdo);
         $users->create(self::MEMBER_TG, 'Участник', 'tenor', UserRole::MEMBER, UserStatus::ACTIVE);
         $outbound ??= new RecordingTelegramOutbound();
-        $recipients = new NotificationRecipientResolver($config, $users);
-        $blocks = new MemberBlockService($users, new BlockEventRepository($pdo));
-        $recalculator = new ConsecutiveUnexcusedRecalculator(new AttendanceMarkRepository($pdo), $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $service = new AttendanceService(new AttendanceMarkRepository($pdo), $users, $discipline, $recalculator);
-
-        $deps = new AttendanceDeps(
-            $config,
-            $users,
-            new RehearsalRepository($pdo),
-            new AttendanceMarkRepository($pdo),
-            new UserFlowRepository($pdo),
-            $service,
-            new AttendanceMessageFactory($texts),
-            new AttendanceConductorNotifier($recipients, $texts, $outbound),
-            $recalculator,
-            new AttendanceHistoryPresenter($texts),
-            $texts,
-            new CheckInSessionRepository($pdo),
-            new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
-        );
+        $deps = \App\Tests\Support\AttendanceDepsFactory::make($config, $pdo, $texts, $users, $outbound);
 
         return ['deps' => $deps, 'pdo' => $pdo];
     }

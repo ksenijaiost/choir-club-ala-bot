@@ -8,11 +8,14 @@ use App\Services\AccessControl;
 use App\Services\ProgramDateParser;
 use App\Support\SqlPagination;
 use App\Telegram\CallbackUi;
+use App\Telegram\FlowStepCleanup;
+use App\Telegram\TelegramHtml;
 use App\Telegram\GroupFlowSession;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
@@ -104,6 +107,7 @@ final class ProgramAdminHandler
             SafeTelegram::answerCallbackQuery($bot);
             $state = $deps->flows->get($actorTg);
             $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
+            FlowStepCleanup::purgeAll($bot, $ctx);
             $deps->flows->clear($actorTg);
             self::sendActorFeedback($bot, $deps, $actor, $deps->texts->get('programs.flow_cancelled'), $ctx);
 
@@ -278,6 +282,8 @@ final class ProgramAdminHandler
         }
 
         $trimmed = trim($text);
+        FlowStepCleanup::recordUserReply($bot, $ctx, $chatId);
+        $deps->flows->set($telegramId, $flow, $ctx);
 
         if ($flow === self::FLOW_CREATE_TITLE) {
             if ($trimmed === '') {
@@ -291,7 +297,6 @@ final class ProgramAdminHandler
             }
             $programId = $deps->programs->create($trimmed, (int) $actor['id'], null);
             $ctx['program_id'] = $programId;
-            $deps->flows->set($telegramId, self::FLOW_CREATE_DATE, $ctx);
             GroupFlowSession::sendTextPrompt(
                 $bot,
                 $deps->texts,
@@ -299,6 +304,7 @@ final class ProgramAdminHandler
                 $ctx,
                 'prg:cn',
             );
+            $deps->flows->set($telegramId, self::FLOW_CREATE_DATE, $ctx);
 
             return true;
         }
@@ -312,13 +318,14 @@ final class ProgramAdminHandler
             }
             $dateIso = self::parseDateInput($deps, $trimmed);
             if ($dateIso === false) {
-                self::sendFlowPrompt($bot, $deps, $ctx, 'programs.date_invalid');
+                self::sendFlowPrompt($bot, $deps, $telegramId, $flow, $ctx, 'programs.date_invalid');
 
                 return true;
             }
             if ($dateIso !== null) {
                 $deps->programs->setDate($programId, $dateIso);
             }
+            FlowStepCleanup::purgeAll($bot, $ctx);
             $deps->flows->clear($telegramId);
             $actor = $deps->users->findByTelegramId($telegramId);
             if ($actor !== null) {
@@ -344,6 +351,7 @@ final class ProgramAdminHandler
                 return true;
             }
             $deps->programs->rename($programId, $trimmed);
+            FlowStepCleanup::purgeAll($bot, $ctx);
             $deps->flows->clear($telegramId);
             $actor = $deps->users->findByTelegramId($telegramId);
             if ($actor !== null) {
@@ -364,11 +372,12 @@ final class ProgramAdminHandler
             }
             $dateIso = self::parseDateInput($deps, $trimmed);
             if ($dateIso === false) {
-                self::sendFlowPrompt($bot, $deps, $ctx, 'programs.date_invalid');
+                self::sendFlowPrompt($bot, $deps, $telegramId, $flow, $ctx, 'programs.date_invalid');
 
                 return true;
             }
             $deps->programs->setDate($programId, $dateIso);
+            FlowStepCleanup::purgeAll($bot, $ctx);
             $deps->flows->clear($telegramId);
             $actor = $deps->users->findByTelegramId($telegramId);
             if ($actor !== null) {
@@ -411,15 +420,16 @@ final class ProgramAdminHandler
     /**
      * @param array<string, mixed> $ctx
      */
-    private static function sendFlowPrompt(Nutgram $bot, ProgramDeps $deps, array $ctx, string $textKey): void
-    {
-        if (GroupFlowSession::isGroupContext($ctx)) {
-            GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($textKey), $ctx, 'prg:cn');
-
-            return;
-        }
-
-        SafeTelegram::sendMessage($bot, $deps->texts->get($textKey));
+    private static function sendFlowPrompt(
+        Nutgram $bot,
+        ProgramDeps $deps,
+        int $telegramId,
+        string $flow,
+        array &$ctx,
+        string $textKey,
+    ): void {
+        GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($textKey), $ctx, 'prg:cn');
+        $deps->flows->set($telegramId, $flow, $ctx);
     }
 
     /**
@@ -435,8 +445,8 @@ final class ProgramAdminHandler
         string $promptKey,
     ): void {
         self::bindGroupFromBot($bot, $access, $ctx, $actorTg);
-        $deps->flows->set($actorTg, $flow, $ctx);
         GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($promptKey), $ctx, 'prg:cn');
+        $deps->flows->set($actorTg, $flow, $ctx);
     }
 
     /**
@@ -564,14 +574,14 @@ final class ProgramAdminHandler
 
         $lines = [
             $deps->texts->get('programs.detail_header', [
-                'title' => (string) ($program['title'] ?? ''),
-                'date' => $deps->programMessages->formatDateLine($program),
+                'title' => TelegramHtml::escape((string) ($program['title'] ?? '')),
+                'date' => TelegramHtml::escape($deps->programMessages->formatDateLine($program)),
             ]),
         ];
         $songs = $deps->programs->getSongs($programId);
         $n = 1;
         foreach ($songs as $song) {
-            $lines[] = $n . '. ' . (string) ($song['title'] ?? '');
+            $lines[] = $n . '. ' . TelegramHtml::escape((string) ($song['title'] ?? ''));
             $n++;
         }
         if ($songs === []) {
@@ -631,7 +641,14 @@ final class ProgramAdminHandler
         $back = $archived ? 'prg:ar' : 'prg:home';
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, $back);
 
-        CallbackUi::editCurrentMessage($bot, implode("\n", $lines), $keyboard, $deps->interactiveMenus, $actorTg);
+        CallbackUi::editCurrentMessage(
+            $bot,
+            implode("\n", $lines),
+            $keyboard,
+            $deps->interactiveMenus,
+            $actorTg,
+            ParseMode::HTML,
+        );
     }
 
     private static function editSongPicker(
@@ -679,13 +696,14 @@ final class ProgramAdminHandler
         CallbackUi::editCurrentMessage(
             $bot,
             $deps->texts->get('programs.edit_songs_header', [
-                'title' => (string) ($program['title'] ?? ''),
+                'title' => TelegramHtml::escape((string) ($program['title'] ?? '')),
                 'page' => (string) ($page + 1),
                 'pages' => (string) InlineMenuHelper::totalPages($total),
             ]),
             $keyboard,
             $deps->interactiveMenus,
             $actorTg,
+            ParseMode::HTML,
         );
     }
 
@@ -702,7 +720,8 @@ final class ProgramAdminHandler
         }
 
         $result = $deps->delivery->notifyParticipants($bot, $program, $isUpdate);
-        $deps->delivery->sendResultToConductor($bot, $actorTg, $result['sent'], $result['total']);
+        $chatId = (int) ($bot->chatId() ?? $actorTg);
+        $deps->delivery->sendResultSummary($bot, $chatId, $result);
         self::editDetail($bot, $deps, $programId, $actorTg);
     }
 

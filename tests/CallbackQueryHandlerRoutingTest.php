@@ -41,6 +41,7 @@ final class CallbackQueryHandlerRoutingTest extends TestCase
         'pay:',
         'pa:',
         'atd:',
+        'rsv:',
         'att:',
         'chk:',
         'sch:',

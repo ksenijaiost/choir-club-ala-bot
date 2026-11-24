@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
-use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 use App\Telegram\TelegramOutbound;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class RecordingTelegramOutbound implements TelegramOutbound
 {
-    /** @var list<array{chat_id: int, text: string, message_id: int, has_keyboard: bool}> */
+    /** @var list<array{chat_id: int, text: string, message_id: int, has_keyboard: bool, parse_mode: ?string}> */
     public array $messages = [];
 
     /** @var list<array{chat_id: int, message_id: int, text: string}> */
@@ -17,14 +18,19 @@ final class RecordingTelegramOutbound implements TelegramOutbound
 
     private int $nextMessageId = 1;
 
-    public function sendMessage(int $chatId, string $text, ?InlineKeyboardMarkup $replyMarkup = null): ?int
-    {
+    public function sendMessage(
+        int $chatId,
+        string $text,
+        ?InlineKeyboardMarkup $replyMarkup = null,
+        ?ParseMode $parseMode = null,
+    ): ?int {
         $messageId = $this->nextMessageId++;
         $this->messages[] = [
             'chat_id' => $chatId,
             'text' => $text,
             'message_id' => $messageId,
             'has_keyboard' => $replyMarkup !== null,
+            'parse_mode' => $parseMode?->value,
         ];
 
         return $messageId;

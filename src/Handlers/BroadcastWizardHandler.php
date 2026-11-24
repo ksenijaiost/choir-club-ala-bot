@@ -6,7 +6,9 @@ namespace App\Handlers;
 
 use App\Repositories\BroadcastRepository;
 use App\Services\AccessControl;
+use App\Services\TelegramDeliveryReason;
 use App\Telegram\CallbackUi;
+use App\Telegram\FlowStepCleanup;
 use App\Telegram\GroupFlowSession;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuReplyHelper;
@@ -94,6 +96,7 @@ final class BroadcastWizardHandler
         $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
 
         if ($data === 'bc:w:cn') {
+            FlowStepCleanup::purgeAll($bot, $ctx);
             $deps->flows->clear($telegramId);
             CallbackUi::editCurrentMessage($bot, $deps->texts->get('broadcast.wizard_cancelled'), null, $deps->interactiveMenus, $telegramId);
             if (GroupFlowSession::isGroupContext($ctx)) {
@@ -199,6 +202,8 @@ final class BroadcastWizardHandler
         }
 
         $step = (string) ($ctx['step'] ?? '');
+        FlowStepCleanup::recordUserReply($bot, $ctx, $chatId);
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
 
         if ($step === 'body') {
             $trimmed = trim($text);
@@ -291,12 +296,15 @@ final class BroadcastWizardHandler
         }
 
         $stats = $deps->delivery->deliverToParticipants($broadcastId, $actor);
+        FlowStepCleanup::purgeAll($bot, $ctx);
         $deps->flows->clear($telegramId);
 
-        $result = $deps->texts->get('broadcast.wizard_sent', [
-            'sent' => (string) $stats['sent'],
-            'failed' => (string) $stats['failed'],
-        ]);
+        $result = TelegramDeliveryReason::formatSummary(
+            $deps->texts,
+            (int) $stats['sent'],
+            (int) $stats['total'],
+            $stats['failures'],
+        );
         CallbackUi::editCurrentMessage($bot, $result, null, $deps->interactiveMenus, $telegramId);
         if (GroupFlowSession::isGroupContext($ctx)) {
             SafeTelegram::sendMessage(
@@ -341,6 +349,7 @@ final class BroadcastWizardHandler
 
         if (GroupFlowSession::isGroupContext($ctx) && ($step === 'body' || $step === 'options')) {
             GroupFlowSession::sendTextPrompt($bot, $deps->texts, $text, $ctx, 'bc:w:cn');
+            $deps->flows->set($telegramId, self::FLOW, $ctx);
             $text = $deps->texts->get('broadcast.wizard_group_step_hint');
         }
 
@@ -541,17 +550,12 @@ final class BroadcastWizardHandler
     private static function sendWizardPrompt(
         Nutgram $bot,
         BroadcastDeps $deps,
-        array $ctx,
+        array &$ctx,
         int $telegramId,
         string $textKey,
     ): void {
-        if (GroupFlowSession::isGroupContext($ctx)) {
-            GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($textKey), $ctx, 'bc:w:cn');
-
-            return;
-        }
-
-        SafeTelegram::sendMessage($bot, $deps->texts->get($textKey));
+        GroupFlowSession::sendTextPrompt($bot, $deps->texts, $deps->texts->get($textKey), $ctx, 'bc:w:cn');
+        $deps->flows->set($telegramId, self::FLOW, $ctx);
     }
 
     private static function persistWizardMessage(BroadcastDeps $deps, int $telegramId, int $messageId): void

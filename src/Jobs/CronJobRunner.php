@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Clock;
 use App\Config;
 use App\Repositories\AttendanceMarkRepository;
+use App\Repositories\DayBeforeReminderDeliveryRepository;
 use App\Repositories\BotSettingsRepository;
 use App\Repositories\CheckInPromptRepository;
 use App\Repositories\CheckInSessionRepository;
@@ -86,7 +87,9 @@ final class CronJobRunner
         $result['day_before_reminder'] = (new DayBeforeReminderJob(
             $rehearsals,
             $users,
+            $marks,
             $deliveries,
+            new DayBeforeReminderDeliveryRepository($pdo),
             $messages,
             $outbound,
         ))->runIfDue($config);
@@ -173,7 +176,9 @@ final class CronJobRunner
             'day_before_reminder' => (new DayBeforeReminderJob(
                 $rehearsals,
                 $users,
+                $marks,
                 $deliveries,
+                new DayBeforeReminderDeliveryRepository($pdo),
                 $messages,
                 $outbound,
             ))->runIfDue($config),

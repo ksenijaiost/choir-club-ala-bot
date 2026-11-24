@@ -216,29 +216,9 @@ final class MenuFlowInterruptTest extends TestCase
                     new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
         );
 
-        $marks = new AttendanceMarkRepository($pdo);
-        $outbound = new RecordingTelegramOutbound();
         $recipients = new NotificationRecipientResolver($config, $users);
-        $blocks = new MemberBlockService($users, new BlockEventRepository($pdo));
-        $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
-        $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $service = new AttendanceService($marks, $users, $discipline, $recalculator);
-
-        $attendance = new AttendanceDeps(
-            $config,
-            $users,
-            $rehearsals,
-            $marks,
-            $flows,
-            $service,
-            new AttendanceMessageFactory($texts),
-            new AttendanceConductorNotifier($recipients, $texts, $outbound),
-            $recalculator,
-            new AttendanceHistoryPresenter($texts),
-            $texts,
-            new CheckInSessionRepository($pdo),
-                    new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
-        );
+        $marks = new AttendanceMarkRepository($pdo);
+        $attendance = \App\Tests\Support\AttendanceDepsFactory::make($config, $pdo, $texts, $users);
 
         $settings = new BotSettingsRepository($pdo);
         $paymentTexts = new PaymentTexts($texts);

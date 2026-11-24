@@ -10,6 +10,7 @@ use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class BroadcastAdminHandler
@@ -155,9 +156,9 @@ final class BroadcastAdminHandler
         foreach ($chunks as $chunk) {
             if ($first) {
                 $first = false;
-                SafeTelegram::sendMessage($bot, $chunk, replyMarkup: $keyboard);
+                SafeTelegram::sendMessage($bot, $chunk, replyMarkup: $keyboard, parseMode: ParseMode::HTML);
             } else {
-                SafeTelegram::sendMessage($bot, $chunk);
+                SafeTelegram::sendMessage($bot, $chunk, parseMode: ParseMode::HTML);
             }
         }
     }
@@ -181,10 +182,17 @@ final class BroadcastAdminHandler
             $deps->keyboards->buildStatusActionsKeyboard($broadcastId, $isOpen),
             $deps->texts,
         );
-        CallbackUi::editCurrentMessage($bot, $text, $keyboard, $deps->interactiveMenus, (int) ($actor['telegram_id'] ?? 0));
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $text,
+            $keyboard,
+            $deps->interactiveMenus,
+            (int) ($actor['telegram_id'] ?? 0),
+            ParseMode::HTML,
+        );
 
         for ($i = 1, $count = count($chunks); $i < $count; $i++) {
-            SafeTelegram::sendMessage($bot, $chunks[$i]);
+            SafeTelegram::sendMessage($bot, $chunks[$i], parseMode: ParseMode::HTML);
         }
     }
 

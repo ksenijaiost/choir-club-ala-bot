@@ -6,11 +6,9 @@ namespace App\Services;
 
 use App\Repositories\BroadcastRepository;
 use App\Repositories\UserRepository;
-use App\Telegram\TelegramApiErrors;
 use App\Telegram\TelegramApiRetry;
 use App\Telegram\TelegramOutbound;
 use App\Text\TextRepository;
-use SergiX44\Nutgram\Telegram\Exceptions\TelegramException;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class BroadcastDeliveryService
@@ -29,13 +27,18 @@ final class BroadcastDeliveryService
 
     /**
      * @param array<string, mixed> $author
-     * @return array{sent: int, failed: int}
+     * @return array{
+     *   sent: int,
+     *   failed: int,
+     *   total: int,
+     *   failures: list<array{user_id: int, name: string, reason_label: string, error_code: string}>
+     * }
      */
     public function deliverToParticipants(int $broadcastId, array $author): array
     {
         $broadcast = $this->broadcasts->find($broadcastId);
         if ($broadcast === null) {
-            return ['sent' => 0, 'failed' => 0];
+            return ['sent' => 0, 'failed' => 0, 'total' => 0, 'failures' => []];
         }
 
         $kind = (string) ($broadcast['kind'] ?? '');
@@ -51,6 +54,7 @@ final class BroadcastDeliveryService
 
         $sent = 0;
         $failed = 0;
+        $failures = [];
 
         foreach ($this->users->listActiveParticipants() as $participant) {
             $userId = (int) ($participant['id'] ?? 0);
@@ -62,17 +66,25 @@ final class BroadcastDeliveryService
             $this->broadcasts->addRecipient($broadcastId, $userId);
             $keyboard = $this->recipientKeyboard($broadcast, $options, $userId);
 
-            $messageId = $this->sendToTelegramId($telegramId, $messageText, $keyboard);
-            if ($messageId !== null) {
-                $this->broadcasts->markDelivered($broadcastId, $userId, $messageId);
+            $sendResult = $this->sendToTelegramId($telegramId, $messageText, $keyboard);
+            if (is_int($sendResult)) {
+                $this->broadcasts->markDelivered($broadcastId, $userId, $sendResult);
                 $sent++;
             } else {
-                $this->broadcasts->markDeliveryFailed($broadcastId, $userId, 'send_failed');
+                $this->broadcasts->markDeliveryFailed($broadcastId, $userId, $sendResult);
                 $failed++;
+                $failures[] = [
+                    'user_id' => $userId,
+                    'name' => (string) ($participant['display_name'] ?? ''),
+                    'reason_label' => TelegramDeliveryReason::label($this->texts, $sendResult),
+                    'error_code' => $sendResult,
+                ];
             }
         }
 
-        return ['sent' => $sent, 'failed' => $failed];
+        $total = $sent + $failed;
+
+        return ['sent' => $sent, 'failed' => $failed, 'total' => $total, 'failures' => $failures];
     }
 
     /**
@@ -111,12 +123,12 @@ final class BroadcastDeliveryService
     }
 
     /**
-     * @return ?int message id
+     * @return int|string message id or error code
      */
-    private function sendToTelegramId(int $telegramId, string $text, InlineKeyboardMarkup $keyboard): ?int
+    private function sendToTelegramId(int $telegramId, string $text, InlineKeyboardMarkup $keyboard): int|string
     {
         if ($telegramId <= 0) {
-            return null;
+            return TelegramDeliveryReason::NEVER_STARTED;
         }
 
         try {
@@ -125,29 +137,16 @@ final class BroadcastDeliveryService
             });
             if ($messageId !== null) {
                 usleep(self::PAUSE_MICROSECONDS);
+
+                return $messageId;
             }
 
-            return $messageId;
-        } catch (TelegramException $e) {
-            if (TelegramApiErrors::isRecipientUnreachable($e) || TelegramApiErrors::isVoiceMessagesForbidden($e)) {
-                error_log('[broadcast-delivery] skip chat_id=' . $telegramId . ': ' . $e->getMessage());
-
-                return null;
-            }
-
-            error_log('[broadcast-delivery] send failed chat_id=' . $telegramId . ': ' . $e->getMessage());
-
-            return null;
+            return TelegramDeliveryReason::OTHER;
         } catch (\Throwable $e) {
-            if (TelegramApiErrors::isRecipientUnreachable($e) || TelegramApiErrors::isVoiceMessagesForbidden($e)) {
-                error_log('[broadcast-delivery] skip chat_id=' . $telegramId . ': ' . $e->getMessage());
-
-                return null;
-            }
-
+            $code = TelegramDeliveryReason::codeFromThrowable($e);
             error_log('[broadcast-delivery] send failed chat_id=' . $telegramId . ': ' . $e->getMessage());
 
-            return null;
+            return $code;
         }
     }
 }

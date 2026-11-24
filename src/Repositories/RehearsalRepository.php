@@ -186,4 +186,45 @@ final class RehearsalRepository
 
         return $stmt->fetchAll() ?: [];
     }
+
+    /**
+     * Default for RSVP: ongoing today or nearest upcoming scheduled rehearsal.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findDefaultForRsvp(string $nowLocal): ?array
+    {
+        $ongoing = $this->listOngoingScheduled($nowLocal);
+        if ($ongoing !== []) {
+            return $ongoing[0];
+        }
+
+        $upcoming = $this->listUpcomingScheduled($nowLocal, 1);
+
+        return $upcoming[0] ?? null;
+    }
+
+    public function findPreviousScheduledId(int $rehearsalId, string $nowLocal): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM rehearsals WHERE status = ? AND starts_at < (SELECT starts_at FROM rehearsals WHERE id = ?)
+             ORDER BY starts_at DESC LIMIT 1'
+        );
+        $stmt->execute(['scheduled', $rehearsalId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
+    public function findNextScheduledId(int $rehearsalId): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM rehearsals WHERE status = ? AND starts_at > (SELECT starts_at FROM rehearsals WHERE id = ?)
+             ORDER BY starts_at ASC LIMIT 1'
+        );
+        $stmt->execute(['scheduled', $rehearsalId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
 }

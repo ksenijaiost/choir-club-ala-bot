@@ -128,6 +128,8 @@ final class AboutBotHandler
             'cmd_profile' => $texts->get('commands.profile'),
             'cmd_about' => $texts->get('commands.about'),
             'cmd_stats' => $texts->get('commands.stats'),
+            'cmd_rsvp' => $texts->get('commands.rsvp'),
+            'btn_rsvp' => $texts->get('rsvp.open_button'),
             'btn_schedule' => $texts->get('menu.schedule'),
             'btn_wont_come' => $texts->get('menu.wont_come'),
             'btn_find_song' => $texts->get('menu.find_song'),

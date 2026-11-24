@@ -232,6 +232,7 @@ final class AdminChatProgramsBroadcastTest extends TestCase
             $programMessages,
             $texts,
             new \App\Telegram\NutgramOutbound(Nutgram::fake()),
+            new \App\Repositories\ProgramNotifyDeliveryRepository($pdo),
         );
         $interactiveMenus = new \App\Telegram\InteractiveMenuService(new UserOpenMenuRepository($pdo));
 

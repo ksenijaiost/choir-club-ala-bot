@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Telegram;
 
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 use SergiX44\Nutgram\Telegram\Types\Message\Message;
 
@@ -21,6 +22,7 @@ final class CallbackUi
         ?InlineKeyboardMarkup $replyMarkup = null,
         ?InteractiveMenuService $menus = null,
         ?int $ownerTelegramId = null,
+        ?ParseMode $parseMode = null,
     ): void {
         $message = self::callbackMessage($bot);
         if ($message === null) {
@@ -33,6 +35,7 @@ final class CallbackUi
                 chat_id: $message->chat->id,
                 message_id: $message->message_id,
                 reply_markup: $replyMarkup,
+                parse_mode: $parseMode,
             ));
             if ($menus !== null && $ownerTelegramId !== null) {
                 InlineMenuHelper::trackEditedMenu(

@@ -106,6 +106,7 @@ final class AttendanceMemberHandler
         }
 
         if ($source === AttendanceSource::DAY_BEFORE) {
+            $deps->rsvp->upsert($rehearsalId, $userId, \App\Domain\RehearsalRsvpAnswer::NO);
             $deps->conductor->forwardDayBeforeReason($user, $rehearsal, $reason, $tz);
         } elseif ($source === AttendanceSource::ABSENCE_BUTTON) {
             $deps->conductor->notifyPlannedAbsence($user, $rehearsal, $reason, $tz);
@@ -140,6 +141,10 @@ final class AttendanceMemberHandler
         $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
 
         $deps->attendance->recordUnexcused($user, $rehearsalId, $source);
+
+        if ($source === AttendanceSource::DAY_BEFORE) {
+            $deps->rsvp->upsert($rehearsalId, (int) $user['id'], \App\Domain\RehearsalRsvpAnswer::NO);
+        }
 
         if ($source === AttendanceSource::CHECKIN && self::flowReplacedAttended($ctx)) {
             $deps->conductor->notifyCheckinChangedToAbsent($user, '');

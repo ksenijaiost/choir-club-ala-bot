@@ -34,6 +34,9 @@ final class AttendanceAdminHandler
             ->addRow(
                 InlineKeyboardButton::make($texts->get('attendance.by_rehearsal'), callback_data: 'atd:rh'),
                 InlineKeyboardButton::make($texts->get('attendance.by_member'), callback_data: 'atd:ms'),
+            )
+            ->addRow(
+                InlineKeyboardButton::make($texts->get('rsvp.open_button'), callback_data: 'atd:rsv'),
             );
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
@@ -244,6 +247,11 @@ final class AttendanceAdminHandler
             $marksByUser[(int) $markRow['user_id']] = (string) $markRow['mark'];
         }
 
+        $rsvpByUser = [];
+        foreach ($deps->rsvp->listForRehearsal($rehearsalId) as $rsvpRow) {
+            $rsvpByUser[(int) $rsvpRow['user_id']] = (string) $rsvpRow['answer'];
+        }
+
         $participants = $deps->users->listActiveParticipants();
         $total = count($participants);
         $slice = InlineMenuHelper::pageSlice($participants, $page);
@@ -253,7 +261,15 @@ final class AttendanceAdminHandler
             $uid = (int) $user['id'];
             $name = (string) ($user['display_name'] ?? '');
             $mark = $marksByUser[$uid] ?? null;
-            $lines[] = '• ' . $name . ' — ' . $presenter->markLabel($mark);
+            $label = $presenter->markLabel($mark);
+            $rsvpAnswer = $rsvpByUser[$uid] ?? null;
+            if ($rsvpAnswer !== null) {
+                $suffix = $rsvpAnswer === 'yes'
+                    ? $texts->get('rsvp.inline_yes')
+                    : $texts->get('rsvp.inline_no');
+                $label .= ' ' . $suffix;
+            }
+            $lines[] = '• ' . $name . ' — ' . $label;
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make(
                     $name,

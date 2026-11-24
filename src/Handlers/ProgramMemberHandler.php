@@ -10,7 +10,9 @@ use App\Support\SqlPagination;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\SafeTelegram;
+use App\Telegram\TelegramHtml;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
@@ -328,14 +330,15 @@ final class ProgramMemberHandler
         CallbackUi::editCurrentMessage(
             $bot,
             $programs->texts->get('programs.member_songs_header', [
-                'title' => $title,
-                'date' => $dateLine,
+                'title' => TelegramHtml::escape($title),
+                'date' => TelegramHtml::escape($dateLine),
                 'page' => (string) ($page + 1),
                 'pages' => (string) InlineMenuHelper::totalPages($total),
             ]),
             $keyboard,
             $programs->interactiveMenus,
             $actorTelegramId,
+            ParseMode::HTML,
         );
     }
 
