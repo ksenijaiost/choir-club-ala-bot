@@ -25,7 +25,7 @@ final class BotCommandsRegistrationTest extends TestCase
         self::assertSame([null, 'ru'], $this->languageCodesFromSetMyCommands($bot));
 
         $commandsJson = $this->firstSetMyCommandsPayload($bot)['commands'] ?? '[]';
-        foreach (['start', 'help', 'song', 'recordings', 'profile', 'about'] as $name) {
+        foreach (['start', 'help', 'song', 'recordings', 'profile', 'about', 'programs', 'programs_edit'] as $name) {
             self::assertStringContainsString('"command":"' . $name . '"', $commandsJson);
         }
         self::assertStringNotContainsString('"command":"stats"', $commandsJson);
@@ -42,7 +42,7 @@ final class BotCommandsRegistrationTest extends TestCase
         self::assertSame([null, 'ru'], $this->languageCodesFromSetMyCommands($bot));
 
         $commandsJson = $this->firstSetMyCommandsPayload($bot)['commands'] ?? '[]';
-        foreach (['notes', 'songs', 'members', 'edit', 'programs', 'rsvp', 'broadcast', 'polls', 'stats'] as $name) {
+        foreach (['notes', 'songs', 'members', 'edit', 'programs_edit', 'rsvp', 'broadcast', 'polls', 'stats'] as $name) {
             self::assertStringContainsString('"command":"' . $name . '"', $commandsJson);
         }
         self::assertStringNotContainsString('"command":"translit"', $commandsJson);

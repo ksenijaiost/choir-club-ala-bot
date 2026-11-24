@@ -134,15 +134,47 @@ final class SongDeliveryService
     }
 
     /**
-     * @param list<int> $songIds
+     * @param list<array{id: int, title: string}> $songs
      */
-    public function sendAllNotesForProgramSongs(Nutgram $bot, array $songIds): void
+    public function sendAllNotesForProgramSongs(Nutgram $bot, array $songs): void
     {
-        foreach ($songIds as $songId) {
+        $hasAny = false;
+        foreach ($songs as $song) {
+            $songId = (int) ($song['id'] ?? 0);
+            if ($songId > 0 && $this->materials->listCurrentNotes($songId) !== []) {
+                $hasAny = true;
+                break;
+            }
+        }
+        if (!$hasAny) {
+            SafeTelegram::sendMessage($bot, $this->texts->get('songs.no_material'));
+
+            return;
+        }
+
+        $first = true;
+        foreach ($songs as $song) {
+            $songId = (int) ($song['id'] ?? 0);
             if ($songId <= 0) {
                 continue;
             }
-            $this->sendNotes($bot, $songId);
+            $rows = $this->materials->listCurrentNotes($songId);
+            if ($rows === []) {
+                continue;
+            }
+            if (!$first) {
+                usleep(self::BULK_RECORDINGS_PAUSE_MICROSECONDS);
+            }
+            $first = false;
+            $title = (string) ($song['title'] ?? '');
+            SafeTelegram::sendMessage(
+                $bot,
+                '🎵 ' . TelegramHtml::escape($title),
+                null,
+                null,
+                ParseMode::HTML,
+            );
+            $this->sendNoteFiles($bot, $rows);
         }
     }
 

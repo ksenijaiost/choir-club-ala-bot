@@ -63,7 +63,7 @@ final class UsageSectionResolver
             'about' => 'about',
             'stats' => 'stats',
             'broadcast', 'polls' => 'broadcast',
-            'programs' => 'programs',
+            'programs', 'programs_edit' => 'programs',
             'schedule' => 'schedule',
             default => null,
         };
@@ -90,6 +90,7 @@ final class UsageSectionResolver
             'menu.admin_chat' => 'admin_materials',
             'menu.broadcast' => 'broadcast',
             'menu.broadcasts_list' => 'broadcast',
+            'menu.member_programs' => 'programs',
             'menu.programs' => 'programs',
         ];
 

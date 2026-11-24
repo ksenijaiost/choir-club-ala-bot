@@ -171,8 +171,10 @@ final class ProgramMemberHandler
             SafeTelegram::answerCallbackQuery($bot);
             CallbackUi::clearKeyboard($bot);
             $programId = (int) $m[1];
-            $songIds = self::programSongIdsWithNotes($programs, $materials, $programId);
-            $materials->delivery->sendAllNotesForProgramSongs($bot, $songIds);
+            $songs = self::mapSongsForDelivery(
+                self::filterProgramSongsWithNotes($programs, $materials, $programId),
+            );
+            $materials->delivery->sendAllNotesForProgramSongs($bot, $songs);
 
             return true;
         }

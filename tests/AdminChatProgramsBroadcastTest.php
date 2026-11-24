@@ -37,6 +37,39 @@ final class AdminChatProgramsBroadcastTest extends TestCase
 
     private const CONDUCTOR_TG = 97_101;
 
+    public function testProgramsEditCommandOpensMenuInAdminChat(): void
+    {
+        $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');
+        $config = $this->testConfig();
+        $pdo = Connection::make($config);
+        (new Migrator($pdo, 'sqlite'))->migrate();
+        (new BotSettingsRepository($pdo))->set('admin_chat_id', (string) self::ADMIN_CHAT_ID);
+
+        $users = new UserRepository($pdo);
+        $users->upsertConductor(self::CONDUCTOR_TG, 'Дирижёр');
+
+        $bot = $this->fakeGroupBot(self::CONDUCTOR_TG, self::ADMIN_CHAT_ID);
+        HandlerRegistry::register($bot, $texts, $config, $pdo);
+
+        $bot->hearText('/programs_edit')
+            ->willStartConversation()
+            ->reply()
+            ->assertCalled('sendMessage');
+
+        $sentToAdmin = false;
+        foreach ($bot->getRequestHistory() as $entry) {
+            $body = (string) $entry['request']->getBody();
+            if (str_contains($body, '"chat_id":' . self::ADMIN_CHAT_ID)) {
+                $sentToAdmin = true;
+            }
+            if (str_contains($body, 'Программы концертов')) {
+                self::assertStringContainsString('Программы концертов', $body);
+            }
+        }
+
+        self::assertTrue($sentToAdmin);
+    }
+
     public function testProgramsCommandOpensMenuInAdminChat(): void
     {
         $texts = TextRepository::fromFile(dirname(__DIR__) . '/texts/ru.json');

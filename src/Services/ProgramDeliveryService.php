@@ -52,7 +52,7 @@ final class ProgramDeliveryService
         $keyboard = InlineKeyboardMarkup::make()->addRow(
             InlineKeyboardButton::make(
                 $this->texts->get('programs.button_open_recordings'),
-                callback_data: 'prg:mo:' . $programId,
+                callback_data: 'prg:in:' . $programId,
             ),
         );
 

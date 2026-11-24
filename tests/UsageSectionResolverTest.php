@@ -18,14 +18,21 @@ final class UsageSectionResolverTest extends TestCase
         $resolveCommand = new \ReflectionMethod(UsageSectionResolver::class, 'resolveCommand');
         $resolveCommand->setAccessible(true);
         self::assertSame('find_song', $resolveCommand->invoke($resolver, 'song'));
+        self::assertSame('programs', $resolveCommand->invoke($resolver, 'programs'));
+        self::assertSame('programs', $resolveCommand->invoke($resolver, 'programs_edit'));
 
         $resolveMenu = new \ReflectionMethod(UsageSectionResolver::class, 'resolveMenuLabel');
         $resolveMenu->setAccessible(true);
         self::assertSame('find_song', $resolveMenu->invoke($resolver, $texts->get('menu.find_song')));
+        self::assertSame('programs', $resolveMenu->invoke($resolver, $texts->get('menu.member_programs')));
+        self::assertSame('programs', $resolveMenu->invoke($resolver, $texts->get('menu.programs')));
 
         $resolveCallback = new \ReflectionMethod(UsageSectionResolver::class, 'resolveCallbackPrefix');
         $resolveCallback->setAccessible(true);
         self::assertSame('my_recordings', $resolveCallback->invoke($resolver, 'snd:my:all:soprano_1'));
         self::assertSame('programs', $resolveCallback->invoke($resolver, 'prg:mo:1'));
+        self::assertSame('programs', $resolveCallback->invoke($resolver, 'prg:in:1'));
+        self::assertSame('programs', $resolveCallback->invoke($resolver, 'prg:ls:0'));
+        self::assertSame('my_recordings', $resolveCallback->invoke($resolver, 'prg:mr:hub'));
     }
 }
