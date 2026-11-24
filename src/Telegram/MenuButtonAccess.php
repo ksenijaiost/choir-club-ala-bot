@@ -23,6 +23,7 @@ final class MenuButtonAccess
             || $label === $texts->get('menu.wont_come')
             || $label === $texts->get('menu.find_song')
             || $label === $texts->get('menu.my_recordings')
+            || $label === $texts->get('menu.member_programs')
             || $label === $texts->get('menu.my_profile')
             || $label === $texts->get('menu.about_bot')) {
             return true;

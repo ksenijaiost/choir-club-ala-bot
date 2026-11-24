@@ -38,8 +38,12 @@ final class SongDeliveryService
      * @param array<string, mixed> $song
      * @param array<string, mixed>|null $viewer
      */
-    public function sendSongCard(Nutgram $bot, array $song, ?array $viewer = null): void
-    {
+    public function sendSongCard(
+        Nutgram $bot,
+        array $song,
+        ?array $viewer = null,
+        ?string $backCallback = null,
+    ): void {
         $title = (string) ($song['title'] ?? '');
         $songId = (int) $song['id'];
 
@@ -54,7 +58,7 @@ final class SongDeliveryService
 
         $summary = $this->songs->materialsSummary($songId, $voicePart);
         $translitCard = $this->resolveTranslitCardState($songId, $summary);
-        $keyboard = $this->buildSongCardKeyboard($songId, $summary, $anyRecordings, $translitCard);
+        $keyboard = $this->buildSongCardKeyboard($songId, $summary, $anyRecordings, $translitCard, $backCallback);
         $text = '🎵 ' . TelegramHtml::escape($title);
         $parseMode = ParseMode::HTML;
         if ($translitCard['preview'] !== null && $translitCard['preview'] !== '') {
@@ -76,8 +80,13 @@ final class SongDeliveryService
      * } $summary
      * @param array{preview: ?string, show_file_button: bool, show_full_button: bool} $translitCard
      */
-    public function buildSongCardKeyboard(int $songId, array $summary, bool $anyRecordings, ?array $translitCard = null): InlineKeyboardMarkup
-    {
+    public function buildSongCardKeyboard(
+        int $songId,
+        array $summary,
+        bool $anyRecordings,
+        ?array $translitCard = null,
+        ?string $footerBack = null,
+    ): InlineKeyboardMarkup {
         if ($translitCard === null) {
             $translitCard = $this->resolveTranslitCardState($songId, $summary);
         }
@@ -121,7 +130,52 @@ final class SongDeliveryService
             );
         }
 
-        return InlineMenuHelper::appendFooter($keyboard, $this->texts);
+        return InlineMenuHelper::appendFooter($keyboard, $this->texts, $footerBack);
+    }
+
+    /**
+     * @param list<array{id: int, title: string}> $songs
+     */
+    public function sendAllNotesForProgramSongs(Nutgram $bot, array $songs): void
+    {
+        $hasAny = false;
+        foreach ($songs as $song) {
+            $songId = (int) ($song['id'] ?? 0);
+            if ($songId > 0 && $this->materials->listCurrentNotes($songId) !== []) {
+                $hasAny = true;
+                break;
+            }
+        }
+        if (!$hasAny) {
+            SafeTelegram::sendMessage($bot, $this->texts->get('songs.no_material'));
+
+            return;
+        }
+
+        $first = true;
+        foreach ($songs as $song) {
+            $songId = (int) ($song['id'] ?? 0);
+            if ($songId <= 0) {
+                continue;
+            }
+            $rows = $this->materials->listCurrentNotes($songId);
+            if ($rows === []) {
+                continue;
+            }
+            if (!$first) {
+                usleep(self::BULK_RECORDINGS_PAUSE_MICROSECONDS);
+            }
+            $first = false;
+            $title = (string) ($song['title'] ?? '');
+            SafeTelegram::sendMessage(
+                $bot,
+                '🎵 ' . TelegramHtml::escape($title),
+                null,
+                null,
+                ParseMode::HTML,
+            );
+            $this->sendNoteFiles($bot, $rows);
+        }
     }
 
     /**

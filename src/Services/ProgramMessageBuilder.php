@@ -16,6 +16,36 @@ final class ProgramMessageBuilder
     ) {
     }
 
+    public function numberedSongLines(int $programId): string
+    {
+        $songs = $this->programs->getSongs($programId);
+        $lines = [];
+        $n = 1;
+        foreach ($songs as $row) {
+            $lines[] = $n . '. ' . TelegramHtml::escape((string) ($row['title'] ?? ''));
+            $n++;
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<string, mixed> $program
+     */
+    public function memberCardBody(array $program): string
+    {
+        $programId = (int) ($program['id'] ?? 0);
+        $title = TelegramHtml::escape((string) ($program['title'] ?? ''));
+        $date = TelegramHtml::escape($this->formatDateLine($program));
+        $songsBlock = $this->numberedSongLines($programId);
+
+        return $this->texts->get('programs.member_card_body', [
+            'title' => $title,
+            'date' => $date,
+            'songs' => $songsBlock,
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $program
      */
@@ -29,12 +59,7 @@ final class ProgramMessageBuilder
             'date_suffix' => $dateSuffix,
         ])];
 
-        $songs = $this->programs->getSongs((int) $program['id']);
-        $n = 1;
-        foreach ($songs as $row) {
-            $lines[] = $n . '. ' . TelegramHtml::escape((string) ($row['title'] ?? ''));
-            $n++;
-        }
+        $lines[] = $this->numberedSongLines((int) $program['id']);
 
         return implode("\n", $lines);
     }

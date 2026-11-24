@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Telegram\MenuKeyboard;
+use App\Telegram\SafeTelegram;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
 
@@ -114,7 +115,18 @@ final class MenuActionDispatcher
             return true;
         }
 
+        if ($text === $texts->get('menu.member_programs') && $programDeps !== null) {
+            ProgramMemberHandler::openCatalog($bot, $programDeps, $user);
+
+            return true;
+        }
+
         if ($text === $texts->get('menu.programs') && $programDeps !== null) {
+            if (!$access->canManageBroadcasts($user)) {
+                SafeTelegram::sendMessage($bot, $programDeps->texts->get('programs.forbidden'));
+
+                return true;
+            }
             ProgramAdminHandler::openHome($bot, $programDeps, $access, $user);
 
             return true;

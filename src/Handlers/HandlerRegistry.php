@@ -288,7 +288,6 @@ final class HandlerRegistry
         HelpersAdminHandler::register($bot, $texts, $users, $access, $interactiveMenus);
         MembersAdminHandler::register($bot, $texts, $users, $access, $blockService, $interactiveMenus);
         BroadcastCommandHandler::register($bot, $broadcast, $access, $users);
-        ProgramCommandHandler::register($bot, $programDeps, $access, $users);
         RehearsalRsvpCommandHandler::register($bot, $attendance, $access, $users);
         StatsCommandHandler::register($bot, $texts, $users, $access, $statsPresenter);
         PrivateMenuCommandHandler::register(
@@ -305,6 +304,7 @@ final class HandlerRegistry
             $broadcast,
             $programDeps,
         );
+        ProgramCommandHandler::register($bot, $programDeps, $access, $users);
         MessageHandler::register($bot, $texts, $users, $access, $schedule, $attendance, $paymentDeps, $materials, $adminHistory, $adminChat, $broadcast, $programDeps, $errorReports);
     }
 }

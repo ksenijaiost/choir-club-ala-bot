@@ -56,6 +56,10 @@ final class MenuKeyboard
         ];
 
         $rows[] = [
+            $texts->get('menu.member_programs'),
+        ];
+
+        $rows[] = [
             $texts->get('menu.my_profile'),
             $texts->get('menu.about_bot'),
         ];
@@ -141,6 +145,7 @@ final class MenuKeyboard
             $texts->get('menu.wont_come'),
             $texts->get('menu.find_song'),
             $texts->get('menu.my_recordings'),
+            $texts->get('menu.member_programs'),
             $texts->get('menu.my_profile'),
             $texts->get('menu.about_bot'),
             $texts->get('menu.payment'),

@@ -21,6 +21,32 @@ final class ProgramMemberHandler
     /**
      * @param array<string, mixed> $user
      */
+    public static function openCatalog(
+        Nutgram $bot,
+        ProgramDeps $programs,
+        array $user,
+    ): void {
+        $today = $programs->delivery->todayIso();
+        if ($programs->programs->countActiveForMembers($today) === 0) {
+            SafeTelegram::sendMessage($bot, $programs->texts->get('programs.member_list_empty'));
+
+            return;
+        }
+
+        $ownerTelegramId = (int) ($user['telegram_id'] ?? $bot->userId() ?? 0);
+        $built = self::buildProgramListPage($programs, 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $programs->interactiveMenus,
+            $ownerTelegramId,
+            $built['text'],
+            $built['keyboard'],
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
     public static function openHub(
         Nutgram $bot,
         ProgramDeps $programs,
@@ -82,19 +108,9 @@ final class ProgramMemberHandler
             return null;
         }
 
-        $today = $programs->delivery->todayIso();
-        $hasPrograms = $programs->programs->countActiveForMembers($today) > 0;
         $recordingCount = self::recordingCountForUser($materials, $partCode);
 
         $keyboard = InlineKeyboardMarkup::make();
-        if ($hasPrograms) {
-            $keyboard = $keyboard->addRow(
-                InlineKeyboardButton::make(
-                    $programs->texts->get('programs.hub_programs_button'),
-                    callback_data: 'prg:mr:ls:0',
-                ),
-            );
-        }
         $keyboard = $keyboard->addRow(
             InlineKeyboardButton::make(
                 $programs->texts->get('programs.hub_pick_button'),
@@ -129,6 +145,140 @@ final class ProgramMemberHandler
         string $data,
     ): bool {
         $telegramId = (int) ($user['telegram_id'] ?? 0);
+
+        if (preg_match('/^prg:ls:(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            self::editProgramList($bot, $programs, (int) $m[1], $telegramId);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:mr:ls:(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            self::editProgramList($bot, $programs, (int) $m[1], $telegramId);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:in:(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            self::editProgramCard($bot, $programs, (int) $m[1], $telegramId);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:nd:(\d+):al$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            CallbackUi::clearKeyboard($bot);
+            $programId = (int) $m[1];
+            $songs = self::mapSongsForDelivery(
+                self::filterProgramSongsWithNotes($programs, $materials, $programId),
+            );
+            $materials->delivery->sendAllNotesForProgramSongs($bot, $songs);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:nd:(\d+):(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            CallbackUi::clearKeyboard($bot);
+            $materials->delivery->sendNotes($bot, (int) $m[2]);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:nd:(\d+):pg:(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            self::editProgramNotes($bot, $programs, $materials, (int) $m[1], (int) $m[2], $telegramId);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:nd:(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            self::editProgramNotes($bot, $programs, $materials, (int) $m[1], 0, $telegramId);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:pk:(\d+):(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            CallbackUi::clearKeyboard($bot);
+            $programId = (int) $m[1];
+            $songId = (int) $m[2];
+            $song = $programs->songs->findById($songId);
+            if ($song === null) {
+                SafeTelegram::sendMessage($bot, $programs->texts->get('songs.not_found'));
+
+                return true;
+            }
+            $materials->delivery->sendSongCard($bot, $song, $user, 'prg:pk:' . $programId);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:pk:(\d+):pg:(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            self::editProgramPick($bot, $programs, (int) $m[1], (int) $m[2], $telegramId);
+
+            return true;
+        }
+
+        if (preg_match('/^prg:pk:(\d+)$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            self::editProgramPick($bot, $programs, (int) $m[1], 0, $telegramId);
+
+            return true;
+        }
+
+        if (str_starts_with($data, 'prg:mo:')) {
+            $partCode = self::resolvePartCode($user);
+            if ($partCode === null) {
+                SafeTelegram::answerCallbackQuery($bot, [
+                    'text' => $materials->texts->get('songs.my_recordings_need_part'),
+                    'show_alert' => true,
+                ]);
+
+                return true;
+            }
+
+            if (preg_match('/^prg:mo:(\d+):al$/', $data, $m) === 1) {
+                SafeTelegram::answerCallbackQuery($bot);
+                CallbackUi::clearKeyboard($bot);
+                $programId = (int) $m[1];
+                $filtered = self::filterProgramSongsWithRecordings($programs, $materials, $programId, $partCode);
+                $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
+                $materials->delivery->sendAllMyRecordingsForSongs(
+                    $bot,
+                    self::mapSongsForDelivery($filtered),
+                    $partCode,
+                    $allParts,
+                );
+
+                return true;
+            }
+
+            if (preg_match('/^prg:mo:(\d+)$/', $data, $m) === 1) {
+                SafeTelegram::answerCallbackQuery($bot);
+                self::editProgramSongs($bot, $programs, $materials, (int) $m[1], $partCode, 0, $telegramId);
+
+                return true;
+            }
+
+            if (preg_match('/^prg:mo:(\d+):pg:(\d+)$/', $data, $m) === 1) {
+                SafeTelegram::answerCallbackQuery($bot);
+                self::editProgramSongs($bot, $programs, $materials, (int) $m[1], $partCode, (int) $m[2], $telegramId);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        if (!str_starts_with($data, 'prg:mr:')) {
+            return false;
+        }
+
         $partCode = self::resolvePartCode($user);
         if ($partCode === null) {
             SafeTelegram::answerCallbackQuery($bot, [
@@ -142,13 +292,6 @@ final class ProgramMemberHandler
         if ($data === 'prg:mr:hub') {
             SafeTelegram::answerCallbackQuery($bot);
             self::editHub($bot, $programs, $materials, $user, $telegramId);
-
-            return true;
-        }
-
-        if (preg_match('/^prg:mr:ls:(\d+)$/', $data, $m) === 1) {
-            SafeTelegram::answerCallbackQuery($bot);
-            self::editProgramList($bot, $programs, (int) $m[1], $telegramId);
 
             return true;
         }
@@ -168,36 +311,6 @@ final class ProgramMemberHandler
                 ? $materials->materials->listSongsWithRecordingsAnyPart()
                 : $materials->materials->listSongsWithRecordingsForPart($partCode);
             $materials->delivery->sendAllMyRecordingsForSongs($bot, $songs, $partCode, $allParts);
-
-            return true;
-        }
-
-        if (preg_match('/^prg:mo:(\d+):al$/', $data, $m) === 1) {
-            SafeTelegram::answerCallbackQuery($bot);
-            CallbackUi::clearKeyboard($bot);
-            $programId = (int) $m[1];
-            $filtered = self::filterProgramSongsWithRecordings($programs, $materials, $programId, $partCode);
-            $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
-            $materials->delivery->sendAllMyRecordingsForSongs(
-                $bot,
-                self::mapSongsForDelivery($filtered),
-                $partCode,
-                $allParts,
-            );
-
-            return true;
-        }
-
-        if (preg_match('/^prg:mo:(\d+)$/', $data, $m) === 1) {
-            SafeTelegram::answerCallbackQuery($bot);
-            self::editProgramSongs($bot, $programs, $materials, (int) $m[1], $partCode, 0, $telegramId);
-
-            return true;
-        }
-
-        if (preg_match('/^prg:mo:(\d+):pg:(\d+)$/', $data, $m) === 1) {
-            SafeTelegram::answerCallbackQuery($bot);
-            self::editProgramSongs($bot, $programs, $materials, (int) $m[1], $partCode, (int) $m[2], $telegramId);
 
             return true;
         }
@@ -222,7 +335,6 @@ final class ProgramMemberHandler
                 InlineMenuHelper::appendFooter(
                     InlineKeyboardMarkup::make(),
                     $programs->texts,
-                    'prg:mr:hub',
                 ),
                 $programs->interactiveMenus,
                 $actorTelegramId,
@@ -232,6 +344,27 @@ final class ProgramMemberHandler
         }
 
         $page = SqlPagination::clampPage($page);
+        $built = self::buildProgramListPage($programs, $page);
+
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $built['text'],
+            $built['keyboard'],
+            $programs->interactiveMenus,
+            $actorTelegramId,
+        );
+    }
+
+    /**
+     * @return array{text: string, keyboard: InlineKeyboardMarkup}
+     */
+    private static function buildProgramListPage(ProgramDeps $programs, int $page): array
+    {
+        $today = $programs->delivery->todayIso();
+        $rows = $programs->programs->listActiveForMembers($today);
+        $total = count($rows);
+        $page = SqlPagination::clampPage($page);
+
         $keyboard = InlineKeyboardMarkup::make();
         foreach (InlineMenuHelper::pageSlice($rows, $page) as $row) {
             $id = (int) $row['id'];
@@ -242,7 +375,7 @@ final class ProgramMemberHandler
                 $label = mb_substr($title, 0, 30) . '… · ' . $date;
             }
             $keyboard = $keyboard->addRow(
-                InlineKeyboardButton::make($label, callback_data: 'prg:mo:' . $id),
+                InlineKeyboardButton::make($label, callback_data: 'prg:in:' . $id),
             );
         }
 
@@ -251,19 +384,228 @@ final class ProgramMemberHandler
             $programs->texts,
             $page,
             $total,
-            'prg:mr:ls:',
-            'prg:mr:hub',
+            'prg:ls:',
+        );
+
+        return [
+            'text' => $programs->texts->get('programs.member_list_header', [
+                'page' => (string) ($page + 1),
+                'pages' => (string) InlineMenuHelper::totalPages($total),
+            ]),
+            'keyboard' => $keyboard,
+        ];
+    }
+
+    public static function editProgramCard(
+        Nutgram $bot,
+        ProgramDeps $programs,
+        int $programId,
+        int $actorTelegramId,
+    ): void {
+        $program = $programs->programs->find($programId);
+        if ($program === null) {
+            CallbackUi::editCurrentMessage(
+                $bot,
+                $programs->texts->get('programs.not_found'),
+                InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $programs->texts, 'prg:ls:0'),
+                $programs->interactiveMenus,
+                $actorTelegramId,
+            );
+
+            return;
+        }
+
+        $keyboard = InlineKeyboardMarkup::make()
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $programs->texts->get('programs.member_card_button_notes'),
+                    callback_data: 'prg:nd:' . $programId,
+                ),
+            )
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $programs->texts->get('programs.member_card_button_recordings'),
+                    callback_data: 'prg:mo:' . $programId,
+                ),
+            )
+            ->addRow(
+                InlineKeyboardButton::make(
+                    $programs->texts->get('programs.member_card_button_about'),
+                    callback_data: 'prg:pk:' . $programId,
+                ),
+            );
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $programs->texts, 'prg:ls:0');
+
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $programs->programMessages->memberCardBody($program),
+            $keyboard,
+            $programs->interactiveMenus,
+            $actorTelegramId,
+            ParseMode::HTML,
+        );
+    }
+
+    public static function editProgramNotes(
+        Nutgram $bot,
+        ProgramDeps $programs,
+        MaterialsDeps $materials,
+        int $programId,
+        int $page,
+        int $actorTelegramId,
+    ): void {
+        $program = $programs->programs->find($programId);
+        if ($program === null) {
+            CallbackUi::editCurrentMessage(
+                $bot,
+                $programs->texts->get('programs.not_found'),
+                InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $programs->texts, 'prg:ls:0'),
+                $programs->interactiveMenus,
+                $actorTelegramId,
+            );
+
+            return;
+        }
+
+        $songs = self::filterProgramSongsWithNotes($programs, $materials, $programId);
+        $total = count($songs);
+
+        $title = (string) ($program['title'] ?? '');
+        if ($total === 0) {
+            CallbackUi::editCurrentMessage(
+                $bot,
+                $programs->texts->get('programs.member_notes_empty', [
+                    'title' => TelegramHtml::escape($title),
+                ]),
+                InlineMenuHelper::appendFooter(
+                    InlineKeyboardMarkup::make(),
+                    $programs->texts,
+                    'prg:in:' . $programId,
+                ),
+                $programs->interactiveMenus,
+                $actorTelegramId,
+                ParseMode::HTML,
+            );
+
+            return;
+        }
+
+        $page = SqlPagination::clampPage($page);
+        $keyboard = InlineKeyboardMarkup::make();
+        foreach (InlineMenuHelper::pageSlice($songs, $page) as $song) {
+            $songId = (int) $song['song_id'];
+            $songTitle = (string) ($song['title'] ?? '');
+            $label = mb_strlen($songTitle) > 42 ? mb_substr($songTitle, 0, 39) . '…' : $songTitle;
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($label, callback_data: 'prg:nd:' . $programId . ':' . $songId),
+            );
+        }
+
+        $noteFileCount = self::programNoteFileCount($materials, $songs);
+        if ($noteFileCount > 1) {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    $programs->texts->get('programs.member_notes_send_all_button'),
+                    callback_data: 'prg:nd:' . $programId . ':al',
+                ),
+            );
+        }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $programs->texts,
+            $page,
+            $total,
+            'prg:nd:' . $programId . ':pg:',
+            'prg:in:' . $programId,
         );
 
         CallbackUi::editCurrentMessage(
             $bot,
-            $programs->texts->get('programs.member_list_header', [
+            $programs->texts->get('programs.member_notes_header', [
+                'title' => TelegramHtml::escape($title),
                 'page' => (string) ($page + 1),
                 'pages' => (string) InlineMenuHelper::totalPages($total),
             ]),
             $keyboard,
             $programs->interactiveMenus,
             $actorTelegramId,
+            ParseMode::HTML,
+        );
+    }
+
+    public static function editProgramPick(
+        Nutgram $bot,
+        ProgramDeps $programs,
+        int $programId,
+        int $page,
+        int $actorTelegramId,
+    ): void {
+        $program = $programs->programs->find($programId);
+        if ($program === null) {
+            CallbackUi::editCurrentMessage(
+                $bot,
+                $programs->texts->get('programs.not_found'),
+                InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $programs->texts, 'prg:ls:0'),
+                $programs->interactiveMenus,
+                $actorTelegramId,
+            );
+
+            return;
+        }
+
+        $songs = $programs->programs->getSongs($programId);
+        $total = count($songs);
+        $title = (string) ($program['title'] ?? '');
+
+        if ($total === 0) {
+            CallbackUi::editCurrentMessage(
+                $bot,
+                $programs->texts->get('programs.detail_no_songs'),
+                InlineMenuHelper::appendFooter(
+                    InlineKeyboardMarkup::make(),
+                    $programs->texts,
+                    'prg:in:' . $programId,
+                ),
+                $programs->interactiveMenus,
+                $actorTelegramId,
+            );
+
+            return;
+        }
+
+        $page = SqlPagination::clampPage($page);
+        $keyboard = InlineKeyboardMarkup::make();
+        foreach (InlineMenuHelper::pageSlice($songs, $page) as $song) {
+            $songId = (int) $song['song_id'];
+            $songTitle = (string) ($song['title'] ?? '');
+            $label = mb_strlen($songTitle) > 42 ? mb_substr($songTitle, 0, 39) . '…' : $songTitle;
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($label, callback_data: 'prg:pk:' . $programId . ':' . $songId),
+            );
+        }
+
+        $keyboard = InlineMenuHelper::appendPaginationAndFooter(
+            $keyboard,
+            $programs->texts,
+            $page,
+            $total,
+            'prg:pk:' . $programId . ':pg:',
+            'prg:in:' . $programId,
+        );
+
+        CallbackUi::editCurrentMessage(
+            $bot,
+            $programs->texts->get('programs.member_pick_header', [
+                'title' => TelegramHtml::escape($title),
+                'page' => (string) ($page + 1),
+                'pages' => (string) InlineMenuHelper::totalPages($total),
+            ]),
+            $keyboard,
+            $programs->interactiveMenus,
+            $actorTelegramId,
+            ParseMode::HTML,
         );
     }
 
@@ -281,7 +623,7 @@ final class ProgramMemberHandler
             CallbackUi::editCurrentMessage(
                 $bot,
                 $programs->texts->get('programs.not_found'),
-                InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $programs->texts, 'prg:mr:hub'),
+                InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $programs->texts, 'prg:ls:0'),
                 $programs->interactiveMenus,
                 $actorTelegramId,
             );
@@ -293,6 +635,7 @@ final class ProgramMemberHandler
         $filtered = self::filterProgramSongsWithRecordings($programs, $materials, $programId, $partCode);
 
         $total = count($filtered);
+        $back = 'prg:in:' . $programId;
         if ($total === 0) {
             CallbackUi::editCurrentMessage(
                 $bot,
@@ -302,7 +645,7 @@ final class ProgramMemberHandler
                 InlineMenuHelper::appendFooter(
                     InlineKeyboardMarkup::make(),
                     $programs->texts,
-                    'prg:mr:ls:0',
+                    $back,
                 ),
                 $programs->interactiveMenus,
                 $actorTelegramId,
@@ -315,8 +658,8 @@ final class ProgramMemberHandler
         $keyboard = InlineKeyboardMarkup::make();
         foreach (InlineMenuHelper::pageSlice($filtered, $page) as $song) {
             $songId = (int) $song['song_id'];
-            $title = (string) ($song['title'] ?? '');
-            $label = mb_strlen($title) > 42 ? mb_substr($title, 0, 39) . '…' : $title;
+            $songTitle = (string) ($song['title'] ?? '');
+            $label = mb_strlen($songTitle) > 42 ? mb_substr($songTitle, 0, 39) . '…' : $songTitle;
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make($label, callback_data: 'snd:my:' . $songId . ':' . $partCode),
             );
@@ -337,7 +680,7 @@ final class ProgramMemberHandler
             $page,
             $total,
             'prg:mo:' . $programId . ':pg:',
-            'prg:mr:ls:0',
+            $back,
         );
 
         $title = (string) ($program['title'] ?? '');
@@ -411,6 +754,54 @@ final class ProgramMemberHandler
         }
 
         return $filtered;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function filterProgramSongsWithNotes(
+        ProgramDeps $programs,
+        MaterialsDeps $materials,
+        int $programId,
+    ): array {
+        $filtered = [];
+        foreach ($programs->programs->getSongs($programId) as $song) {
+            $songId = (int) $song['song_id'];
+            if ($materials->materials->countCurrentNotes($songId) > 0) {
+                $filtered[] = $song;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function programSongIdsWithNotes(
+        ProgramDeps $programs,
+        MaterialsDeps $materials,
+        int $programId,
+    ): array {
+        $ids = [];
+        foreach (self::filterProgramSongsWithNotes($programs, $materials, $programId) as $song) {
+            $ids[] = (int) $song['song_id'];
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $songs
+     */
+    private static function programNoteFileCount(MaterialsDeps $materials, array $songs): int
+    {
+        $sum = 0;
+        foreach ($songs as $song) {
+            $sum += $materials->materials->countCurrentNotes((int) $song['song_id']);
+        }
+
+        return $sum;
     }
 
     /**
