@@ -57,7 +57,7 @@ final class ProgramMyRecordingsTest extends TestCase
         self::assertNotContains('prg:mr:ls:0', $callbacks);
     }
 
-    public function testHubThreeButtonsWithActiveProgram(): void
+    public function testHubTwoButtonsWithActiveProgram(): void
     {
         $bundle = $this->bundle();
         $admin = $bundle['users']->findByTelegramId(96200);
@@ -72,7 +72,7 @@ final class ProgramMyRecordingsTest extends TestCase
         ProgramMemberHandler::openHub($bot, $bundle['programs'], $bundle['materials'], $member);
 
         $callbacks = $this->callbacks($bot);
-        self::assertContains('prg:mr:ls:0', $callbacks);
+        self::assertNotContains('prg:mr:ls:0', $callbacks);
         self::assertContains('prg:mr:pk', $callbacks);
     }
 

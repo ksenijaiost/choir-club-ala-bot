@@ -25,7 +25,14 @@ final class ProgramCallbackHandler
             return false;
         }
 
-        if (str_starts_with($data, 'prg:mr:') || str_starts_with($data, 'prg:mo:')) {
+        if (
+            str_starts_with($data, 'prg:mr:')
+            || str_starts_with($data, 'prg:mo:')
+            || str_starts_with($data, 'prg:ls:')
+            || str_starts_with($data, 'prg:in:')
+            || str_starts_with($data, 'prg:nd:')
+            || str_starts_with($data, 'prg:pk:')
+        ) {
             return ProgramMemberHandler::handleCallback(
                 $bot,
                 $programs,
