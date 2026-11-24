@@ -172,6 +172,22 @@ final class ProgramMemberHandler
             return true;
         }
 
+        if (preg_match('/^prg:mo:(\d+):al$/', $data, $m) === 1) {
+            SafeTelegram::answerCallbackQuery($bot);
+            CallbackUi::clearKeyboard($bot);
+            $programId = (int) $m[1];
+            $filtered = self::filterProgramSongsWithRecordings($programs, $materials, $programId, $partCode);
+            $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
+            $materials->delivery->sendAllMyRecordingsForSongs(
+                $bot,
+                self::mapSongsForDelivery($filtered),
+                $partCode,
+                $allParts,
+            );
+
+            return true;
+        }
+
         if (preg_match('/^prg:mo:(\d+)$/', $data, $m) === 1) {
             SafeTelegram::answerCallbackQuery($bot);
             self::editProgramSongs($bot, $programs, $materials, (int) $m[1], $partCode, 0, $telegramId);
@@ -273,18 +289,8 @@ final class ProgramMemberHandler
             return;
         }
 
-        $songs = $programs->programs->getSongs($programId);
         $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
-        $filtered = [];
-        foreach ($songs as $song) {
-            $songId = (int) $song['song_id'];
-            $has = $allParts
-                ? $materials->materials->listCurrentRecordingsAllParts($songId) !== []
-                : $materials->materials->songHasRecordingsForPart($songId, $partCode);
-            if ($has) {
-                $filtered[] = $song;
-            }
-        }
+        $filtered = self::filterProgramSongsWithRecordings($programs, $materials, $programId, $partCode);
 
         $total = count($filtered);
         if ($total === 0) {
@@ -313,6 +319,15 @@ final class ProgramMemberHandler
             $label = mb_strlen($title) > 42 ? mb_substr($title, 0, 39) . '…' : $title;
             $keyboard = $keyboard->addRow(
                 InlineKeyboardButton::make($label, callback_data: 'snd:my:' . $songId . ':' . $partCode),
+            );
+        }
+
+        if (self::programRecordingCount($materials, $filtered, $partCode, $allParts) > 1) {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    $programs->texts->get('programs.member_send_all_button'),
+                    callback_data: 'prg:mo:' . $programId . ':al',
+                ),
             );
         }
 
@@ -368,6 +383,69 @@ final class ProgramMemberHandler
         $sum = 0;
         foreach ($songs as $song) {
             $sum += (int) ($song['recording_count'] ?? 0);
+        }
+
+        return $sum;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function filterProgramSongsWithRecordings(
+        ProgramDeps $programs,
+        MaterialsDeps $materials,
+        int $programId,
+        string $partCode,
+    ): array {
+        $songs = $programs->programs->getSongs($programId);
+        $allParts = $partCode === VoicePartRules::RECORDINGS_ALL_PARTS;
+        $filtered = [];
+        foreach ($songs as $song) {
+            $songId = (int) $song['song_id'];
+            $has = $allParts
+                ? $materials->materials->listCurrentRecordingsAllParts($songId) !== []
+                : $materials->materials->songHasRecordingsForPart($songId, $partCode);
+            if ($has) {
+                $filtered[] = $song;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $filtered
+     * @return list<array{id: int, title: string}>
+     */
+    private static function mapSongsForDelivery(array $filtered): array
+    {
+        $mapped = [];
+        foreach ($filtered as $song) {
+            $mapped[] = [
+                'id' => (int) $song['song_id'],
+                'title' => (string) ($song['title'] ?? ''),
+            ];
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $filtered
+     */
+    private static function programRecordingCount(
+        MaterialsDeps $materials,
+        array $filtered,
+        string $partCode,
+        bool $allParts,
+    ): int {
+        $sum = 0;
+        foreach ($filtered as $song) {
+            $songId = (int) $song['song_id'];
+            $rows = $allParts
+                ? $materials->materials->listCurrentRecordingsAllParts($songId)
+                : $materials->materials->listCurrentRecordings($songId, $partCode);
+            $sum += count($rows);
         }
 
         return $sum;
