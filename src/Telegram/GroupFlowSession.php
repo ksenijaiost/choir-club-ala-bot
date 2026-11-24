@@ -7,9 +7,6 @@ namespace App\Telegram;
 use App\Repositories\UserFlowRepository;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
-use SergiX44\Nutgram\Telegram\Types\Keyboard\ForceReply;
-use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
-use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class GroupFlowSession
 {
@@ -77,34 +74,10 @@ final class GroupFlowSession
         Nutgram $bot,
         TextRepository $texts,
         string $promptText,
-        array $ctx,
+        array &$ctx,
         ?string $cancelCallback = null,
     ): void {
-        $chatId = self::targetChatId($ctx, $bot, (int) ($ctx[self::CTX_OWNER] ?? $bot->userId() ?? 0));
-        $replyTo = (int) ($ctx[self::CTX_REPLY_TO] ?? 0);
-
-        if (self::isGroupContext($ctx)) {
-            $force = ForceReply::make(force_reply: true, selective: true);
-            SafeTelegram::sendMessage(
-                $bot,
-                $promptText,
-                $chatId,
-                $force,
-                null,
-                false,
-                $replyTo > 0 ? $replyTo : null,
-            );
-            if ($cancelCallback !== null && $cancelCallback !== '') {
-                $cancelKeyboard = InlineKeyboardMarkup::make()->addRow(
-                    InlineKeyboardButton::make($texts->get('buttons.cancel'), callback_data: $cancelCallback),
-                );
-                SafeTelegram::sendMessage($bot, $texts->get('common.tap_cancel_to_abort'), $chatId, $cancelKeyboard);
-            }
-
-            return;
-        }
-
-        SafeTelegram::sendMessage($bot, $promptText, $chatId > 0 ? $chatId : null);
+        FlowStepCleanup::sendStepPrompt($bot, $texts, $promptText, $ctx, $cancelCallback);
     }
 
     public static function flowBlocksOtherChat(
