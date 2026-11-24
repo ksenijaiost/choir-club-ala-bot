@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Repositories\ProgramRepository;
+use App\Telegram\TelegramHtml;
 use App\Text\TextRepository;
 
 final class ProgramMessageBuilder
@@ -15,12 +16,12 @@ final class ProgramMessageBuilder
     ) {
     }
 
-      /**
+    /**
      * @param array<string, mixed> $program
      */
     public function notifyBody(array $program, bool $isUpdate): string
     {
-        $title = (string) ($program['title'] ?? '');
+        $title = TelegramHtml::escape((string) ($program['title'] ?? ''));
         $dateSuffix = $this->dateSuffix($program);
         $headerKey = $isUpdate ? 'programs.notify_header_updated' : 'programs.notify_header_new';
         $lines = [$this->texts->get($headerKey, [
@@ -31,7 +32,7 @@ final class ProgramMessageBuilder
         $songs = $this->programs->getSongs((int) $program['id']);
         $n = 1;
         foreach ($songs as $row) {
-            $lines[] = $n . '. ' . (string) ($row['title'] ?? '');
+            $lines[] = $n . '. ' . TelegramHtml::escape((string) ($row['title'] ?? ''));
             $n++;
         }
 
@@ -71,7 +72,7 @@ final class ProgramMessageBuilder
         }
 
         return $this->texts->get('programs.date_title_suffix', [
-            'date' => $this->formatDateLine($program),
+            'date' => TelegramHtml::escape($this->formatDateLine($program)),
         ]);
     }
 

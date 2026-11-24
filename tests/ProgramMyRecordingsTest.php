@@ -86,7 +86,15 @@ final class ProgramMyRecordingsTest extends TestCase
         $materialsDeps = MaterialsTestDeps::build($config, $users, $flows, $songs, $materials, $texts, $interactive);
         $programsRepo = new ProgramRepository($pdo);
         $programMessages = new ProgramMessageBuilder($texts, $programsRepo);
-        $delivery = new ProgramDeliveryService($config, $users, $programsRepo, $programMessages, $texts, new RecordingTelegramOutbound());
+        $delivery = new ProgramDeliveryService(
+            $config,
+            $users,
+            $programsRepo,
+            $programMessages,
+            $texts,
+            new RecordingTelegramOutbound(),
+            new \App\Repositories\ProgramNotifyDeliveryRepository($pdo),
+        );
         $programDeps = new ProgramDeps($config, $users, $flows, $programsRepo, $songs, $programMessages, $delivery, $texts, $interactive);
 
         return [

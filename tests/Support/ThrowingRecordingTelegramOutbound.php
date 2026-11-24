@@ -6,6 +6,7 @@ namespace App\Tests\Support;
 
 use App\Telegram\TelegramOutbound;
 use SergiX44\Nutgram\Telegram\Exceptions\TelegramException;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 final class ThrowingRecordingTelegramOutbound implements TelegramOutbound
@@ -28,13 +29,17 @@ final class ThrowingRecordingTelegramOutbound implements TelegramOutbound
         return $this->inner->messages;
     }
 
-    public function sendMessage(int $chatId, string $text, ?InlineKeyboardMarkup $replyMarkup = null): ?int
-    {
+    public function sendMessage(
+        int $chatId,
+        string $text,
+        ?InlineKeyboardMarkup $replyMarkup = null,
+        ?ParseMode $parseMode = null,
+    ): ?int {
         if ($chatId === $this->failChatId) {
             throw new TelegramException($this->message, $this->code);
         }
 
-        return $this->inner->sendMessage($chatId, $text, $replyMarkup);
+        return $this->inner->sendMessage($chatId, $text, $replyMarkup, $parseMode);
     }
 
     public function closeCheckinPrompt(int $chatId, int $messageId, string $questionText, string $closedSuffix): void

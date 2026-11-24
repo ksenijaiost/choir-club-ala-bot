@@ -79,7 +79,7 @@ final class RehearsalRsvpStatusService
             }
 
             if ($delivery !== null && ($delivery['status'] ?? '') === DayBeforeReminderDeliveryRepository::STATUS_FAILED) {
-                $undelivered[] = $this->enrichUser($user, $mark, $answer);
+                $undelivered[] = $this->enrichUser($user, $mark, $answer, $delivery);
 
                 continue;
             }
@@ -114,14 +114,16 @@ final class RehearsalRsvpStatusService
     /**
      * @param array<string, mixed> $user
      * @param array<string, mixed>|null $mark
+     * @param array<string, mixed>|null $delivery
      * @return array<string, mixed>
      */
-    private function enrichUser(array $user, ?array $mark, ?string $answer): array
+    private function enrichUser(array $user, ?array $mark, ?string $answer, ?array $delivery = null): array
     {
         return [
             'user' => $user,
             'mark' => $mark,
             'rsvp_answer' => $answer,
+            'delivery' => $delivery,
         ];
     }
 }

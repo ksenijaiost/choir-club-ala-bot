@@ -55,14 +55,14 @@ final class RehearsalRsvpStatusPresenter
         }
 
         $sections = [
-            ['rsvp.section_yes', $lists['yes'], false],
-            ['rsvp.section_no', $lists['no'], true],
-            ['rsvp.section_pending', $lists['pending'], false],
-            ['rsvp.section_undelivered', $lists['undelivered'], false],
+            ['rsvp.section_yes', $lists['yes'], false, false],
+            ['rsvp.section_no', $lists['no'], true, false],
+            ['rsvp.section_pending', $lists['pending'], false, false],
+            ['rsvp.section_undelivered', $lists['undelivered'], false, true],
         ];
 
         $first = true;
-        foreach ($sections as [$key, $items, $withNoDetail]) {
+        foreach ($sections as [$key, $items, $withNoDetail, $withDeliveryError]) {
             if ($items === []) {
                 continue;
             }
@@ -71,7 +71,7 @@ final class RehearsalRsvpStatusPresenter
             }
             $first = false;
             $lines[] = $this->texts->get($key);
-            $lines = array_merge($lines, $this->formatSortedMemberLines($items, $withNoDetail));
+            $lines = array_merge($lines, $this->formatSortedMemberLines($items, $withNoDetail, $withDeliveryError));
         }
 
         if ($lists['early_absent'] !== []) {
@@ -91,12 +91,12 @@ final class RehearsalRsvpStatusPresenter
      * @param list<array<string, mixed>> $entries with user, mark, rsvp_answer
      * @return list<string>
      */
-    private function formatSortedMemberLines(array $entries, bool $withNoDetail): array
+    private function formatSortedMemberLines(array $entries, bool $withNoDetail, bool $withDeliveryError = false): array
     {
         $sorted = $this->sortByVoiceParts($entries);
         $lines = [];
         foreach ($sorted as $entry) {
-            $lines[] = $this->formatMemberLine($entry, $withNoDetail);
+            $lines[] = $this->formatMemberLine($entry, $withNoDetail, $withDeliveryError);
         }
 
         return $lines;
@@ -144,11 +144,22 @@ final class RehearsalRsvpStatusPresenter
     /**
      * @param array<string, mixed> $entry
      */
-    private function formatMemberLine(array $entry, bool $withNoDetail): string
+    private function formatMemberLine(array $entry, bool $withNoDetail, bool $withDeliveryError = false): string
     {
         $user = $entry['user'];
         $name = (string) ($user['display_name'] ?? '');
         $mark = $entry['mark'];
+
+        if ($withDeliveryError) {
+            $delivery = $entry['delivery'] ?? null;
+            $errorRaw = is_array($delivery) ? ($delivery['error_text'] ?? null) : null;
+            $reason = TelegramDeliveryReason::label($this->texts, is_string($errorRaw) ? $errorRaw : null);
+
+            return $this->texts->get('rsvp.member_line_delivery', [
+                'name' => $name,
+                'reason' => $reason,
+            ]);
+        }
 
         if (!$withNoDetail) {
             return $this->texts->get('rsvp.member_line', ['name' => $name]);

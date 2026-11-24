@@ -203,6 +203,7 @@ final class HandlerRegistry
 
         $programRepo = new ProgramRepository($pdo);
         $programMessages = new ProgramMessageBuilder($texts, $programRepo);
+        $programNotifyDeliveries = new \App\Repositories\ProgramNotifyDeliveryRepository($pdo);
         $programDelivery = new ProgramDeliveryService(
             $config,
             $users,
@@ -210,6 +211,7 @@ final class HandlerRegistry
             $programMessages,
             $texts,
             $outbound,
+            $programNotifyDeliveries,
         );
         $programDeps = new ProgramDeps(
             $config,

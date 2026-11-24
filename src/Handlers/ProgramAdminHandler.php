@@ -8,11 +8,13 @@ use App\Services\AccessControl;
 use App\Services\ProgramDateParser;
 use App\Support\SqlPagination;
 use App\Telegram\CallbackUi;
+use App\Telegram\TelegramHtml;
 use App\Telegram\GroupFlowSession;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\MenuReplyHelper;
 use App\Telegram\SafeTelegram;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
@@ -564,14 +566,14 @@ final class ProgramAdminHandler
 
         $lines = [
             $deps->texts->get('programs.detail_header', [
-                'title' => (string) ($program['title'] ?? ''),
-                'date' => $deps->programMessages->formatDateLine($program),
+                'title' => TelegramHtml::escape((string) ($program['title'] ?? '')),
+                'date' => TelegramHtml::escape($deps->programMessages->formatDateLine($program)),
             ]),
         ];
         $songs = $deps->programs->getSongs($programId);
         $n = 1;
         foreach ($songs as $song) {
-            $lines[] = $n . '. ' . (string) ($song['title'] ?? '');
+            $lines[] = $n . '. ' . TelegramHtml::escape((string) ($song['title'] ?? ''));
             $n++;
         }
         if ($songs === []) {
@@ -631,7 +633,14 @@ final class ProgramAdminHandler
         $back = $archived ? 'prg:ar' : 'prg:home';
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $deps->texts, $back);
 
-        CallbackUi::editCurrentMessage($bot, implode("\n", $lines), $keyboard, $deps->interactiveMenus, $actorTg);
+        CallbackUi::editCurrentMessage(
+            $bot,
+            implode("\n", $lines),
+            $keyboard,
+            $deps->interactiveMenus,
+            $actorTg,
+            ParseMode::HTML,
+        );
     }
 
     private static function editSongPicker(
@@ -679,13 +688,14 @@ final class ProgramAdminHandler
         CallbackUi::editCurrentMessage(
             $bot,
             $deps->texts->get('programs.edit_songs_header', [
-                'title' => (string) ($program['title'] ?? ''),
+                'title' => TelegramHtml::escape((string) ($program['title'] ?? '')),
                 'page' => (string) ($page + 1),
                 'pages' => (string) InlineMenuHelper::totalPages($total),
             ]),
             $keyboard,
             $deps->interactiveMenus,
             $actorTg,
+            ParseMode::HTML,
         );
     }
 
@@ -702,7 +712,8 @@ final class ProgramAdminHandler
         }
 
         $result = $deps->delivery->notifyParticipants($bot, $program, $isUpdate);
-        $deps->delivery->sendResultToConductor($bot, $actorTg, $result['sent'], $result['total']);
+        $chatId = (int) ($bot->chatId() ?? $actorTg);
+        $deps->delivery->sendResultSummary($bot, $chatId, $result);
         self::editDetail($bot, $deps, $programId, $actorTg);
     }
 

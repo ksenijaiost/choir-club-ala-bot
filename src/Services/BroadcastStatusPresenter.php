@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Repositories\BroadcastRepository;
 use App\Repositories\UserRepository;
+use App\Telegram\TelegramHtml;
 use App\Telegram\TelegramMessageChunker;
 use App\Text\TextRepository;
 
@@ -49,8 +50,8 @@ final class BroadcastStatusPresenter
         $names = $this->nameCounts($recipients);
 
         $blocks = [$this->texts->get('broadcast.status_text_header', [
-            'text' => (string) ($broadcast['text'] ?? ''),
-            'status' => $this->statusLabel($broadcast),
+            'text' => TelegramHtml::escape((string) ($broadcast['text'] ?? '')),
+            'status' => TelegramHtml::escape($this->statusLabel($broadcast)),
         ])];
 
         $read = [];
@@ -59,7 +60,11 @@ final class BroadcastStatusPresenter
         foreach ($recipients as $row) {
             $line = $this->formatPersonLine($row, $names);
             if (($row['delivery_error'] ?? null) !== null && ($row['delivery_error'] ?? '') !== '') {
-                $failed[] = $line;
+                $reason = TelegramDeliveryReason::label($this->texts, (string) $row['delivery_error']);
+                $failed[] = $this->texts->get('broadcast.status_failed_line', [
+                    'name' => TelegramHtml::escape(trim((string) ($row['display_name'] ?? '')) ?: '#' . (int) ($row['user_id'] ?? 0)),
+                    'reason' => TelegramHtml::escape($reason),
+                ]);
             } elseif (($row['read_at'] ?? null) !== null && ($row['read_at'] ?? '') !== '') {
                 $read[] = $line;
             } else {
@@ -93,8 +98,8 @@ final class BroadcastStatusPresenter
 
         $names = $this->nameCounts(array_merge($recipients, $answers));
         $blocks = [$this->texts->get('broadcast.status_poll_header', [
-            'question' => (string) ($broadcast['text'] ?? ''),
-            'status' => $this->statusLabel($broadcast),
+            'question' => TelegramHtml::escape((string) ($broadcast['text'] ?? '')),
+            'status' => TelegramHtml::escape($this->statusLabel($broadcast)),
         ])];
 
         foreach ($options as $option) {
@@ -106,7 +111,7 @@ final class BroadcastStatusPresenter
                 }
             }
             $blocks[] = $this->texts->get('broadcast.status_poll_option', [
-                'option' => (string) ($option['label'] ?? ''),
+                'option' => TelegramHtml::escape((string) ($option['label'] ?? '')),
                 'names' => $this->joinOrDash($voters),
             ]);
         }
@@ -120,7 +125,7 @@ final class BroadcastStatusPresenter
             if ($custom === '') {
                 continue;
             }
-            $customLines[] = $this->formatPersonLine($answer, $names) . ': ' . $custom;
+            $customLines[] = $this->formatPersonLine($answer, $names) . ': ' . TelegramHtml::escape($custom);
         }
         if ((bool) ((int) ($broadcast['allow_custom'] ?? 0))) {
             $blocks[] = $this->texts->get('broadcast.status_poll_custom', [
@@ -139,7 +144,15 @@ final class BroadcastStatusPresenter
                 continue;
             }
             if (!isset($answeredUserIds[$uid])) {
-                $noAnswer[] = $this->formatPersonLine($row, $names);
+                if (($row['delivery_error'] ?? null) !== null && ($row['delivery_error'] ?? '') !== '') {
+                    $reason = TelegramDeliveryReason::label($this->texts, (string) $row['delivery_error']);
+                    $noAnswer[] = $this->texts->get('broadcast.status_failed_line', [
+                        'name' => TelegramHtml::escape(trim((string) ($row['display_name'] ?? '')) ?: '#' . $uid),
+                        'reason' => TelegramHtml::escape($reason),
+                    ]);
+                } else {
+                    $noAnswer[] = $this->formatPersonLine($row, $names);
+                }
             }
         }
         $blocks[] = $this->texts->get('broadcast.status_poll_no_answer', [
@@ -194,7 +207,7 @@ final class BroadcastStatusPresenter
             }
         }
 
-        return '• ' . $name;
+        return '• ' . TelegramHtml::escape($name);
     }
 
     /**

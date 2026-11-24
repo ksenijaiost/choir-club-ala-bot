@@ -145,7 +145,15 @@ final class RehearsalRsvpAdminHandler
                 'ok' => $deps->texts->get('rsvp.nudge_ok', ['count' => (string) $result['sent']]),
                 default => $deps->texts->get('errors.generic'),
             };
-            SafeTelegram::answerCallbackQuery($bot, ['text' => $text, 'show_alert' => true]);
+            if ($result['reason'] === 'ok') {
+                SafeTelegram::answerCallbackQuery($bot);
+                $chatId = $bot->chatId();
+                if ($chatId !== null) {
+                    SafeTelegram::sendMessage($bot, $text, (int) $chatId);
+                }
+            } else {
+                SafeTelegram::answerCallbackQuery($bot, ['text' => $text, 'show_alert' => true]);
+            }
 
             return true;
         }

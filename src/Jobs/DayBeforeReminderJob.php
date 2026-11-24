@@ -14,6 +14,7 @@ use App\Repositories\JobDeliveryRepository;
 use App\Repositories\RehearsalRepository;
 use App\Repositories\UserRepository;
 use App\Services\AttendanceMessageFactory;
+use App\Services\TelegramDeliveryReason;
 use App\Telegram\TelegramOutbound;
 
 final class DayBeforeReminderJob
@@ -67,7 +68,11 @@ final class DayBeforeReminderJob
                     $this->reminderDeliveries->recordSent($rehearsalId, $userId);
                     $sent++;
                 } catch (\Throwable $e) {
-                    $this->reminderDeliveries->recordFailed($rehearsalId, $userId, $e->getMessage());
+                    $this->reminderDeliveries->recordFailed(
+                        $rehearsalId,
+                        $userId,
+                        TelegramDeliveryReason::codeFromThrowable($e),
+                    );
                 }
             }
         }

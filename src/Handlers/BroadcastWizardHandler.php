@@ -6,6 +6,7 @@ namespace App\Handlers;
 
 use App\Repositories\BroadcastRepository;
 use App\Services\AccessControl;
+use App\Services\TelegramDeliveryReason;
 use App\Telegram\CallbackUi;
 use App\Telegram\GroupFlowSession;
 use App\Telegram\InlineMenuHelper;
@@ -293,10 +294,12 @@ final class BroadcastWizardHandler
         $stats = $deps->delivery->deliverToParticipants($broadcastId, $actor);
         $deps->flows->clear($telegramId);
 
-        $result = $deps->texts->get('broadcast.wizard_sent', [
-            'sent' => (string) $stats['sent'],
-            'failed' => (string) $stats['failed'],
-        ]);
+        $result = TelegramDeliveryReason::formatSummary(
+            $deps->texts,
+            (int) $stats['sent'],
+            (int) $stats['total'],
+            $stats['failures'],
+        );
         CallbackUi::editCurrentMessage($bot, $result, null, $deps->interactiveMenus, $telegramId);
         if (GroupFlowSession::isGroupContext($ctx)) {
             SafeTelegram::sendMessage(

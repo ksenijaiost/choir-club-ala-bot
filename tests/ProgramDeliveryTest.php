@@ -9,6 +9,7 @@ use App\Database\Connection;
 use App\Database\Migrator;
 use App\Domain\UserRole;
 use App\Domain\UserStatus;
+use App\Repositories\ProgramNotifyDeliveryRepository;
 use App\Repositories\ProgramRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\UserRepository;
@@ -48,6 +49,7 @@ final class ProgramDeliveryTest extends TestCase
             new ProgramMessageBuilder($texts, $programs),
             $texts,
             $outbound,
+            new ProgramNotifyDeliveryRepository($pdo),
         );
 
         $bot = Nutgram::fake();

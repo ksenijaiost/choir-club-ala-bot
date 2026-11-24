@@ -9,6 +9,7 @@ use App\Repositories\RehearsalRepository;
 use App\Repositories\RehearsalRsvpNudgeRepository;
 use App\Repositories\RehearsalRsvpRepository;
 use App\Repositories\UserRepository;
+use App\Services\TelegramDeliveryReason;
 use App\Telegram\TelegramOutbound;
 
 final class RehearsalRsvpNudgeService
@@ -73,7 +74,12 @@ final class RehearsalRsvpNudgeService
             try {
                 $this->outbound->sendMessage((int) $user['telegram_id'], $text, $keyboard);
                 $sent++;
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                $this->deliveries->recordFailed(
+                    $rehearsalId,
+                    $userId,
+                    TelegramDeliveryReason::codeFromThrowable($e),
+                );
             }
         }
 
