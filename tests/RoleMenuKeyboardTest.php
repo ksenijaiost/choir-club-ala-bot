@@ -59,7 +59,6 @@ final class RoleMenuKeyboardTest extends TestCase
                 UserRole::CONDUCTOR,
                 [
                     $texts->get('menu.schedule'),
-                    $texts->get('menu.wont_come'),
                     $texts->get('menu.find_song'),
                     $texts->get('menu.my_recordings'),
                     $texts->get('menu.member_programs'),
@@ -136,6 +135,11 @@ final class RoleMenuKeyboardTest extends TestCase
 
         if ($role === UserRole::ADMIN) {
             self::assertNotContains($texts->get('menu.admin_attendance'), $labels);
+        }
+
+        if ($role === UserRole::CONDUCTOR) {
+            self::assertNotContains($texts->get('menu.wont_come'), $labels);
+            self::assertNotContains($texts->get('menu.payment'), $labels);
         }
     }
 

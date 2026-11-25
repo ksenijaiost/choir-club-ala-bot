@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
+use App\Domain\UserRole;
 use App\Repositories\AttendanceMarkRepository;
 use App\Repositories\UserRepository;
 
@@ -24,6 +25,10 @@ final class AttendanceService
    */
     public function recordWarned(array $user, int $rehearsalId, string $source, ?string $reason = null): void
     {
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            return;
+        }
+
         $userId = (int) $user['id'];
         $this->marks->upsert($rehearsalId, $userId, AttendanceMark::WARNED, $source, $reason);
         $this->users->resetConsecutiveUnexcused($userId);
@@ -34,6 +39,10 @@ final class AttendanceService
      */
     public function recordAttended(array $user, int $rehearsalId): void
     {
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            return;
+        }
+
         $userId = (int) $user['id'];
         $this->marks->upsert($rehearsalId, $userId, AttendanceMark::ATTENDED, AttendanceSource::CHECKIN, null);
         $this->users->resetConsecutiveUnexcused($userId);
@@ -44,6 +53,10 @@ final class AttendanceService
      */
     public function recordUnexcused(array $user, int $rehearsalId, string $source): void
     {
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            return;
+        }
+
         $existing = $this->marks->find($rehearsalId, (int) $user['id']);
         if ($existing !== null) {
             return;

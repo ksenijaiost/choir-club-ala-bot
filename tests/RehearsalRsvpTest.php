@@ -114,7 +114,7 @@ final class RehearsalRsvpTest extends TestCase
         $deliveries->recordFailed($rehearsalId, $users->create(88010, 'Фейл', 'alto_1', UserRole::MEMBER, UserStatus::ACTIVE), 'blocked');
 
         $service = new \App\Services\RehearsalRsvpStatusService($rsvp, $deliveries, $marks);
-        $lists = $service->buildLists($rehearsalId, $users->listActiveParticipants());
+        $lists = $service->buildLists($rehearsalId, $users->listAttendanceParticipants());
 
         self::assertTrue($lists['reminder_started']);
         self::assertCount(1, $lists['yes']);

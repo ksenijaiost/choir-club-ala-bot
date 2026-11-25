@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Telegram;
 
+use App\Domain\UserRole;
 use App\Handlers\PaymentMemberHandler;
 use App\Services\AccessControl;
 use App\Text\TextRepository;
@@ -19,8 +20,13 @@ final class MenuButtonAccess
         array $user,
         string $label,
     ): bool {
+        if ($label === $texts->get('menu.wont_come')) {
+            $role = (string) ($user['role'] ?? '');
+
+            return UserRole::participatesInAttendance($role);
+        }
+
         if ($label === $texts->get('menu.schedule')
-            || $label === $texts->get('menu.wont_come')
             || $label === $texts->get('menu.find_song')
             || $label === $texts->get('menu.my_recordings')
             || $label === $texts->get('menu.member_programs')

@@ -170,12 +170,16 @@ final class UserRepository
 
         if ($existing === null) {
             $this->create($telegramId, $displayName, null, UserRole::CONDUCTOR, UserStatus::ACTIVE);
+            $created = $this->findByTelegramId($telegramId);
+            if ($created !== null) {
+                $this->resetConsecutiveUnexcused((int) $created['id']);
+            }
 
             return;
         }
 
         $stmt = $this->pdo->prepare(
-            'UPDATE users SET role = ?, status = ?, voice_part = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+            'UPDATE users SET role = ?, status = ?, voice_part = NULL, consecutive_unexcused = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
         );
         $stmt->execute([UserRole::CONDUCTOR, UserStatus::ACTIVE, $existing['id']]);
     }
@@ -197,6 +201,7 @@ final class UserRepository
             $this->demoteAllConductorsToMember();
             $this->updateRole($userId, UserRole::CONDUCTOR);
             $this->clearVoicePart($userId);
+            $this->resetConsecutiveUnexcused($userId);
             $this->pdo->commit();
         } catch (\Throwable $e) {
             $this->pdo->rollBack();
@@ -291,7 +296,7 @@ final class UserRepository
     }
 
     /**
-     * Участники посещаемости: active member/admin/conductor/owner.
+     * Получатели материалов, программ и рассылок: active member/admin/conductor/owner.
      *
      * @return list<array<string, mixed>>
      */
@@ -307,6 +312,21 @@ final class UserRepository
             UserRole::CONDUCTOR,
             UserRole::OWNER,
         ]);
+
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Участники посещаемости и напоминаний накануне (без дирижёра).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listAttendanceParticipants(): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM users WHERE status = ? AND role IN (?, ?, ?) ORDER BY id ASC'
+        );
+        $stmt->execute([UserStatus::ACTIVE, UserRole::MEMBER, UserRole::ADMIN, UserRole::OWNER]);
 
         return $stmt->fetchAll();
     }

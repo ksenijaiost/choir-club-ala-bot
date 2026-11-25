@@ -8,6 +8,7 @@ use App\Clock;
 use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
 use App\Domain\RehearsalRsvpAnswer;
+use App\Domain\UserRole;
 use App\Domain\UserStatus;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
@@ -76,6 +77,13 @@ final class AttendanceCallbackHandler
         $user = $deps->users->findByTelegramId($telegramId);
         if ($user === null || ($user['status'] ?? '') !== UserStatus::ACTIVE) {
             $bot->answerCallbackQuery();
+
+            return;
+        }
+
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
 
             return;
         }
@@ -348,6 +356,13 @@ final class AttendanceCallbackHandler
             return null;
         }
 
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+
+            return null;
+        }
+
         $rehearsal = $deps->rehearsals->findById($rehearsalId);
         if ($rehearsal === null) {
             $bot->answerCallbackQuery();
@@ -392,6 +407,13 @@ final class AttendanceCallbackHandler
         $user = $deps->users->findByTelegramId($telegramId);
         if ($user === null || ($user['status'] ?? '') !== UserStatus::ACTIVE) {
             $bot->answerCallbackQuery();
+
+            return;
+        }
+
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
 
             return;
         }

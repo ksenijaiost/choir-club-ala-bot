@@ -45,10 +45,16 @@ final class MenuKeyboard
         $role = (string) ($user['role'] ?? UserRole::MEMBER);
         $rows = [];
 
-        $rows[] = [
-            $texts->get('menu.schedule'),
-            $texts->get('menu.wont_come'),
-        ];
+        if ($role === UserRole::CONDUCTOR) {
+            $rows[] = [
+                $texts->get('menu.schedule'),
+            ];
+        } else {
+            $rows[] = [
+                $texts->get('menu.schedule'),
+                $texts->get('menu.wont_come'),
+            ];
+        }
 
         $rows[] = [
             $texts->get('menu.find_song'),

@@ -51,7 +51,7 @@ final class DayBeforeReminderJob
             $text = $this->messages->dayBeforeText($rehearsal, $tz);
             $keyboard = $this->messages->dayBeforeKeyboard($rehearsalId);
 
-            foreach ($this->users->listActiveParticipants() as $user) {
+            foreach ($this->users->listAttendanceParticipants() as $user) {
                 $userId = (int) $user['id'];
                 $jobKey = 'day_before:' . $rehearsalId . ':' . $userId;
                 if ($this->deliveries->wasDelivered($jobKey)) {

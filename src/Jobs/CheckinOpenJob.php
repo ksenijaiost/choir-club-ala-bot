@@ -50,7 +50,7 @@ final class CheckinOpenJob
             $text = $this->texts->get('checkin.question');
             $keyboard = $this->messages->checkinKeyboard($rehearsalId);
 
-            foreach ($this->users->listActiveParticipants() as $user) {
+            foreach ($this->users->listAttendanceParticipants() as $user) {
                 $userId = (int) $user['id'];
                 $mark = $this->marks->find($rehearsalId, $userId);
                 if ($mark !== null && ($mark['mark'] ?? '') === AttendanceMark::WARNED) {

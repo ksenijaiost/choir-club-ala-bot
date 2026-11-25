@@ -10,4 +10,9 @@ final class UserRole
     public const ADMIN = 'admin';
     public const CONDUCTOR = 'conductor';
     public const OWNER = 'owner';
+
+    public static function participatesInAttendance(string $role): bool
+    {
+        return $role !== self::CONDUCTOR;
+    }
 }
