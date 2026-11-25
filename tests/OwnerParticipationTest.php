@@ -100,7 +100,35 @@ final class OwnerParticipationTest extends TestCase
         }
 
         self::assertSame(UserStatus::ACTIVE, $conductor['status']);
-        self::assertSame(4, (int) ($conductor['consecutive_unexcused'] ?? 0));
+        self::assertSame(0, (int) ($conductor['consecutive_unexcused'] ?? 0));
+
+        $strikeTexts = array_filter(
+            $outbound->messages,
+            static fn (array $message): bool => str_contains($message['text'], 'пропуск'),
+        );
+        self::assertSame([], $strikeTexts);
+    }
+
+    public function testConductorInMaterialRecipientsNotInAttendanceList(): void
+    {
+        $pdo = Connection::make($this->testConfig());
+        (new Migrator($pdo, 'sqlite'))->migrate();
+
+        $users = new UserRepository($pdo);
+        $users->create(10, 'Участник', 'tenor', UserRole::MEMBER, UserStatus::ACTIVE);
+        $users->upsertConductor(88, 'Дирижёр');
+
+        $materialIds = array_map(
+            static fn (array $row): int => (int) $row['telegram_id'],
+            $users->listActiveParticipants(),
+        );
+        self::assertContains(88, $materialIds);
+
+        $attendanceIds = array_map(
+            static fn (array $row): int => (int) $row['telegram_id'],
+            $users->listAttendanceParticipants(),
+        );
+        self::assertNotContains(88, $attendanceIds);
     }
 
     private function testConfig(): Config

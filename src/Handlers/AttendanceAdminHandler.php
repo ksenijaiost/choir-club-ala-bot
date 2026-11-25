@@ -252,7 +252,7 @@ final class AttendanceAdminHandler
             $rsvpByUser[(int) $rsvpRow['user_id']] = (string) $rsvpRow['answer'];
         }
 
-        $participants = $deps->users->listActiveParticipants();
+        $participants = $deps->users->listAttendanceParticipants();
         $total = count($participants);
         $slice = InlineMenuHelper::pageSlice($participants, $page);
 
@@ -372,7 +372,7 @@ final class AttendanceAdminHandler
 
     private static function sendMemberPicker(Nutgram $bot, TextRepository $texts, AttendanceDeps $deps, int $page): void
     {
-        $all = $deps->users->listActiveParticipants();
+        $all = $deps->users->listAttendanceParticipants();
         $total = count($all);
         if ($total === 0) {
             $bot->sendMessage($texts->get('attendance.member_pick'));

@@ -174,7 +174,7 @@ final class RehearsalRsvpAdminHandler
             ];
         }
 
-        $participants = $deps->users->listActiveParticipants();
+        $participants = $deps->users->listAttendanceParticipants();
         $lists = $deps->rsvpStatus->buildLists($rehearsalId, $participants);
         $header = $deps->rsvpPresenter->headerText($rehearsal, $tz);
         $body = $deps->rsvpPresenter->buildBody($lists);

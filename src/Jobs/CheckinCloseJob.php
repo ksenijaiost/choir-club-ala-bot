@@ -64,7 +64,7 @@ final class CheckinCloseJob
             }
             $this->prompts->deleteForRehearsal($rehearsalId);
 
-            foreach ($this->users->listActiveParticipants() as $user) {
+            foreach ($this->users->listAttendanceParticipants() as $user) {
                 $userId = (int) $user['id'];
                 if ($this->marks->hasMark($rehearsalId, $userId)) {
                     continue;

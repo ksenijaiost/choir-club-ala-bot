@@ -7,6 +7,7 @@ namespace App\Handlers;
 use App\Clock;
 use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
+use App\Domain\UserRole;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
 use App\Telegram\MenuReplyHelper;
@@ -60,6 +61,12 @@ final class AttendanceMemberHandler
         $rehearsal = $deps->rehearsals->findById($rehearsalId);
         $user = $deps->users->findByTelegramId($telegramId);
         if ($rehearsal === null || $user === null) {
+            $deps->flows->clear($telegramId);
+
+            return true;
+        }
+
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
             $deps->flows->clear($telegramId);
 
             return true;

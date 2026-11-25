@@ -25,6 +25,10 @@ final class AttendanceDiscipline
      */
     public function onUnexcusedRecorded(array $user): void
     {
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            return;
+        }
+
         $userId = (int) $user['id'];
         $count = $this->users->incrementConsecutiveUnexcused($userId);
         $telegramId = (int) $user['telegram_id'];
@@ -65,6 +69,6 @@ final class AttendanceDiscipline
     {
         $role = (string) ($user['role'] ?? '');
 
-        return $role === UserRole::OWNER || $role === UserRole::CONDUCTOR;
+        return $role === UserRole::OWNER;
     }
 }
