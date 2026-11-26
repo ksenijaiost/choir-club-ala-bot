@@ -19,6 +19,7 @@ use App\Services\AttendanceService;
 use App\Services\AchievementService;
 use App\Services\AttendanceStreakService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\ChoirWrappedService;
 use App\Services\PartBattleService;
 use App\Services\RehearsalRsvpNudgeService;
 use App\Services\RehearsalRsvpStatusPresenter;
@@ -50,6 +51,7 @@ final class AttendanceDeps
         public readonly AttendanceStreakService $streak,
         public readonly AchievementService $achievements,
         public readonly PartBattleService $partBattle,
+        public readonly ChoirWrappedService $wrapped,
     ) {
     }
 }

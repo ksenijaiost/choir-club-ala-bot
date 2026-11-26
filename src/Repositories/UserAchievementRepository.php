@@ -47,6 +47,24 @@ final class UserAchievementRepository
         );
     }
 
+    /**
+     * @return list<string>
+     */
+    public function listCodesAwardedBetween(int $userId, string $fromUtc, string $toUtc): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT code FROM user_achievements
+             WHERE user_id = ? AND awarded_at >= ? AND awarded_at <= ?
+             ORDER BY awarded_at ASC, id ASC'
+        );
+        $stmt->execute([$userId, $fromUtc, $toUtc]);
+
+        return array_map(
+            static fn (array $row): string => (string) $row['code'],
+            $stmt->fetchAll() ?: [],
+        );
+    }
+
     private function driverName(): string
     {
         return (string) $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);

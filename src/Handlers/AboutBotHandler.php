@@ -180,6 +180,13 @@ final class AboutBotHandler
                 'btn_part_battle' => $texts->get('attendance.part_battle_button'),
             ]),
             'btn_part_battle' => $texts->get('attendance.part_battle_button'),
+            'wrapped_about_member' => $texts->get('wrapped.about_member', [
+                'btn_my_summary' => $texts->get('wrapped.my_summary_button'),
+                'btn_my_profile' => $texts->get('menu.my_profile'),
+            ]),
+            'wrapped_about_admin' => $texts->get('wrapped.about_admin', [
+                'btn_season_wrapped' => $texts->get('wrapped.season_button'),
+            ]),
         ];
     }
 

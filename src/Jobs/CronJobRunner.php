@@ -25,6 +25,7 @@ use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\AdminChatResolver;
 use App\Services\NotificationRecipientResolver;
+use App\Services\ChoirWrappedService;
 use App\Services\PartBattleService;
 use App\Services\PaymentTexts;
 use App\Services\PaymentReminderTextService;
@@ -69,6 +70,7 @@ final class CronJobRunner
             'payment_reminder_2' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
             'program_archive' => ['archived' => 0, 'ids' => []],
             'part_battle_monthly' => ['sent' => false, 'not_due' => true],
+            'monthly_wrapped' => ['sent' => 0, 'not_due' => true],
         ];
 
         if ($bot === null || trim($config->botToken) === '') {
@@ -173,6 +175,24 @@ final class CronJobRunner
             $partBattle,
             $deliveries,
             new AdminChatResolver(new BotSettingsRepository($pdo), $config),
+            $outbound,
+        ))->runIfDue($config);
+
+        $wrapped = new ChoirWrappedService(
+            $rehearsals,
+            $users,
+            $marks,
+            $streakAwards,
+            new \App\Repositories\UserAchievementRepository($pdo),
+            new ProgramRepository($pdo),
+            $partBattle,
+            $texts,
+            new PaymentTexts($texts),
+        );
+        $result['monthly_wrapped'] = (new MonthlyWrappedJob(
+            $wrapped,
+            $users,
+            $deliveries,
             $outbound,
         ))->runIfDue($config);
 

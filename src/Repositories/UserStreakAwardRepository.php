@@ -44,6 +44,21 @@ final class UserStreakAwardRepository
         return array_map(static fn (array $row): int => (int) $row['milestone'], $stmt->fetchAll() ?: []);
     }
 
+    /**
+     * @return list<int>
+     */
+    public function listMilestonesAwardedBetween(int $userId, string $fromUtc, string $toUtc): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT milestone FROM user_streak_awards
+             WHERE user_id = ? AND awarded_at >= ? AND awarded_at <= ?
+             ORDER BY milestone ASC'
+        );
+        $stmt->execute([$userId, $fromUtc, $toUtc]);
+
+        return array_map(static fn (array $row): int => (int) $row['milestone'], $stmt->fetchAll() ?: []);
+    }
+
     private function driverName(): string
     {
         return (string) $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);

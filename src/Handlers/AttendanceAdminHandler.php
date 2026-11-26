@@ -41,6 +41,9 @@ final class AttendanceAdminHandler
             )
             ->addRow(
                 InlineKeyboardButton::make($texts->get('attendance.part_battle_button'), callback_data: 'atd:pb'),
+            )
+            ->addRow(
+                InlineKeyboardButton::make($texts->get('wrapped.season_button'), callback_data: 'atd:sw'),
             );
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);

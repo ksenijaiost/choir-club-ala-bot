@@ -27,19 +27,33 @@ final class PartBattleService
     public function buildForMonth(Config $config, int $year, int $month): PartBattleMonthResult
     {
         $tz = new \DateTimeZone($config->timezone);
-        $now = Clock::now($config)->setTimezone($tz);
-        $pivotLocal = ScheduleTime::toStorage($now);
-
         $monthStart = new \DateTimeImmutable(sprintf('%04d-%02d-01 00:00:00', $year, $month), $tz);
         $monthEnd = $monthStart->modify('last day of this month')->setTime(23, 59, 59);
 
-        $rehearsalRows = $this->rehearsals->listPastInCalendarMonth(
-            ScheduleTime::toStorage($monthStart),
-            ScheduleTime::toStorage($monthEnd),
+        return $this->buildForLocalRange($config, $monthStart, $monthEnd, $year, $month);
+    }
+
+    public function buildForLocalRange(
+        Config $config,
+        \DateTimeImmutable $rangeStart,
+        \DateTimeImmutable $rangeEnd,
+        ?int $labelYear = null,
+        ?int $labelMonth = null,
+    ): PartBattleMonthResult {
+        $tz = new \DateTimeZone($config->timezone);
+        $now = Clock::now($config)->setTimezone($tz);
+        $pivotLocal = ScheduleTime::toStorage($now);
+
+        $rehearsalRows = $this->rehearsals->listPastBetween(
+            ScheduleTime::toStorage($rangeStart),
+            ScheduleTime::toStorage($rangeEnd),
             $pivotLocal,
         );
         $rehearsalIds = array_map(static fn (array $row): int => (int) $row['id'], $rehearsalRows);
         $rehearsalCount = count($rehearsalIds);
+
+        $labelYear ??= (int) $rangeEnd->format('Y');
+        $labelMonth ??= (int) $rangeEnd->format('n');
 
         $byPart = [];
         foreach ($this->users->listAttendanceParticipants() as $user) {
@@ -115,7 +129,7 @@ final class PartBattleService
             }
         }
 
-        return new PartBattleMonthResult($year, $month, $rehearsalCount, $rows, $winners);
+        return new PartBattleMonthResult($labelYear, $labelMonth, $rehearsalCount, $rows, $winners);
     }
 
     /**

@@ -317,6 +317,26 @@ final class ProgramRepository
         return array_map(static fn ($row): string => (string) $row, $stmt->fetchAll(\PDO::FETCH_COLUMN));
     }
 
+    /**
+     * Программы с event_date в диапазоне (включительно), любой статус архива.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listByEventDateBetween(string $fromIso, string $toIso): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT p.*, (SELECT COUNT(*) FROM program_songs ps WHERE ps.program_id = p.id) AS song_count
+             FROM programs p
+             WHERE p.event_date IS NOT NULL
+               AND p.event_date >= ?
+               AND p.event_date <= ?
+             ORDER BY p.event_date ASC, p.id ASC'
+        );
+        $stmt->execute([$fromIso, $toIso]);
+
+        return $stmt->fetchAll() ?: [];
+    }
+
     public function markNotified(int $id): void
     {
         $stmt = $this->pdo->prepare(

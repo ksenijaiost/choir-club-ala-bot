@@ -260,6 +260,18 @@ final class HandlerRegistry
             $texts,
             $paymentTexts,
         );
+        $programRepoForWrapped = $programRepo;
+        $wrapped = new \App\Services\ChoirWrappedService(
+            $rehearsals,
+            $users,
+            $marks,
+            $streakAwards,
+            new \App\Repositories\UserAchievementRepository($pdo),
+            $programRepoForWrapped,
+            $partBattle,
+            $texts,
+            $paymentTexts,
+        );
 
         $attendance = new AttendanceDeps(
             $config,
@@ -283,6 +295,7 @@ final class HandlerRegistry
             $streak,
             $achievements,
             $partBattle,
+            $wrapped,
         );
 
         CallbackQueryHandler::register(

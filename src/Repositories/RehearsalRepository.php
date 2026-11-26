@@ -235,6 +235,14 @@ final class RehearsalRepository
      */
     public function listPastInCalendarMonth(string $monthStartLocal, string $monthEndLocal, string $pivotLocal): array
     {
+        return $this->listPastBetween($monthStartLocal, $monthEndLocal, $pivotLocal);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listPastBetween(string $rangeStartLocal, string $rangeEndLocal, string $pivotLocal): array
+    {
         $stmt = $this->pdo->prepare(
             'SELECT * FROM rehearsals
              WHERE status != ?
@@ -243,8 +251,22 @@ final class RehearsalRepository
                AND ends_at <= ?
              ORDER BY starts_at ASC'
         );
-        $stmt->execute(['cancelled', $monthStartLocal, $monthEndLocal, $pivotLocal]);
+        $stmt->execute(['cancelled', $rangeStartLocal, $rangeEndLocal, $pivotLocal]);
 
         return $stmt->fetchAll() ?: [];
+    }
+
+    public function countPastBetween(string $rangeStartLocal, string $rangeEndLocal, string $pivotLocal): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM rehearsals
+             WHERE status != ?
+               AND starts_at >= ?
+               AND starts_at <= ?
+               AND ends_at <= ?'
+        );
+        $stmt->execute(['cancelled', $rangeStartLocal, $rangeEndLocal, $pivotLocal]);
+
+        return (int) $stmt->fetchColumn();
     }
 }

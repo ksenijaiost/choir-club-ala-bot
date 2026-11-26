@@ -143,6 +143,7 @@ final class MenuActionDispatcher
                 $attendance->achievements,
                 $attendance->partBattle,
                 $attendance->config,
+                $attendance->wrapped,
             );
 
             return true;
