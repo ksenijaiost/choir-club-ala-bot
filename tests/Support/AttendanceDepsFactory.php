@@ -50,7 +50,8 @@ final class AttendanceDepsFactory
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
         $streak = new AttendanceStreakService($marks, $users, new UserStreakAwardRepository($pdo), $texts, $recipients, $outbound);
-        $service = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
+        $achievements = AchievementServiceFactory::make($config, $pdo, $texts, $outbound);
+        $service = new AttendanceService($marks, $users, $discipline, $recalculator, $streak, $achievements);
         $messages = new AttendanceMessageFactory($texts);
         $rsvp = new RehearsalRsvpRepository($pdo);
         $dayBefore = new DayBeforeReminderDeliveryRepository($pdo);
@@ -76,6 +77,7 @@ final class AttendanceDepsFactory
             new RehearsalRsvpStatusPresenter($texts),
             new RehearsalRsvpNudgeService($nudgeRepo, $rsvp, $dayBefore, $rehearsals, $users, $messages, $outbound),
             $streak,
+            $achievements,
         );
     }
 }

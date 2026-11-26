@@ -10,6 +10,7 @@ use App\Repositories\SongRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\MaterialNotificationService;
+use App\Services\AchievementService;
 use App\Services\MaterialsService;
 use App\Services\SongDeliveryService;
 use App\Telegram\InteractiveMenuService;
@@ -28,6 +29,7 @@ final class MaterialsDeps
         public readonly MaterialNotificationService $materialNotifications,
         public readonly TextRepository $texts,
         public readonly InteractiveMenuService $interactiveMenus,
+        public readonly AchievementService $achievements,
     ) {
     }
 }

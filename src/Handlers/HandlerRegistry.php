@@ -129,10 +129,20 @@ final class HandlerRegistry
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blockService);
         $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
         $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
-        $attendanceService = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
-        $conductorNotifier = new AttendanceConductorNotifier($recipients, $texts, $outbound);
-
+        $programRepo = new ProgramRepository($pdo);
         $payments = new PaymentRecordRepository($pdo);
+        $achievements = new \App\Services\AchievementService(
+            new \App\Repositories\UserAchievementRepository($pdo),
+            $texts,
+            $outbound,
+            $marks,
+            new DayBeforeReminderDeliveryRepository($pdo),
+            $programRepo,
+            $payments,
+            $settings,
+        );
+        $attendanceService = new AttendanceService($marks, $users, $discipline, $recalculator, $streak, $achievements);
+        $conductorNotifier = new AttendanceConductorNotifier($recipients, $texts, $outbound);
         $paymentTexts = new PaymentTexts($texts);
         $paymentDeps = new PaymentDeps(
             $config,
@@ -145,6 +155,7 @@ final class HandlerRegistry
             $flows,
             new PaymentReminderTextService($settings, $texts, $paymentTexts),
             $interactiveMenus,
+            $achievements,
         );
 
         $songRepo = new SongRepository($pdo);
@@ -161,6 +172,7 @@ final class HandlerRegistry
             new MaterialNotificationService($users, $texts, $materialsService, $outbound),
             $texts,
             $interactiveMenus,
+            $achievements,
         );
 
         $rolePresenter = new UserRolePresenter($texts);
@@ -203,7 +215,6 @@ final class HandlerRegistry
             $outbound,
         );
 
-        $programRepo = new ProgramRepository($pdo);
         $programMessages = new ProgramMessageBuilder($texts, $programRepo);
         $programNotifyDeliveries = new \App\Repositories\ProgramNotifyDeliveryRepository($pdo);
         $programDelivery = new ProgramDeliveryService(
@@ -225,6 +236,7 @@ final class HandlerRegistry
             $programDelivery,
             $texts,
             $interactiveMenus,
+            $achievements,
         );
 
         $rsvpRepo = new RehearsalRsvpRepository($pdo);
@@ -261,6 +273,7 @@ final class HandlerRegistry
             new RehearsalRsvpStatusPresenter($texts),
             $rsvpNudge,
             $streak,
+            $achievements,
         );
 
         CallbackQueryHandler::register(

@@ -8,6 +8,7 @@ use App\Domain\UserRole;
 use App\Domain\VoicePart;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
+use App\Services\AchievementService;
 use App\Services\AttendanceStreakService;
 use App\Services\VoicePartRules;
 use App\Telegram\CallbackUi;
@@ -33,6 +34,7 @@ final class ProfileHandler
         array $user,
         InteractiveMenuService $interactiveMenus,
         ?AttendanceStreakService $streak = null,
+        ?AchievementService $achievements = null,
     ): void {
         $fresh = $users->findById((int) $user['id']) ?? $user;
         $isConductor = VoicePartRules::isConductor($fresh);
@@ -82,6 +84,12 @@ final class ProfileHandler
             ]);
             if ($streak !== null) {
                 $section = $streak->formatProfileSection($fresh);
+                if ($section !== '') {
+                    $body .= "\n\n" . $section;
+                }
+            }
+            if ($achievements !== null) {
+                $section = $achievements->formatProfileSection($fresh);
                 if ($section !== '') {
                     $body .= "\n\n" . $section;
                 }
@@ -235,6 +243,7 @@ final class ProfileHandler
         string $data,
         int $actorTelegramId,
         ?AttendanceStreakService $streak = null,
+        ?AchievementService $achievements = null,
     ): bool {
         if (!str_starts_with($data, 'prf:')) {
             return false;
@@ -276,7 +285,7 @@ final class ProfileHandler
                 : $texts->get('profile.material_notify_turned_off'));
             CallbackUi::clearKeyboard($bot);
             $fresh = $users->findById((int) $user['id']) ?? $user;
-            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus, $streak);
+            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus, $streak, $achievements);
 
             return true;
         }

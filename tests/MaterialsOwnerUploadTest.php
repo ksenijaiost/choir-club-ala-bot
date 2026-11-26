@@ -105,6 +105,7 @@ final class MaterialsOwnerUploadTest extends TestCase
 
         return MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             $flows,
             $songRepo,

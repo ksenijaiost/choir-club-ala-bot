@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\AchievementServiceFactory;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -163,7 +164,7 @@ final class ProgramMemberCatalogTest extends TestCase
         $interactive = new InteractiveMenuService(new UserOpenMenuRepository($pdo));
         $songs = new SongRepository($pdo);
         $materialsRepo = new MaterialRepository($pdo);
-        $materialsDeps = MaterialsTestDeps::build($config, $users, $flows, $songs, $materialsRepo, $texts, $interactive);
+        $materialsDeps = MaterialsTestDeps::build($config, $pdo, $users, $flows, $songs, $materialsRepo, $texts, $interactive);
         $programsRepo = new ProgramRepository($pdo);
         $programMessages = new ProgramMessageBuilder($texts, $programsRepo);
         $delivery = new ProgramDeliveryService(
@@ -175,7 +176,7 @@ final class ProgramMemberCatalogTest extends TestCase
             new RecordingTelegramOutbound(),
             new \App\Repositories\ProgramNotifyDeliveryRepository($pdo),
         );
-        $programDeps = new ProgramDeps($config, $users, $flows, $programsRepo, $songs, $programMessages, $delivery, $texts, $interactive);
+        $programDeps = new ProgramDeps($config, $users, $flows, $programsRepo, $songs, $programMessages, $delivery, $texts, $interactive, AchievementServiceFactory::make($config, $pdo, $texts));
 
         return [
             'texts' => $texts,

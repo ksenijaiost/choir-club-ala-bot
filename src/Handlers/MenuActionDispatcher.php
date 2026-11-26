@@ -133,7 +133,7 @@ final class MenuActionDispatcher
         }
 
         if ($text === $texts->get('menu.my_profile')) {
-            ProfileHandler::openProfile($bot, $texts, $users, $user, $schedule->interactiveMenus, $attendance->streak);
+            ProfileHandler::openProfile($bot, $texts, $users, $user, $schedule->interactiveMenus, $attendance->streak, $attendance->achievements);
 
             return true;
         }

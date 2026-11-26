@@ -310,6 +310,7 @@ final class MyRecordingsDeliveryTest extends TestCase
         $materialRepo = new MaterialRepository($pdo);
         return MaterialsTestDeps::build(
             $this->testConfig(),
+                        $pdo,
             $users,
             new UserFlowRepository($pdo),
             $songRepo,

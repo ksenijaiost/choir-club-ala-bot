@@ -448,6 +448,7 @@ final class TranslitTextUploadTest extends TestCase
         $materialRepo = new MaterialRepository($pdo);
         return MaterialsTestDeps::build(
             $this->testConfig(),
+                        $pdo,
             $users,
             $flows,
             $songRepo,

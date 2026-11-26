@@ -145,8 +145,15 @@ final class PaymentAdminMonthHandler
 
         if (preg_match('/^pay:am:mk:(\d+):(\d{4}):(\d{1,2})$/', $data, $m) === 1) {
             SafeTelegram::answerCallbackQuery($bot);
-            $deps->payments->confirmByConductor((int) $m[1], (int) $m[2], (int) $m[3], $conductorUserId);
-            self::renderUserCard($bot, $deps, (int) $m[1], (int) $m[2], (int) $m[3], $actorTg);
+            $memberUserId = (int) $m[1];
+            $year = (int) $m[2];
+            $month = (int) $m[3];
+            $deps->payments->confirmByConductor($memberUserId, $year, $month, $conductorUserId);
+            $confirmedMember = $deps->users->findById($memberUserId);
+            if ($confirmedMember !== null) {
+                $deps->achievements->onPaymentConfirmed($confirmedMember, $year, $month, $deps->config);
+            }
+            self::renderUserCard($bot, $deps, $memberUserId, $year, $month, $actorTg);
 
             return true;
         }
@@ -491,6 +498,8 @@ final class PaymentAdminMonthHandler
         }
 
         $deps->payments->confirmByConductor($memberUserId, $year, $month, $conductorUserId);
+        $freshMember = $deps->users->findById($memberUserId) ?? $member;
+        $deps->achievements->onPaymentConfirmed($freshMember, $year, $month, $deps->config);
 
         $placeholders = $deps->paymentTexts->monthYearPlaceholders($year, $month);
         SafeTelegram::sendMessage(

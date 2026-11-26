@@ -172,6 +172,7 @@ final class AboutBotHandler
             'phrase_materials_notifications' => $texts->get('materials.notifications_sent', ['count' => 'N']),
             'streak_freeze' => $texts->get('streak.about_freeze'),
             'streak_milestones_list' => self::formatStreakMilestonesList($texts),
+            'achievements_secret_about' => $texts->get('achievements.secret.about_teaser'),
         ];
     }
 

@@ -84,7 +84,18 @@ final class CronJobRunner
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
         $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
         $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
-        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
+        $settings = new BotSettingsRepository($pdo);
+        $achievements = new \App\Services\AchievementService(
+            new \App\Repositories\UserAchievementRepository($pdo),
+            $texts,
+            $outbound,
+            $marks,
+            new DayBeforeReminderDeliveryRepository($pdo),
+            new \App\Repositories\ProgramRepository($pdo),
+            new PaymentRecordRepository($pdo),
+            $settings,
+        );
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak, $achievements);
 
         $result['day_before_reminder'] = (new DayBeforeReminderJob(
             $rehearsals,
@@ -174,7 +185,18 @@ final class CronJobRunner
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
         $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
         $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
-        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
+        $settings = new BotSettingsRepository($pdo);
+        $achievements = new \App\Services\AchievementService(
+            new \App\Repositories\UserAchievementRepository($pdo),
+            $texts,
+            $outbound,
+            $marks,
+            new DayBeforeReminderDeliveryRepository($pdo),
+            new \App\Repositories\ProgramRepository($pdo),
+            new PaymentRecordRepository($pdo),
+            $settings,
+        );
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak, $achievements);
 
         return [
             'day_before_reminder' => (new DayBeforeReminderJob(

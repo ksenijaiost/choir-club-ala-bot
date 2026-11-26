@@ -139,6 +139,7 @@ final class BotCommandAtMentionTest extends TestCase
         $materials = new MaterialRepository($pdo);
         $handlerDeps = MaterialsTestDeps::build(
             $this->testConfig(),
+                        $pdo,
             $users,
             $flows,
             $songs,

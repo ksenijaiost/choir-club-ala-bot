@@ -185,6 +185,7 @@ final class VoiceRecordingDeliveryTest extends TestCase
 
         return MaterialsTestDeps::build(
             $this->testConfig(),
+                        $pdo,
             $users,
             new UserFlowRepository($pdo),
             new SongRepository($pdo),

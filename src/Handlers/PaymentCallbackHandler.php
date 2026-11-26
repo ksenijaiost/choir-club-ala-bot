@@ -191,6 +191,8 @@ final class PaymentCallbackHandler
         }
 
         $deps->payments->confirmByConductor($memberUserId, $year, $month, (int) $conductor['id']);
+        $freshMember = $deps->users->findById($memberUserId) ?? $member;
+        $deps->achievements->onPaymentConfirmed($freshMember, $year, $month, $deps->config);
         SafeTelegram::answerCallbackQuery($bot, ['text' => $deps->texts->get('payment.admin_confirmed_ok')]);
         CallbackUi::finalizeWithAnswer($bot, $deps->texts->get('payment.inline_answer_confirmed'));
 

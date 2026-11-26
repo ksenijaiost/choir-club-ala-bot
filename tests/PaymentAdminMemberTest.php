@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\AchievementServiceFactory;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -293,6 +294,7 @@ final class PaymentAdminMemberTest extends TestCase
             new UserFlowRepository($pdo),
             new PaymentReminderTextService($settings, $texts, new PaymentTexts($texts)),
             new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            AchievementServiceFactory::make($config, $pdo, $texts)
         );
     }
 

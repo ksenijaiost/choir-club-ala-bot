@@ -198,6 +198,7 @@ final class SongRecordingPartPickerTest extends TestCase
         $materialRepo = new MaterialRepository($pdo);
         return MaterialsTestDeps::build(
             $this->testConfig(),
+                        $pdo,
             $users,
             new UserFlowRepository($pdo),
             $songRepo,

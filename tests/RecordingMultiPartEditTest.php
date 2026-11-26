@@ -93,6 +93,7 @@ final class RecordingMultiPartEditTest extends TestCase
         $outbound = new RecordingTelegramOutbound();
         $handlerDeps = MaterialsTestDeps::build(
             $this->testConfig(),
+                        $pdo,
             $users,
             $flows,
             $songs,
@@ -192,6 +193,7 @@ final class RecordingMultiPartEditTest extends TestCase
         $flows = new UserFlowRepository($pdo);
         $handlerDeps = MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             $flows,
             $songs,

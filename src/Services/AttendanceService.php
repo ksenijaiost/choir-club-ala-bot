@@ -18,6 +18,7 @@ final class AttendanceService
         private readonly AttendanceDiscipline $discipline,
         private readonly ConsecutiveUnexcusedRecalculator $recalculator,
         private readonly AttendanceStreakService $streak,
+        private readonly ?AchievementService $achievements = null,
     ) {
     }
 
@@ -39,9 +40,11 @@ final class AttendanceService
 
         if ($priorMark !== null && $priorMark !== AttendanceMark::WARNED) {
             $this->streak->recalculateSilent($userId);
-            $fresh = $this->users->findById($userId) ?? $user;
+            $user = $this->users->findById($userId) ?? $user;
+        }
 
-            return $this->streak->frozenLineResult($fresh);
+        if ($this->achievements !== null) {
+            $this->achievements->onWontComeWarned($user, $rehearsalId, $source);
         }
 
         return $this->streak->frozenLineResult($user);
@@ -60,7 +63,12 @@ final class AttendanceService
         $this->marks->upsert($rehearsalId, $userId, AttendanceMark::ATTENDED, AttendanceSource::CHECKIN, null);
         $this->users->resetConsecutiveUnexcused($userId);
 
-        return $this->streak->onAttended($user);
+        $result = $this->streak->onAttended($user);
+        if ($this->achievements !== null) {
+            $this->achievements->onAttendedCheckIn($user, $rehearsalId);
+        }
+
+        return $result;
     }
 
     /**

@@ -21,6 +21,7 @@ final class MaterialsTestDeps
 {
     public static function build(
         Config $config,
+        \PDO $pdo,
         UserRepository $users,
         UserFlowRepository $flows,
         SongRepository $songs,
@@ -43,6 +44,7 @@ final class MaterialsTestDeps
             new MaterialNotificationService($users, $texts, $service, $outbound),
             $texts,
             $interactiveMenus,
+            AchievementServiceFactory::make($config, $pdo, $texts),
         );
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\AchievementServiceFactory;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -136,6 +137,7 @@ final class DeliveryRenderingTest extends TestCase
             $delivery,
             $texts,
             new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            AchievementServiceFactory::make($config, $pdo, $texts),
         );
         $access = new AccessControl($config, new AdminChatResolver(new BotSettingsRepository($pdo), $config));
         $actor = $users->findByTelegramId(self::CONDUCTOR_TG);
