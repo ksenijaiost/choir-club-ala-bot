@@ -227,4 +227,24 @@ final class RehearsalRepository
 
         return $id === false ? null : (int) $id;
     }
+
+    /**
+     * Прошедшие репетиции календарного месяца (не отменённые, ends_at <= pivot).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listPastInCalendarMonth(string $monthStartLocal, string $monthEndLocal, string $pivotLocal): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM rehearsals
+             WHERE status != ?
+               AND starts_at >= ?
+               AND starts_at <= ?
+               AND ends_at <= ?
+             ORDER BY starts_at ASC'
+        );
+        $stmt->execute(['cancelled', $monthStartLocal, $monthEndLocal, $pivotLocal]);
+
+        return $stmt->fetchAll() ?: [];
+    }
 }

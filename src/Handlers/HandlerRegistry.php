@@ -253,6 +253,14 @@ final class HandlerRegistry
             $outbound,
         );
 
+        $partBattle = new \App\Services\PartBattleService(
+            $rehearsals,
+            $users,
+            $marks,
+            $texts,
+            $paymentTexts,
+        );
+
         $attendance = new AttendanceDeps(
             $config,
             $users,
@@ -274,6 +282,7 @@ final class HandlerRegistry
             $rsvpNudge,
             $streak,
             $achievements,
+            $partBattle,
         );
 
         CallbackQueryHandler::register(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Domain\AttendanceMark;
 use App\Support\SqlPagination;
 
 final class AttendanceMarkRepository
@@ -131,5 +132,27 @@ final class AttendanceMarkRepository
     {
         $stmt = $this->pdo->prepare('DELETE FROM attendance_marks WHERE rehearsal_id = ? AND user_id = ?');
         $stmt->execute([$rehearsalId, $userId]);
+    }
+
+    /**
+     * @param list<int> $rehearsalIds
+     * @param list<int> $userIds
+     */
+    public function countAttendedAtRehearsalsForUsers(array $rehearsalIds, array $userIds): int
+    {
+        if ($rehearsalIds === [] || $userIds === []) {
+            return 0;
+        }
+
+        $rehearsalPlaceholders = implode(',', array_fill(0, count($rehearsalIds), '?'));
+        $userPlaceholders = implode(',', array_fill(0, count($userIds), '?'));
+        $sql = 'SELECT COUNT(*) FROM attendance_marks
+                WHERE mark = ?
+                  AND rehearsal_id IN (' . $rehearsalPlaceholders . ')
+                  AND user_id IN (' . $userPlaceholders . ')';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(array_merge([AttendanceMark::ATTENDED], $rehearsalIds, $userIds));
+
+        return (int) $stmt->fetchColumn();
     }
 }

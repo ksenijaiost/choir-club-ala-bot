@@ -23,9 +23,11 @@ use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
+use App\Services\AdminChatResolver;
 use App\Services\NotificationRecipientResolver;
-use App\Services\PaymentReminderTextService;
+use App\Services\PartBattleService;
 use App\Services\PaymentTexts;
+use App\Services\PaymentReminderTextService;
 use App\Repositories\BlockEventRepository;
 use App\Services\ScheduleGenerator;
 use App\Telegram\NutgramOutbound;
@@ -66,6 +68,7 @@ final class CronJobRunner
             'payment_reminder_1' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
             'payment_reminder_2' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
             'program_archive' => ['archived' => 0, 'ids' => []],
+            'part_battle_monthly' => ['sent' => false, 'not_due' => true],
         ];
 
         if ($bot === null || trim($config->botToken) === '') {
@@ -158,6 +161,20 @@ final class CronJobRunner
         ))->runIfDue($config);
 
         $result['program_archive'] = (new ProgramArchiveJob(new ProgramRepository($pdo)))->run($config);
+
+        $partBattle = new PartBattleService(
+            $rehearsals,
+            $users,
+            new AttendanceMarkRepository($pdo),
+            $texts,
+            new PaymentTexts($texts),
+        );
+        $result['part_battle_monthly'] = (new PartBattleMonthlyJob(
+            $partBattle,
+            $deliveries,
+            new AdminChatResolver(new BotSettingsRepository($pdo), $config),
+            $outbound,
+        ))->runIfDue($config);
 
         return $result;
     }

@@ -26,6 +26,8 @@ use App\Services\AttendanceStreakService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Services\PartBattleService;
+use App\Services\PaymentTexts;
 use App\Services\RehearsalRsvpNudgeService;
 use App\Services\RehearsalRsvpStatusPresenter;
 use App\Services\RehearsalRsvpStatusService;
@@ -56,6 +58,7 @@ final class AttendanceDepsFactory
         $rsvp = new RehearsalRsvpRepository($pdo);
         $dayBefore = new DayBeforeReminderDeliveryRepository($pdo);
         $nudgeRepo = new RehearsalRsvpNudgeRepository($pdo);
+        $partBattle = new PartBattleService($rehearsals, $users, $marks, $texts, new PaymentTexts($texts));
 
         return new AttendanceDeps(
             $config,
@@ -78,6 +81,7 @@ final class AttendanceDepsFactory
             new RehearsalRsvpNudgeService($nudgeRepo, $rsvp, $dayBefore, $rehearsals, $users, $messages, $outbound),
             $streak,
             $achievements,
+            $partBattle,
         );
     }
 }

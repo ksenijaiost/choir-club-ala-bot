@@ -173,6 +173,13 @@ final class AboutBotHandler
             'streak_freeze' => $texts->get('streak.about_freeze'),
             'streak_milestones_list' => self::formatStreakMilestonesList($texts),
             'achievements_secret_about' => $texts->get('achievements.secret.about_teaser'),
+            'part_battle_about_member' => $texts->get('part_battle.about_member', [
+                'btn_my_profile' => $texts->get('menu.my_profile'),
+            ]),
+            'part_battle_about_admin' => $texts->get('part_battle.about_admin', [
+                'btn_part_battle' => $texts->get('attendance.part_battle_button'),
+            ]),
+            'btn_part_battle' => $texts->get('attendance.part_battle_button'),
         ];
     }
 

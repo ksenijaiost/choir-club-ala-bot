@@ -38,6 +38,9 @@ final class AttendanceAdminHandler
             ->addRow(
                 InlineKeyboardButton::make($texts->get('rsvp.open_button'), callback_data: 'atd:rsv'),
                 InlineKeyboardButton::make($texts->get('attendance.streak_top_button'), callback_data: 'atd:st'),
+            )
+            ->addRow(
+                InlineKeyboardButton::make($texts->get('attendance.part_battle_button'), callback_data: 'atd:pb'),
             );
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
@@ -99,6 +102,24 @@ final class AttendanceAdminHandler
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
             self::sendTopStreaks($bot, $texts, $deps);
+
+            return true;
+        }
+
+        if ($data === 'atd:pb' || $data === 'atd:pb:cur') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $current = $deps->partBattle->currentCalendarMonth($deps->config);
+            self::sendPartBattle($bot, $deps, $current['year'], $current['month'], 'cur');
+
+            return true;
+        }
+
+        if ($data === 'atd:pb:prev') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $prev = $deps->partBattle->previousCalendarMonth($deps->config);
+            self::sendPartBattle($bot, $deps, $prev['year'], $prev['month'], 'prev');
 
             return true;
         }
@@ -467,6 +488,40 @@ final class AttendanceAdminHandler
             $deps->interactiveMenus,
             $ownerTelegramId,
             implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
+    }
+
+    private static function sendPartBattle(
+        Nutgram $bot,
+        AttendanceDeps $deps,
+        int $year,
+        int $month,
+        string $view,
+    ): void {
+        $texts = $deps->texts;
+        $result = $deps->partBattle->buildForMonth($deps->config, $year, $month);
+        $body = $deps->partBattle->formatAdminMessage($result);
+
+        $keyboard = InlineKeyboardMarkup::make();
+        if ($view === 'cur') {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($texts->get('part_battle.show_previous'), callback_data: 'atd:pb:prev'),
+            );
+        } else {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($texts->get('part_battle.show_current'), callback_data: 'atd:pb:cur'),
+            );
+        }
+
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'atd:');
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            $body,
             $keyboard,
             $bot->chatId() ?? $ownerTelegramId,
         );

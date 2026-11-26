@@ -261,7 +261,19 @@ final class CallbackQueryHandler
             }
 
             if (str_starts_with($data, 'prf:')) {
-                ProfileHandler::handleCallback($bot, $texts, $users, $schedule->flows, $schedule->interactiveMenus, $data, $actorTelegramId, $attendance->streak, $attendance->achievements);
+                ProfileHandler::handleCallback(
+                    $bot,
+                    $texts,
+                    $users,
+                    $schedule->flows,
+                    $schedule->interactiveMenus,
+                    $data,
+                    $actorTelegramId,
+                    $attendance->streak,
+                    $attendance->achievements,
+                    $attendance->partBattle,
+                    $attendance->config,
+                );
 
                 return;
             }

@@ -10,6 +10,8 @@ use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\AchievementService;
 use App\Services\AttendanceStreakService;
+use App\Services\PartBattleService;
+use App\Config;
 use App\Services\VoicePartRules;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
@@ -35,6 +37,8 @@ final class ProfileHandler
         InteractiveMenuService $interactiveMenus,
         ?AttendanceStreakService $streak = null,
         ?AchievementService $achievements = null,
+        ?PartBattleService $partBattle = null,
+        ?Config $config = null,
     ): void {
         $fresh = $users->findById((int) $user['id']) ?? $user;
         $isConductor = VoicePartRules::isConductor($fresh);
@@ -92,6 +96,12 @@ final class ProfileHandler
                 $section = $achievements->formatProfileSection($fresh);
                 if ($section !== '') {
                     $body .= "\n\n" . $section;
+                }
+            }
+            if ($partBattle !== null && $config !== null) {
+                $line = $partBattle->formatProfileLine($fresh, $config);
+                if ($line !== '') {
+                    $body .= "\n" . $line;
                 }
             }
         }
@@ -244,6 +254,8 @@ final class ProfileHandler
         int $actorTelegramId,
         ?AttendanceStreakService $streak = null,
         ?AchievementService $achievements = null,
+        ?PartBattleService $partBattle = null,
+        ?Config $config = null,
     ): bool {
         if (!str_starts_with($data, 'prf:')) {
             return false;
@@ -285,7 +297,7 @@ final class ProfileHandler
                 : $texts->get('profile.material_notify_turned_off'));
             CallbackUi::clearKeyboard($bot);
             $fresh = $users->findById((int) $user['id']) ?? $user;
-            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus, $streak, $achievements);
+            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus, $streak, $achievements, $partBattle, $config);
 
             return true;
         }
