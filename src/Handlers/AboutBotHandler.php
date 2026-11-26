@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Handlers;
 
+use App\Domain\StreakMilestones;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
@@ -169,7 +170,21 @@ final class AboutBotHandler
             'programs_notify_button' => $texts->get('programs.button_open_recordings'),
             'recording_link_suffix' => $texts->get('admin_chat.recording_link_suffix'),
             'phrase_materials_notifications' => $texts->get('materials.notifications_sent', ['count' => 'N']),
+            'streak_freeze' => $texts->get('streak.about_freeze'),
+            'streak_milestones_list' => self::formatStreakMilestonesList($texts),
         ];
+    }
+
+    public static function formatStreakMilestonesList(TextRepository $texts): string
+    {
+        $lines = [];
+        foreach (StreakMilestones::all() as $milestone) {
+            $lines[] = $milestone . ' — '
+                . $texts->get(StreakMilestones::badgeKey($milestone)) . ' '
+                . $texts->get(StreakMilestones::textKey($milestone));
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

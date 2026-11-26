@@ -185,11 +185,15 @@ final class AttendanceCallbackHandler
 
         if ($yes) {
             $deps->flows->clear($telegramId);
-            $deps->attendance->recordAttended($user, $rehearsalId);
+            $result = $deps->attendance->recordAttended($user, $rehearsalId);
+            $answer = $deps->texts->get('common.inline_answer_yes');
+            if ($result->appendLine !== null) {
+                $answer .= "\n" . $result->appendLine;
+            }
             CallbackUi::finalizeCheckinAnswer(
                 $bot,
                 $question,
-                $deps->texts->get('common.inline_answer_yes'),
+                $answer,
                 $deps->messages->checkinEditKeyboard($rehearsalId),
             );
 
@@ -226,11 +230,15 @@ final class AttendanceCallbackHandler
 
         $bot->answerCallbackQuery();
         $deps->flows->clear($telegramId);
-        $deps->attendance->recordAttended($user, $rehearsalId);
+        $result = $deps->attendance->recordAttended($user, $rehearsalId);
+        $answer = $deps->texts->get('checkin.thanks_late');
+        if ($result->appendLine !== null) {
+            $answer .= "\n" . $result->appendLine;
+        }
         CallbackUi::finalizeCheckinAnswer(
             $bot,
             $deps->messages->checkinQuestionText(),
-            $deps->texts->get('checkin.thanks_late'),
+            $answer,
             $deps->messages->checkinEditKeyboard($rehearsalId),
         );
     }

@@ -37,6 +37,7 @@ final class AttendanceAdminHandler
             )
             ->addRow(
                 InlineKeyboardButton::make($texts->get('rsvp.open_button'), callback_data: 'atd:rsv'),
+                InlineKeyboardButton::make($texts->get('attendance.streak_top_button'), callback_data: 'atd:st'),
             );
 
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
@@ -90,6 +91,14 @@ final class AttendanceAdminHandler
             $bot->answerCallbackQuery();
             CallbackUi::clearKeyboard($bot);
             self::sendRehearsalPicker($bot, $texts, $deps, $from, $pivot, $tz, (int) $m[1]);
+
+            return true;
+        }
+
+        if ($data === 'atd:st') {
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            self::sendTopStreaks($bot, $texts, $deps);
 
             return true;
         }
@@ -425,10 +434,16 @@ final class AttendanceAdminHandler
             return;
         }
 
-        $streak = (int) ($user['consecutive_unexcused'] ?? 0);
+        $unexcusedStreak = (int) ($user['consecutive_unexcused'] ?? 0);
+        $attendanceStreak = (int) ($user['attendance_streak'] ?? 0);
+        $attendanceBest = (int) ($user['attendance_streak_best'] ?? 0);
         $lines = [
             $texts->get('attendance.history_header', ['name' => (string) ($user['display_name'] ?? '')]),
-            $texts->get('attendance.streak_line', ['streak' => (string) $streak]),
+            $texts->get('attendance.streak_line', ['streak' => (string) $unexcusedStreak]),
+            $texts->get('streak.profile_line', [
+                'current' => (string) $attendanceStreak,
+                'best' => (string) $attendanceBest,
+            ]),
         ];
 
         $history = $deps->marks->listForUserRecent($userId, 20);
@@ -446,6 +461,36 @@ final class AttendanceAdminHandler
             'atd:ms',
         );
 
+        $ownerTelegramId = (int) ($bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $deps->interactiveMenus,
+            $ownerTelegramId,
+            implode("\n", $lines),
+            $keyboard,
+            $bot->chatId() ?? $ownerTelegramId,
+        );
+    }
+
+    private static function sendTopStreaks(Nutgram $bot, TextRepository $texts, AttendanceDeps $deps): void
+    {
+        $rows = $deps->users->listTopAttendanceStreaks(10);
+        $lines = [$texts->get('streak.top_header')];
+        if ($rows === []) {
+            $lines[] = $texts->get('streak.top_empty');
+        } else {
+            $rank = 1;
+            foreach ($rows as $user) {
+                $lines[] = $texts->get('streak.top_line', [
+                    'rank' => (string) $rank,
+                    'name' => (string) ($user['display_name'] ?? ''),
+                    'n' => (string) ((int) ($user['attendance_streak'] ?? 0)),
+                ]);
+                $rank++;
+            }
+        }
+
+        $keyboard = InlineMenuHelper::appendFooter(InlineKeyboardMarkup::make(), $texts, 'atd:');
         $ownerTelegramId = (int) ($bot->userId() ?? 0);
         InlineMenuHelper::sendInteractiveMenu(
             $bot,

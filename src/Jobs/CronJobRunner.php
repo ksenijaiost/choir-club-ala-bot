@@ -82,7 +82,9 @@ final class CronJobRunner
         $blocks = new MemberBlockService($users, $blockEvents);
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator);
+        $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
+        $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
 
         $result['day_before_reminder'] = (new DayBeforeReminderJob(
             $rehearsals,
@@ -170,7 +172,9 @@ final class CronJobRunner
         $blocks = new MemberBlockService($users, $blockEvents);
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator);
+        $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
+        $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
 
         return [
             'day_before_reminder' => (new DayBeforeReminderJob(

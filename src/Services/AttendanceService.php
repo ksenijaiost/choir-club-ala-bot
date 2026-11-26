@@ -17,53 +17,74 @@ final class AttendanceService
         private readonly UserRepository $users,
         private readonly AttendanceDiscipline $discipline,
         private readonly ConsecutiveUnexcusedRecalculator $recalculator,
+        private readonly AttendanceStreakService $streak,
     ) {
-    }
-
-  /**
-   * @param array<string, mixed> $user
-   */
-    public function recordWarned(array $user, int $rehearsalId, string $source, ?string $reason = null): void
-    {
-        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
-            return;
-        }
-
-        $userId = (int) $user['id'];
-        $this->marks->upsert($rehearsalId, $userId, AttendanceMark::WARNED, $source, $reason);
-        $this->users->resetConsecutiveUnexcused($userId);
     }
 
     /**
      * @param array<string, mixed> $user
      */
-    public function recordAttended(array $user, int $rehearsalId): void
+    public function recordWarned(array $user, int $rehearsalId, string $source, ?string $reason = null): AttendanceMarkResult
     {
         if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
-            return;
+            return AttendanceMarkResult::empty();
+        }
+
+        $userId = (int) $user['id'];
+        $existing = $this->marks->find($rehearsalId, $userId);
+        $priorMark = $existing === null ? null : (string) ($existing['mark'] ?? '');
+
+        $this->marks->upsert($rehearsalId, $userId, AttendanceMark::WARNED, $source, $reason);
+        $this->users->resetConsecutiveUnexcused($userId);
+
+        if ($priorMark !== null && $priorMark !== AttendanceMark::WARNED) {
+            $this->streak->recalculateSilent($userId);
+            $fresh = $this->users->findById($userId) ?? $user;
+
+            return $this->streak->frozenLineResult($fresh);
+        }
+
+        return $this->streak->frozenLineResult($user);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public function recordAttended(array $user, int $rehearsalId): AttendanceMarkResult
+    {
+        if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
+            return AttendanceMarkResult::empty();
         }
 
         $userId = (int) $user['id'];
         $this->marks->upsert($rehearsalId, $userId, AttendanceMark::ATTENDED, AttendanceSource::CHECKIN, null);
         $this->users->resetConsecutiveUnexcused($userId);
+
+        return $this->streak->onAttended($user);
     }
 
     /**
      * @param array<string, mixed> $user
      */
-    public function recordUnexcused(array $user, int $rehearsalId, string $source): void
+    public function recordUnexcused(array $user, int $rehearsalId, string $source): AttendanceMarkResult
     {
         if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
-            return;
+            return AttendanceMarkResult::empty();
         }
 
         $existing = $this->marks->find($rehearsalId, (int) $user['id']);
         if ($existing !== null) {
-            return;
+            return AttendanceMarkResult::empty();
         }
 
+        $streakResult = $this->streak->onUnexcused($user);
+
         $this->marks->upsert($rehearsalId, (int) $user['id'], AttendanceMark::UNEXCUSED, $source, null);
-        $this->discipline->onUnexcusedRecorded($user);
+        $disciplineSent = $this->discipline->onUnexcusedRecorded($user, $streakResult->appendLine);
+
+        return new AttendanceMarkResult(
+            $disciplineSent ? null : $streakResult->appendLine,
+        );
     }
 
     public function appendReason(int $rehearsalId, int $userId, string $reason): void
@@ -74,14 +95,21 @@ final class AttendanceService
             return;
         }
 
-        $this->marks->upsert($rehearsalId, $userId, AttendanceMark::WARNED, AttendanceSource::DAY_BEFORE, $reason);
+        $user = $this->users->findById($userId);
+        if ($user !== null) {
+            $this->recordWarned($user, $rehearsalId, AttendanceSource::DAY_BEFORE, $reason);
+        } else {
+            $this->marks->upsert($rehearsalId, $userId, AttendanceMark::WARNED, AttendanceSource::DAY_BEFORE, $reason);
+        }
     }
 
     public function recordManual(int $userId, int $rehearsalId, string $mark): int
     {
         $this->marks->upsert($rehearsalId, $userId, $mark, AttendanceSource::MANUAL, null);
+        $unexcused = $this->recalculator->recalculateForUser($userId);
+        $this->streak->recalculateSilent($userId);
 
-        return $this->recalculator->recalculateForUser($userId);
+        return $unexcused;
     }
 
     /**
@@ -92,6 +120,7 @@ final class AttendanceService
         $userId = (int) $user['id'];
         $this->marks->delete($rehearsalId, $userId);
         $this->users->resetConsecutiveUnexcused($userId);
+        $this->streak->recalculateSilent($userId);
     }
 
     /**
@@ -116,6 +145,7 @@ final class AttendanceService
 
         $this->marks->delete($rehearsalId, $userId);
         $this->recalculator->recalculateForUser($userId);
+        $this->streak->recalculateSilent($userId);
 
         return true;
     }

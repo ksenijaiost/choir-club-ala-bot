@@ -16,6 +16,7 @@ use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\AttendanceStreakService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\RehearsalRsvpNudgeService;
 use App\Services\RehearsalRsvpStatusPresenter;
@@ -44,6 +45,7 @@ final class AttendanceDeps
         public readonly RehearsalRsvpStatusService $rsvpStatus,
         public readonly RehearsalRsvpStatusPresenter $rsvpPresenter,
         public readonly RehearsalRsvpNudgeService $rsvpNudge,
+        public readonly AttendanceStreakService $streak,
     ) {
     }
 }

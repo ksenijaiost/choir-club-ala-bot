@@ -127,7 +127,9 @@ final class HandlerRegistry
         $recipients = new NotificationRecipientResolver($config, $users);
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blockService);
-        $attendanceService = new AttendanceService($marks, $users, $discipline, $recalculator);
+        $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
+        $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
+        $attendanceService = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
         $conductorNotifier = new AttendanceConductorNotifier($recipients, $texts, $outbound);
 
         $payments = new PaymentRecordRepository($pdo);
@@ -258,6 +260,7 @@ final class HandlerRegistry
             new RehearsalRsvpStatusService($rsvpRepo, $dayBeforeDeliveries, $marks),
             new RehearsalRsvpStatusPresenter($texts),
             $rsvpNudge,
+            $streak,
         );
 
         CallbackQueryHandler::register(

@@ -8,6 +8,7 @@ use App\Domain\UserRole;
 use App\Domain\VoicePart;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
+use App\Services\AttendanceStreakService;
 use App\Services\VoicePartRules;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
@@ -31,6 +32,7 @@ final class ProfileHandler
         UserRepository $users,
         array $user,
         InteractiveMenuService $interactiveMenus,
+        ?AttendanceStreakService $streak = null,
     ): void {
         $fresh = $users->findById((int) $user['id']) ?? $user;
         $isConductor = VoicePartRules::isConductor($fresh);
@@ -78,6 +80,12 @@ final class ProfileHandler
                 'part' => $partLabel,
                 'notify_line' => $notifyLine,
             ]);
+            if ($streak !== null) {
+                $section = $streak->formatProfileSection($fresh);
+                if ($section !== '') {
+                    $body .= "\n\n" . $section;
+                }
+            }
         }
 
         $ownerTelegramId = (int) ($fresh['telegram_id'] ?? $bot->userId() ?? 0);
@@ -226,6 +234,7 @@ final class ProfileHandler
         InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
+        ?AttendanceStreakService $streak = null,
     ): bool {
         if (!str_starts_with($data, 'prf:')) {
             return false;
@@ -267,7 +276,7 @@ final class ProfileHandler
                 : $texts->get('profile.material_notify_turned_off'));
             CallbackUi::clearKeyboard($bot);
             $fresh = $users->findById((int) $user['id']) ?? $user;
-            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus);
+            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus, $streak);
 
             return true;
         }

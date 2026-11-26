@@ -33,6 +33,16 @@ try {
     $migrator = Migrator::forConfig($config);
     $applied = $migrator->migrate();
 
+    if (in_array('024_attendance_streaks.sql', $applied, true)) {
+        $pdo = Bootstrap::pdo();
+        (new \App\Services\AttendanceStreakBackfill(
+            new \App\Repositories\UserRepository($pdo),
+            new \App\Repositories\AttendanceMarkRepository($pdo),
+            new \App\Repositories\UserStreakAwardRepository($pdo),
+        ))->runSilent();
+        echo "Attendance streak backfill completed (no notifications).\n";
+    }
+
     if ($applied === []) {
         echo "No new migrations.\n";
     } else {

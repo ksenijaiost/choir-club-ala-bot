@@ -16,11 +16,13 @@ use App\Repositories\RehearsalRsvpRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\UserStreakAwardRepository;
 use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceDiscipline;
 use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\AttendanceStreakService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
@@ -47,7 +49,8 @@ final class AttendanceDepsFactory
         $blocks = new MemberBlockService($users, new BlockEventRepository($pdo));
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $service = new AttendanceService($marks, $users, $discipline, $recalculator);
+        $streak = new AttendanceStreakService($marks, $users, new UserStreakAwardRepository($pdo), $texts, $recipients, $outbound);
+        $service = new AttendanceService($marks, $users, $discipline, $recalculator, $streak);
         $messages = new AttendanceMessageFactory($texts);
         $rsvp = new RehearsalRsvpRepository($pdo);
         $dayBefore = new DayBeforeReminderDeliveryRepository($pdo);
@@ -72,6 +75,7 @@ final class AttendanceDepsFactory
             new RehearsalRsvpStatusService($rsvp, $dayBefore, $marks),
             new RehearsalRsvpStatusPresenter($texts),
             new RehearsalRsvpNudgeService($nudgeRepo, $rsvp, $dayBefore, $rehearsals, $users, $messages, $outbound),
+            $streak,
         );
     }
 }
