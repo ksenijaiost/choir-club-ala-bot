@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\AchievementServiceFactory;
 use App\Tests\Support\MaterialsTestDeps;
 use App\Repositories\UserOpenMenuRepository;
 use App\Telegram\InteractiveMenuService;
@@ -222,6 +223,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
             $flows,
             new \App\Services\PaymentReminderTextService($settings, $texts, $paymentTexts),
             new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            AchievementServiceFactory::make($config, $pdo, $texts)
         );
     }
 
@@ -245,6 +247,7 @@ final class AdminMenuMessageHandlerTest extends TestCase
         $materialRepo = new MaterialRepository($pdo);
         return MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             $flows,
             $songRepo,

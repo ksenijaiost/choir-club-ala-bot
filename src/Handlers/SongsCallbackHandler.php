@@ -82,6 +82,7 @@ final class SongsCallbackHandler
                 $viewer = $deps->users->findByTelegramId($telegramId);
             }
             $delivery->sendSongCard($bot, $song, $viewer);
+            self::maybeNightOwl($deps, $viewer);
 
             return true;
         }
@@ -89,6 +90,7 @@ final class SongsCallbackHandler
         if (preg_match('/^snd:nt:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             $delivery->sendSingletonFile($bot, (int) $m[1], MaterialType::NOTES);
+            self::maybeNightOwl($deps, $deps->users->findByTelegramId((int) ($bot->userId() ?? 0)));
 
             return true;
         }
@@ -96,6 +98,7 @@ final class SongsCallbackHandler
         if (preg_match('/^snd:tr:(\d+)$/', $data, $m) === 1) {
             $bot->answerCallbackQuery();
             $delivery->sendSingletonFile($bot, (int) $m[1], MaterialType::TRANSLIT);
+            self::maybeNightOwl($deps, $deps->users->findByTelegramId((int) ($bot->userId() ?? 0)));
 
             return true;
         }
@@ -136,6 +139,7 @@ final class SongsCallbackHandler
                 ? $deps->materials->listTuttiRecordings($songId)
                 : $deps->materials->listCurrentRecordings($songId, $part);
             $delivery->sendRecordingFiles($bot, $rows);
+            self::maybeNightOwl($deps, $deps->users->findByTelegramId((int) ($bot->userId() ?? 0)));
 
             return true;
         }
@@ -155,6 +159,7 @@ final class SongsCallbackHandler
                 ? $deps->materials->listSongsWithRecordingsAnyPart()
                 : $deps->materials->listSongsWithRecordingsForPart($part);
             $delivery->sendAllMyRecordingsForSongs($bot, $songs, $part, $allParts);
+            self::maybeNightOwl($deps, $deps->users->findByTelegramId((int) ($bot->userId() ?? 0)));
 
             return true;
         }
@@ -166,6 +171,7 @@ final class SongsCallbackHandler
                 CallbackUi::clearKeyboard($bot);
                 $rows = $deps->materials->listCurrentRecordingsAllParts((int) $m[1]);
                 $delivery->sendRecordingFiles($bot, $rows);
+                self::maybeNightOwl($deps, $deps->users->findByTelegramId((int) ($bot->userId() ?? 0)));
 
                 return true;
             }
@@ -180,11 +186,24 @@ final class SongsCallbackHandler
             CallbackUi::clearKeyboard($bot);
             $rows = $deps->materials->listCurrentRecordings((int) $m[1], $part);
             $delivery->sendRecordingFiles($bot, $rows);
+            self::maybeNightOwl($deps, $deps->users->findByTelegramId((int) ($bot->userId() ?? 0)));
 
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * @param array<string, mixed>|null $user
+     */
+    private static function maybeNightOwl(MaterialsDeps $deps, ?array $user): void
+    {
+        if ($user === null) {
+            return;
+        }
+
+        $deps->achievements->onMaterialsOpened($user, $deps->config);
     }
 
     private static function sendPartPicker(Nutgram $bot, MaterialsDeps $deps, int $songId, string $view): void

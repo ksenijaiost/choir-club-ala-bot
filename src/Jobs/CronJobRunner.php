@@ -23,9 +23,12 @@ use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
+use App\Services\AdminChatResolver;
 use App\Services\NotificationRecipientResolver;
-use App\Services\PaymentReminderTextService;
+use App\Services\ChoirWrappedService;
+use App\Services\PartBattleService;
 use App\Services\PaymentTexts;
+use App\Services\PaymentReminderTextService;
 use App\Repositories\BlockEventRepository;
 use App\Services\ScheduleGenerator;
 use App\Telegram\NutgramOutbound;
@@ -66,6 +69,8 @@ final class CronJobRunner
             'payment_reminder_1' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
             'payment_reminder_2' => ['sent' => 0, 'skipped_confirmed' => 0, 'not_due' => true],
             'program_archive' => ['archived' => 0, 'ids' => []],
+            'part_battle_monthly' => ['sent' => false, 'not_due' => true],
+            'monthly_wrapped' => ['sent' => 0, 'not_due' => true],
         ];
 
         if ($bot === null || trim($config->botToken) === '') {
@@ -82,7 +87,20 @@ final class CronJobRunner
         $blocks = new MemberBlockService($users, $blockEvents);
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator);
+        $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
+        $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
+        $settings = new BotSettingsRepository($pdo);
+        $achievements = new \App\Services\AchievementService(
+            new \App\Repositories\UserAchievementRepository($pdo),
+            $texts,
+            $outbound,
+            $marks,
+            new DayBeforeReminderDeliveryRepository($pdo),
+            new \App\Repositories\ProgramRepository($pdo),
+            new PaymentRecordRepository($pdo),
+            $settings,
+        );
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak, $achievements);
 
         $result['day_before_reminder'] = (new DayBeforeReminderJob(
             $rehearsals,
@@ -146,6 +164,38 @@ final class CronJobRunner
 
         $result['program_archive'] = (new ProgramArchiveJob(new ProgramRepository($pdo)))->run($config);
 
+        $partBattle = new PartBattleService(
+            $rehearsals,
+            $users,
+            new AttendanceMarkRepository($pdo),
+            $texts,
+            new PaymentTexts($texts),
+        );
+        $result['part_battle_monthly'] = (new PartBattleMonthlyJob(
+            $partBattle,
+            $deliveries,
+            new AdminChatResolver(new BotSettingsRepository($pdo), $config),
+            $outbound,
+        ))->runIfDue($config);
+
+        $wrapped = new ChoirWrappedService(
+            $rehearsals,
+            $users,
+            $marks,
+            $streakAwards,
+            new \App\Repositories\UserAchievementRepository($pdo),
+            new ProgramRepository($pdo),
+            $partBattle,
+            $texts,
+            new PaymentTexts($texts),
+        );
+        $result['monthly_wrapped'] = (new MonthlyWrappedJob(
+            $wrapped,
+            $users,
+            $deliveries,
+            $outbound,
+        ))->runIfDue($config);
+
         return $result;
     }
 
@@ -170,7 +220,20 @@ final class CronJobRunner
         $blocks = new MemberBlockService($users, $blockEvents);
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator);
+        $streakAwards = new \App\Repositories\UserStreakAwardRepository($pdo);
+        $streak = new \App\Services\AttendanceStreakService($marks, $users, $streakAwards, $texts, $recipients, $outbound);
+        $settings = new BotSettingsRepository($pdo);
+        $achievements = new \App\Services\AchievementService(
+            new \App\Repositories\UserAchievementRepository($pdo),
+            $texts,
+            $outbound,
+            $marks,
+            new DayBeforeReminderDeliveryRepository($pdo),
+            new \App\Repositories\ProgramRepository($pdo),
+            new PaymentRecordRepository($pdo),
+            $settings,
+        );
+        $attendance = new AttendanceService($marks, $users, $discipline, $recalculator, $streak, $achievements);
 
         return [
             'day_before_reminder' => (new DayBeforeReminderJob(

@@ -20,6 +20,7 @@ use App\Services\UserIdentitySync;
 use App\Telegram\InlineMenuHelper;
 use App\Telegram\InteractiveMenuService;
 use App\Telegram\MenuKeyboard;
+use App\Telegram\NutgramOutbound;
 use App\Telegram\SafeTelegram;
 use App\Text\TextRepository;
 use SergiX44\Nutgram\Nutgram;
@@ -210,6 +211,20 @@ final class CallbackQueryHandler
                         return;
                     }
 
+                    if (str_starts_with($data, 'atd:sw')) {
+                        ChoirWrappedAdminHandler::handleCallback(
+                            $bot,
+                            $attendance,
+                            $access,
+                            $adminChat->resolver,
+                            new NutgramOutbound($bot),
+                            $actorRow,
+                            $data,
+                        );
+
+                        return;
+                    }
+
                     AttendanceAdminHandler::handleCallback(
                         $bot,
                         $texts,
@@ -261,7 +276,20 @@ final class CallbackQueryHandler
             }
 
             if (str_starts_with($data, 'prf:')) {
-                ProfileHandler::handleCallback($bot, $texts, $users, $schedule->flows, $schedule->interactiveMenus, $data, $actorTelegramId);
+                ProfileHandler::handleCallback(
+                    $bot,
+                    $texts,
+                    $users,
+                    $schedule->flows,
+                    $schedule->interactiveMenus,
+                    $data,
+                    $actorTelegramId,
+                    $attendance->streak,
+                    $attendance->achievements,
+                    $attendance->partBattle,
+                    $attendance->config,
+                    $attendance->wrapped,
+                );
 
                 return;
             }

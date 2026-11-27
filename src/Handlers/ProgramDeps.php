@@ -9,6 +9,7 @@ use App\Repositories\ProgramRepository;
 use App\Repositories\SongRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
+use App\Services\AchievementService;
 use App\Services\ProgramDeliveryService;
 use App\Services\ProgramMessageBuilder;
 use App\Telegram\InteractiveMenuService;
@@ -26,6 +27,7 @@ final class ProgramDeps
         public readonly ProgramDeliveryService $delivery,
         public readonly TextRepository $texts,
         public readonly InteractiveMenuService $interactiveMenus,
+        public readonly AchievementService $achievements,
     ) {
     }
 }

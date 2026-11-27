@@ -75,7 +75,10 @@ final class CheckinCloseJob
                     continue;
                 }
 
-                $this->attendance->recordUnexcused($user, $rehearsalId, AttendanceSource::SYSTEM);
+                $result = $this->attendance->recordUnexcused($user, $rehearsalId, AttendanceSource::SYSTEM);
+                if ($result->appendLine !== null) {
+                    $this->outbound->sendMessage((int) $user['telegram_id'], $result->appendLine);
+                }
                 $marksCreated++;
             }
 

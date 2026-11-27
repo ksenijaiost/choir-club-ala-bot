@@ -72,6 +72,7 @@ final class MaterialsAdminChatSongPickerTest extends TestCase
         $materialRepo = new MaterialRepository($pdo);
         return MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             $flows,
             $songRepo,

@@ -168,6 +168,7 @@ final class AdminChatRecordingEditTest extends TestCase
         $materials = new MaterialRepository($pdo);
         $handlerDeps = MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             $flows,
             $songs,

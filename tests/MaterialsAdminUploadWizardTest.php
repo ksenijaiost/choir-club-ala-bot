@@ -347,6 +347,7 @@ final class MaterialsAdminUploadWizardTest extends TestCase
 
         return MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             new UserFlowRepository($pdo),
             $songRepo,

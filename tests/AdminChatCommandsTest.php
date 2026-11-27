@@ -314,6 +314,7 @@ final class AdminChatCommandsTest extends TestCase
     ): void {
         $handlerDeps = \App\Tests\Support\MaterialsTestDeps::build(
             $this->testConfig(),
+                        $pdo,
             $users,
             new \App\Repositories\UserFlowRepository($pdo),
             $songs,

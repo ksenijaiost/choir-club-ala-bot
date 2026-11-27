@@ -10,6 +10,7 @@ use App\Repositories\PaymentRecordRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
 use App\Services\NotificationRecipientResolver;
+use App\Services\AchievementService;
 use App\Services\PaymentReminderTextService;
 use App\Services\PaymentTexts;
 use App\Telegram\InteractiveMenuService;
@@ -28,6 +29,7 @@ final class PaymentDeps
         public readonly UserFlowRepository $flows,
         public readonly PaymentReminderTextService $reminderTexts,
         public readonly InteractiveMenuService $interactiveMenus,
+        public readonly AchievementService $achievements,
     ) {
     }
 }

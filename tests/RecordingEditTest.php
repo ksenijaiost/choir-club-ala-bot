@@ -234,6 +234,7 @@ final class RecordingEditTest extends TestCase
         $menus = new InteractiveMenuService(new UserOpenMenuRepository($pdo));
         $handlerDeps = MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             $flows,
             $songs,

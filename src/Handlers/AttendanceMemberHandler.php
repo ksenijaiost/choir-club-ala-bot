@@ -8,6 +8,7 @@ use App\Clock;
 use App\Domain\AttendanceMark;
 use App\Domain\AttendanceSource;
 use App\Domain\UserRole;
+use App\Services\AttendanceMarkResult;
 use App\Services\ScheduleTime;
 use App\Telegram\CallbackUi;
 use App\Telegram\MenuReplyHelper;
@@ -105,11 +106,12 @@ final class AttendanceMemberHandler
     ): void {
         $tz = new \DateTimeZone($deps->config->timezone);
         $userId = (int) $user['id'];
+        $warnResult = AttendanceMarkResult::empty();
         $existing = $deps->marks->find($rehearsalId, $userId);
         if ($existing !== null && ($existing['mark'] ?? '') !== AttendanceMark::UNEXCUSED) {
             $deps->marks->appendReason($rehearsalId, $userId, $reason);
         } else {
-            $deps->attendance->recordWarned($user, $rehearsalId, $source, $reason);
+            $warnResult = $deps->attendance->recordWarned($user, $rehearsalId, $source, $reason);
         }
 
         if ($source === AttendanceSource::DAY_BEFORE) {
@@ -126,7 +128,11 @@ final class AttendanceMemberHandler
         }
 
         $deps->flows->clear($telegramId);
-        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $deps->texts->get('absence.confirmed'));
+        $confirmed = $deps->texts->get('absence.confirmed');
+        if ($warnResult->appendLine !== null) {
+            $confirmed .= "\n" . $warnResult->appendLine;
+        }
+        MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $confirmed);
     }
 
     public static function finishReasonWithoutReason(
@@ -147,7 +153,7 @@ final class AttendanceMemberHandler
         $state = $deps->flows->get($telegramId);
         $ctx = is_array($state['context'] ?? null) ? $state['context'] : [];
 
-        $deps->attendance->recordUnexcused($user, $rehearsalId, $source);
+        $unexcusedResult = $deps->attendance->recordUnexcused($user, $rehearsalId, $source);
 
         if ($source === AttendanceSource::DAY_BEFORE) {
             $deps->rsvp->upsert($rehearsalId, (int) $user['id'], \App\Domain\RehearsalRsvpAnswer::NO);
@@ -170,7 +176,11 @@ final class AttendanceMemberHandler
         $deps->flows->clear($telegramId);
 
         if ($source === AttendanceSource::CHECKIN) {
-            MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $deps->texts->get('checkin.thanks_no'));
+            $thanks = $deps->texts->get('checkin.thanks_no');
+            if ($unexcusedResult->appendLine !== null) {
+                $thanks .= "\n" . $unexcusedResult->appendLine;
+            }
+            MenuReplyHelper::sendWithMenu($bot, $deps->texts, $user, $thanks);
         }
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\AchievementServiceFactory;
 use App\Config;
 use App\Database\Connection;
 use App\Database\Migrator;
@@ -279,6 +280,7 @@ final class AdminChatProgramsBroadcastTest extends TestCase
             $programDelivery,
             $texts,
             $interactiveMenus,
+            AchievementServiceFactory::make($this->testConfig(), $pdo, $texts),
         );
     }
 

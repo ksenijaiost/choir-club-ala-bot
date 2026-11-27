@@ -16,7 +16,11 @@ use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\AchievementService;
+use App\Services\AttendanceStreakService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
+use App\Services\ChoirWrappedService;
+use App\Services\PartBattleService;
 use App\Services\RehearsalRsvpNudgeService;
 use App\Services\RehearsalRsvpStatusPresenter;
 use App\Services\RehearsalRsvpStatusService;
@@ -44,6 +48,10 @@ final class AttendanceDeps
         public readonly RehearsalRsvpStatusService $rsvpStatus,
         public readonly RehearsalRsvpStatusPresenter $rsvpPresenter,
         public readonly RehearsalRsvpNudgeService $rsvpNudge,
+        public readonly AttendanceStreakService $streak,
+        public readonly AchievementService $achievements,
+        public readonly PartBattleService $partBattle,
+        public readonly ChoirWrappedService $wrapped,
     ) {
     }
 }

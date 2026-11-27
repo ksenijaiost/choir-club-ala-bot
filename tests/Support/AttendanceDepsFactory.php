@@ -16,14 +16,21 @@ use App\Repositories\RehearsalRsvpRepository;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserOpenMenuRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\UserStreakAwardRepository;
 use App\Services\AttendanceConductorNotifier;
 use App\Services\AttendanceDiscipline;
 use App\Services\AttendanceHistoryPresenter;
 use App\Services\AttendanceMessageFactory;
 use App\Services\AttendanceService;
+use App\Services\AttendanceStreakService;
 use App\Services\ConsecutiveUnexcusedRecalculator;
 use App\Services\MemberBlockService;
 use App\Services\NotificationRecipientResolver;
+use App\Repositories\ProgramRepository;
+use App\Repositories\UserAchievementRepository;
+use App\Services\ChoirWrappedService;
+use App\Services\PartBattleService;
+use App\Services\PaymentTexts;
 use App\Services\RehearsalRsvpNudgeService;
 use App\Services\RehearsalRsvpStatusPresenter;
 use App\Services\RehearsalRsvpStatusService;
@@ -47,11 +54,25 @@ final class AttendanceDepsFactory
         $blocks = new MemberBlockService($users, new BlockEventRepository($pdo));
         $recalculator = new ConsecutiveUnexcusedRecalculator($marks, $users);
         $discipline = new AttendanceDiscipline($users, $texts, $recipients, $outbound, $blocks);
-        $service = new AttendanceService($marks, $users, $discipline, $recalculator);
+        $streak = new AttendanceStreakService($marks, $users, new UserStreakAwardRepository($pdo), $texts, $recipients, $outbound);
+        $achievements = AchievementServiceFactory::make($config, $pdo, $texts, $outbound);
+        $service = new AttendanceService($marks, $users, $discipline, $recalculator, $streak, $achievements);
         $messages = new AttendanceMessageFactory($texts);
         $rsvp = new RehearsalRsvpRepository($pdo);
         $dayBefore = new DayBeforeReminderDeliveryRepository($pdo);
         $nudgeRepo = new RehearsalRsvpNudgeRepository($pdo);
+        $partBattle = new PartBattleService($rehearsals, $users, $marks, $texts, new PaymentTexts($texts));
+        $wrapped = new ChoirWrappedService(
+            $rehearsals,
+            $users,
+            $marks,
+            new UserStreakAwardRepository($pdo),
+            new UserAchievementRepository($pdo),
+            new ProgramRepository($pdo),
+            $partBattle,
+            $texts,
+            new PaymentTexts($texts),
+        );
 
         return new AttendanceDeps(
             $config,
@@ -72,6 +93,10 @@ final class AttendanceDepsFactory
             new RehearsalRsvpStatusService($rsvp, $dayBefore, $marks),
             new RehearsalRsvpStatusPresenter($texts),
             new RehearsalRsvpNudgeService($nudgeRepo, $rsvp, $dayBefore, $rehearsals, $users, $messages, $outbound),
+            $streak,
+            $achievements,
+            $partBattle,
+            $wrapped,
         );
     }
 }

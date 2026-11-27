@@ -445,4 +445,38 @@ final class UserRepository
 
         return $out;
     }
+
+    public function setAttendanceStreak(int $userId, int $current, int $best): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE users SET attendance_streak = ?,
+                attendance_streak_best = CASE WHEN attendance_streak_best > ? THEN attendance_streak_best ELSE ? END,
+                updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?'
+        );
+        $stmt->execute([$current, $best, $best, $userId]);
+    }
+
+    /**
+     * Текущая серия посещений (без дирижёра): топ по attendance_streak.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listTopAttendanceStreaks(int $limit = 10): array
+    {
+        $limit = max(1, min(50, $limit));
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM users WHERE status = ? AND role IN (?, ?, ?) AND attendance_streak > 0
+             ORDER BY attendance_streak DESC, attendance_streak_best DESC, display_name ASC
+             LIMIT ?'
+        );
+        $stmt->bindValue(1, UserStatus::ACTIVE, \PDO::PARAM_STR);
+        $stmt->bindValue(2, UserRole::MEMBER, \PDO::PARAM_STR);
+        $stmt->bindValue(3, UserRole::ADMIN, \PDO::PARAM_STR);
+        $stmt->bindValue(4, UserRole::OWNER, \PDO::PARAM_STR);
+        $stmt->bindValue(5, $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
 }

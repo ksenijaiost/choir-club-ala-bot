@@ -23,18 +23,20 @@ final class AttendanceDiscipline
     /**
      * @param array<string, mixed> $user
      */
-    public function onUnexcusedRecorded(array $user): void
+    public function onUnexcusedRecorded(array $user, ?string $streakAppend = null): bool
     {
         if (!UserRole::participatesInAttendance((string) ($user['role'] ?? ''))) {
-            return;
+            return false;
         }
 
         $userId = (int) $user['id'];
         $count = $this->users->incrementConsecutiveUnexcused($userId);
         $telegramId = (int) $user['telegram_id'];
+        $sent = false;
 
         if ($count === 3) {
-            $this->outbound->sendMessage($telegramId, $this->texts->get('discipline.third_strike'));
+            $this->sendWithOptionalAppend($telegramId, $this->texts->get('discipline.third_strike'), $streakAppend);
+            $sent = true;
         }
 
         if ($count >= 4 && !$this->isExemptFromAutoBlock($user)) {
@@ -42,7 +44,11 @@ final class AttendanceDiscipline
             $partCode = (string) ($user['voice_part'] ?? '');
             $part = $partCode !== '' ? $this->texts->get('parts.' . $partCode) : '—';
 
-            $this->outbound->sendMessage($telegramId, $this->texts->get('discipline.expelled'));
+            $expelled = $this->texts->get('discipline.expelled');
+            if ($streakAppend !== null && $streakAppend !== '') {
+                $expelled .= "\n" . $streakAppend;
+            }
+            $this->outbound->sendMessage($telegramId, $expelled);
 
             $conductorTg = $this->recipients->resolveTelegramId();
             if ($conductorTg !== null) {
@@ -59,7 +65,11 @@ final class AttendanceDiscipline
                 $this->blocks->blockAuto($userId);
             } catch (\InvalidArgumentException) {
             }
+
+            $sent = true;
         }
+
+        return $sent;
     }
 
     /**
@@ -70,5 +80,13 @@ final class AttendanceDiscipline
         $role = (string) ($user['role'] ?? '');
 
         return $role === UserRole::OWNER;
+    }
+
+    private function sendWithOptionalAppend(int $telegramId, string $text, ?string $append): void
+    {
+        if ($append !== null && $append !== '') {
+            $text .= "\n" . $append;
+        }
+        $this->outbound->sendMessage($telegramId, $text);
     }
 }

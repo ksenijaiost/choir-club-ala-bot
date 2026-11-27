@@ -180,6 +180,7 @@ final class SongCatalogAndCardNotesTest extends TestCase
         $materialRepo = new MaterialRepository($pdo);
         return MaterialsTestDeps::build(
             $config,
+                        $pdo,
             $users,
             new UserFlowRepository($pdo),
             $songRepo,

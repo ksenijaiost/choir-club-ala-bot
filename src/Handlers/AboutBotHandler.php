@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Handlers;
 
+use App\Domain\StreakMilestones;
 use App\Repositories\UserRepository;
 use App\Services\AccessControl;
 use App\Telegram\CallbackUi;
@@ -169,7 +170,36 @@ final class AboutBotHandler
             'programs_notify_button' => $texts->get('programs.button_open_recordings'),
             'recording_link_suffix' => $texts->get('admin_chat.recording_link_suffix'),
             'phrase_materials_notifications' => $texts->get('materials.notifications_sent', ['count' => 'N']),
+            'streak_freeze' => $texts->get('streak.about_freeze'),
+            'streak_milestones_list' => self::formatStreakMilestonesList($texts),
+            'achievements_secret_about' => $texts->get('achievements.secret.about_teaser'),
+            'part_battle_about_member' => $texts->get('part_battle.about_member', [
+                'btn_my_profile' => $texts->get('menu.my_profile'),
+            ]),
+            'part_battle_about_admin' => $texts->get('part_battle.about_admin', [
+                'btn_part_battle' => $texts->get('attendance.part_battle_button'),
+            ]),
+            'btn_part_battle' => $texts->get('attendance.part_battle_button'),
+            'wrapped_about_member' => $texts->get('wrapped.about_member', [
+                'btn_my_summary' => $texts->get('wrapped.my_summary_button'),
+                'btn_my_profile' => $texts->get('menu.my_profile'),
+            ]),
+            'wrapped_about_admin' => $texts->get('wrapped.about_admin', [
+                'btn_season_wrapped' => $texts->get('wrapped.season_button'),
+            ]),
         ];
+    }
+
+    public static function formatStreakMilestonesList(TextRepository $texts): string
+    {
+        $lines = [];
+        foreach (StreakMilestones::all() as $milestone) {
+            $lines[] = $milestone . ' — '
+                . $texts->get(StreakMilestones::badgeKey($milestone)) . ' '
+                . $texts->get(StreakMilestones::textKey($milestone));
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

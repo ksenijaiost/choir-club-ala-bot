@@ -175,6 +175,7 @@ final class ProgramMemberHandler
                 self::filterProgramSongsWithNotes($programs, $materials, $programId),
             );
             $materials->delivery->sendAllNotesForProgramSongs($bot, $songs);
+            self::maybeNightOwl($materials, $user);
 
             return true;
         }
@@ -183,6 +184,7 @@ final class ProgramMemberHandler
             SafeTelegram::answerCallbackQuery($bot);
             CallbackUi::clearKeyboard($bot);
             $materials->delivery->sendNotes($bot, (int) $m[2]);
+            self::maybeNightOwl($materials, $user);
 
             return true;
         }
@@ -254,6 +256,7 @@ final class ProgramMemberHandler
                     $partCode,
                     $allParts,
                 );
+                $programs->achievements->onProgramRecordingsFetched($user, $programId, $programs->config);
 
                 return true;
             }
@@ -311,11 +314,24 @@ final class ProgramMemberHandler
                 ? $materials->materials->listSongsWithRecordingsAnyPart()
                 : $materials->materials->listSongsWithRecordingsForPart($partCode);
             $materials->delivery->sendAllMyRecordingsForSongs($bot, $songs, $partCode, $allParts);
+            self::maybeNightOwl($materials, $user);
 
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * @param array<string, mixed>|null $user
+     */
+    private static function maybeNightOwl(MaterialsDeps $materials, ?array $user): void
+    {
+        if ($user === null) {
+            return;
+        }
+
+        $materials->achievements->onMaterialsOpened($user, $materials->config);
     }
 
     public static function editProgramList(

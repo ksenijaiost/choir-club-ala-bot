@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Tests\Support\AchievementServiceFactory;
 use App\Repositories\UserOpenMenuRepository;
 use App\Telegram\InteractiveMenuService;
 use App\Config;
@@ -233,6 +234,7 @@ final class MessageHandlerTest extends TestCase
             $flows,
             new \App\Services\PaymentReminderTextService($settings, $texts, $paymentTexts),
             new InteractiveMenuService(new UserOpenMenuRepository($pdo)),
+            AchievementServiceFactory::make($config, $pdo, $texts)
         );
     }
 

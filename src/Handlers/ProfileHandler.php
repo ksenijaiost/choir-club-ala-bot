@@ -8,6 +8,11 @@ use App\Domain\UserRole;
 use App\Domain\VoicePart;
 use App\Repositories\UserFlowRepository;
 use App\Repositories\UserRepository;
+use App\Services\AchievementService;
+use App\Services\AttendanceStreakService;
+use App\Services\ChoirWrappedService;
+use App\Services\PartBattleService;
+use App\Config;
 use App\Services\VoicePartRules;
 use App\Telegram\CallbackUi;
 use App\Telegram\InlineMenuHelper;
@@ -31,6 +36,11 @@ final class ProfileHandler
         UserRepository $users,
         array $user,
         InteractiveMenuService $interactiveMenus,
+        ?AttendanceStreakService $streak = null,
+        ?AchievementService $achievements = null,
+        ?PartBattleService $partBattle = null,
+        ?Config $config = null,
+        ?ChoirWrappedService $wrapped = null,
     ): void {
         $fresh = $users->findById((int) $user['id']) ?? $user;
         $isConductor = VoicePartRules::isConductor($fresh);
@@ -64,6 +74,12 @@ final class ProfileHandler
             ),
         );
 
+        if (!$isConductor && $wrapped !== null && $config !== null) {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($texts->get('wrapped.my_summary_button'), callback_data: 'prf:wr'),
+            );
+        }
+
         $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts);
 
         if ($isConductor) {
@@ -78,6 +94,24 @@ final class ProfileHandler
                 'part' => $partLabel,
                 'notify_line' => $notifyLine,
             ]);
+            if ($streak !== null) {
+                $section = $streak->formatProfileSection($fresh);
+                if ($section !== '') {
+                    $body .= "\n\n" . $section;
+                }
+            }
+            if ($achievements !== null) {
+                $section = $achievements->formatProfileSection($fresh);
+                if ($section !== '') {
+                    $body .= "\n\n" . $section;
+                }
+            }
+            if ($partBattle !== null && $config !== null) {
+                $line = $partBattle->formatProfileLine($fresh, $config);
+                if ($line !== '') {
+                    $body .= "\n" . $line;
+                }
+            }
         }
 
         $ownerTelegramId = (int) ($fresh['telegram_id'] ?? $bot->userId() ?? 0);
@@ -226,6 +260,11 @@ final class ProfileHandler
         InteractiveMenuService $interactiveMenus,
         string $data,
         int $actorTelegramId,
+        ?AttendanceStreakService $streak = null,
+        ?AchievementService $achievements = null,
+        ?PartBattleService $partBattle = null,
+        ?Config $config = null,
+        ?ChoirWrappedService $wrapped = null,
     ): bool {
         if (!str_starts_with($data, 'prf:')) {
             return false;
@@ -267,7 +306,35 @@ final class ProfileHandler
                 : $texts->get('profile.material_notify_turned_off'));
             CallbackUi::clearKeyboard($bot);
             $fresh = $users->findById((int) $user['id']) ?? $user;
-            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus);
+            self::openProfile($bot, $texts, $users, $fresh, $interactiveMenus, $streak, $achievements, $partBattle, $config, $wrapped);
+
+            return true;
+        }
+
+        if ($data === 'prf:wr' || $data === 'prf:wr:cur') {
+            if ($wrapped === null || $config === null) {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $current = $wrapped->currentCalendarMonth($config);
+            self::sendWrapped($bot, $texts, $users, $wrapped, $config, $user, $interactiveMenus, $current['year'], $current['month'], 'cur');
+
+            return true;
+        }
+
+        if ($data === 'prf:wr:prev') {
+            if ($wrapped === null || $config === null) {
+                $bot->answerCallbackQuery();
+
+                return true;
+            }
+            $bot->answerCallbackQuery();
+            CallbackUi::clearKeyboard($bot);
+            $prev = $wrapped->previousCalendarMonth($config);
+            self::sendWrapped($bot, $texts, $users, $wrapped, $config, $user, $interactiveMenus, $prev['year'], $prev['month'], 'prev');
 
             return true;
         }
@@ -299,5 +366,46 @@ final class ProfileHandler
         }
 
         return false;
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    private static function sendWrapped(
+        Nutgram $bot,
+        TextRepository $texts,
+        UserRepository $users,
+        ChoirWrappedService $wrapped,
+        Config $config,
+        array $user,
+        InteractiveMenuService $interactiveMenus,
+        int $year,
+        int $month,
+        string $view,
+    ): void {
+        $fresh = $users->findById((int) $user['id']) ?? $user;
+        $summary = $wrapped->buildMonthlyMemberSummary($fresh, $config, $year, $month);
+        $body = $wrapped->formatMonthlyMemberMessage($summary);
+
+        $keyboard = InlineKeyboardMarkup::make();
+        if ($view === 'cur') {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($texts->get('part_battle.show_previous'), callback_data: 'prf:wr:prev'),
+            );
+        } else {
+            $keyboard = $keyboard->addRow(
+                InlineKeyboardButton::make($texts->get('part_battle.show_current'), callback_data: 'prf:wr:cur'),
+            );
+        }
+        $keyboard = InlineMenuHelper::appendFooter($keyboard, $texts, 'prf:nm');
+
+        $ownerTelegramId = (int) ($fresh['telegram_id'] ?? $bot->userId() ?? 0);
+        InlineMenuHelper::sendInteractiveMenu(
+            $bot,
+            $interactiveMenus,
+            $ownerTelegramId,
+            $body,
+            $keyboard,
+        );
     }
 }

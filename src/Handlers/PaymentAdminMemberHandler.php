@@ -81,6 +81,10 @@ final class PaymentAdminMemberHandler
                 self::renderUnconfirmPrompt($bot, $deps, $userId, $year, $month, $offset, $actorTg);
             } else {
                 $deps->payments->confirmByConductor($userId, $year, $month, $conductorUserId);
+                $confirmedMember = $deps->users->findById($userId);
+                if ($confirmedMember !== null) {
+                    $deps->achievements->onPaymentConfirmed($confirmedMember, $year, $month, $deps->config);
+                }
                 self::renderMemberCard($bot, $deps, $userId, $offset, $actorTg, 'card');
             }
 
@@ -478,6 +482,10 @@ final class PaymentAdminMemberHandler
             $row = $deps->payments->find($memberUserId, $ym['year'], $ym['month']);
             if (!$deps->payments->isConductorConfirmed($row)) {
                 $deps->payments->confirmByConductor($memberUserId, $ym['year'], $ym['month'], $conductorUserId);
+                $confirmedMember = $deps->users->findById($memberUserId);
+                if ($confirmedMember !== null) {
+                    $deps->achievements->onPaymentConfirmed($confirmedMember, $ym['year'], $ym['month'], $deps->config);
+                }
             }
         }
 
